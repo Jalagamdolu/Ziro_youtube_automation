@@ -1,0 +1,16 @@
+# Working artifacts (only exported outputs/ are committed)
+runs/
+
+# Secrets
+.env
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Node / Remotion
+node_modules/
