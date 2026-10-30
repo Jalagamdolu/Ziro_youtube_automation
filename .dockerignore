@@ -6,3 +6,4 @@ outputs
 **/.mypy_cache
 **/.ruff_cache
 **/.pytest_cache
+templates/remotion/node_modules

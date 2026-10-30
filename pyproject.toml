@@ -28,16 +28,32 @@ dev = [
   "types-pyyaml==6.0.12.20260906",
 ]
 
-# Worker image only (D-24, demo triage D-25): local TTS. WhisperX + CPU torch come back post-demo.
+# Worker image only (D-24): local TTS and word alignment.
 media = [
   "kokoro-onnx==0.6.1",
   "soundfile==0.14.0",
+  "whisperx==3.8.6",
+  # Listed directly so [tool.uv.sources] can point them at the CPU-only index (= whisperx's pins).
+  "torch==2.8.0",
+  "torchaudio==2.8.0",
+  "torchvision==0.23.0",
 ]
 
 [tool.uv]
 package = false
 # Two-week rule: onnxruntime 1.31.x is newer than 2026-10-16.
 constraint-dependencies = ["onnxruntime==1.30.0"]
+
+# CPU-only PyTorch (D-24): PyPI's Linux wheels pull ~2.5 GB of CUDA libraries.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+torchaudio = { index = "pytorch-cpu" }
+torchvision = { index = "pytorch-cpu" }
 
 
 [tool.ruff]
@@ -57,7 +73,7 @@ exclude = ["src/vendor"]
 
 # Worker-image-only media libraries (D-24); the API/test image type-checks without them.
 [[tool.mypy.overrides]]
-module = ["kokoro_onnx", "numpy", "soundfile"]
+module = ["kokoro_onnx", "numpy", "soundfile", "whisperx"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
