@@ -62,3 +62,9 @@ Conflict with the brief, accepted for the demo and to be closed by production mo
 
 ## D-20 Per-claim review is part of the research_review decision
 Brief §05/§07 and ARCHITECTURE §8: the reviewer approves, edits or removes each claim, and scripts may only use approved claims. The research_review decision carries `removed_claims` (ids) and `edited_claims` (id → new wording); they are stored in a new `approvals.claim_edits` JSON column (migration 0002). Scripting derives the approved set from `claims.json` plus the latest research_review approval; it never sees removed claims.
+
+## D-21 Decisions on the Phase 2P flags (Dolender, 2026-10-30)
+- Pass/fail conflict in D-19 accepted: the prototype demonstrates the flow; production mode closes topic generalisation.
+- Short hooks: the brief's 3-second rule (§07) wins over `hookscore.py`'s 9–24-word preference, so the best Short hook scoring 54 (WEAK) is accepted.
+- TTS: edge-tts is dropped — it calls Microsoft's online read-aloud service unofficially and without a license (brief §11 "use licensed TTS"). Before Phase 4P, Piper and Kokoro are evaluated for Indian-English voices; the winner is recorded as its own D-entry and its license in `asset_licenses`.
+- Known gap: prototype fixtures exist only for the Short preset. Long (`make demo-long`) and second-topic (`make second-topic`) fixtures are deliberately not built; after the CEO demo Dolender decides between a long prototype fixture and going straight to production mode. Until then Gate B's "two script packages" is not met in prototype mode.
