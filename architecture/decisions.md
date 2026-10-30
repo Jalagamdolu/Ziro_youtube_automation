@@ -90,3 +90,25 @@ Full Phase 4P could not finish before the demo, so the minimal path ships first:
 - Caption timing comes from per-sentence synthesis (each sentence is its own TTS call, so its start and end are the exact sample counts of the audio we generated), not WhisperX word alignment (D-07). Cues are ≤5 words, timed within the sentence by character share. WhisperX returns post-demo.
 - The video is FFmpeg only: plain dark background, topic title, burned-in captions, narration loudness-normalised to −14 LUFS; thumbnail is plain text on the same background. Remotion templates and Ziro branding wait for supplied brand assets (Phase 5).
 - Deferred and logged in `reports/workboard.md`: WhisperX alignment, VTT, chapters (chapters.py), dead-air QA (deadair.py), the 2-second end card (needs the logo), `[ON SCREEN]` visuals, full automated QA, real-engine tests.
+
+## D-26 Visuals: Remotion templates, Ziro brand values from ziro.digital (Sprint B, 2026-10-30)
+Order changed by Dolender: visuals (Sprint B) before production mode (Sprint A, deferred until budget is approved); zero external cost still applies.
+- **Remotion** `4.0.536` (templates/remotion, pinned, ≥2 weeks old). License: free for individuals, companies with ≤3 employees, and anyone *evaluating* Remotion who is not yet using it commercially; larger for-profit companies need a paid company license. This sandbox is evaluation. **Before Ziro uses rendered videos commercially, the founder must check Remotion's company license** — the one future cost this choice carries.
+- **Pipeline:** storyboarding parses each `[ON SCREEN: ...]` beat + its narration into a scene (prototype: deterministic; an LLM storyboard is a production option); rendering synthesises scene by scene, aligns words with WhisperX, writes SRT/VTT, renders the `Short` composition (scene templates + word-timed captions in the Shorts safe area), then FFmpeg normalises loudness. Shorts only so far.
+- **Templates:** one per scene type — definition card, comparison, chat bubble, flow, quote card, checklist (+ title fallback, end card). Only the definition card is built; the other five wait for Dolender's approval of it. A definition card's body is the approved claim's wording and its attribution the claim's source — never other text.
+- **Brand values** (extracted from https://ziro.digital/ HTML + `/assets/index-2_9_nuLk.css`, 2026-10-30):
+
+  | Token | Value | Source |
+  |---|---|---|
+  | background | `#0F131A` | CSS `.dark --background: 215 28% 8%` |
+  | surface | `#171D26` | CSS `.dark --card: 215 25% 12%` |
+  | text | `#F8FAFC` | CSS `.dark --foreground: 210 40% 98%` |
+  | muted text | `#A694B8` | CSS `.dark --muted-foreground: 270 20% 65%` |
+  | primary (purple) | `#9952E0` | CSS `.dark --primary: 270 70% 60%` (readable on dark) |
+  | logo purple | `#5101D4` | dominant saturated colour of the official logo PNG |
+  | accent (orange) | `#FF7700` | CSS `--ws-brand: 28 100% 50%` |
+  | body font | Inter | CSS `@font-face` (self-hosted on the site); bundled from `@fontsource/inter` 5.3.0, OFL-1.1 |
+  | display font | Space Grotesk | CSS `@font-face` (self-hosted); bundled from `@fontsource/space-grotesk` 5.3.0, OFL-1.1 |
+
+  Also on the site: `<meta name="theme-color" content="#111111">`; Plus Jakarta Sans is loaded only for one landing page (HTML comment), so it is not used.
+- **Logo:** the site serves the official logo as `/__l5e/assets-v1/b3217b6b-0889-4ee0-9568-834aaf8956b0/ziro-digital-logo-transparent.png` (1716×451, transparent; SHA-256 `d996ab53…c837c23f`), saved as `templates/brand/ziro-digital-logo-transparent.png`. It is **not placed in videos yet**: it carries the tagline "#1 AI Career Intelligence Platform", a ranking claim the brief forbids unless supplied as an approved fact, and its black wordmark needs a light background. The end card uses the text wordmark "Ziro" in the site's fonts/colours until the team supplies a logo without the tagline (or approves the claim).
