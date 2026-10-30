@@ -1,16 +1,16 @@
 {
   "hooks": [
     {
-      "text": "Why does your chatbot stop before work?",
-      "explanation": "Question formula: opens the gap the video closes (talking versus doing) and says 'your' in the first three words, inside the 3-second hook window."
+      "text": "Your chatbot answers. Why can't it act?",
+      "explanation": "Question formula: states what the viewer already knows (the chatbot answers), then opens the gap the video closes (why it can't act); says 'your' first, inside the 3-second hook window."
     },
     {
       "text": "Before you build, know agent versus chatbot.",
       "explanation": "Warning formula: ties the distinction to the viewer's next project, which is why this audience cares; no open question, so less pull."
     },
     {
-      "text": "Why your chatbot never finishes the job.",
-      "explanation": "Frames the chatbot's limit as the viewer's own problem; reads as a statement, so the curiosity gap is weaker than a real question."
+      "text": "Chatbot or agent: which one runs tasks?",
+      "explanation": "Question formula framed as a choice; clear and on topic, but it names no stakes for the viewer, so it pulls less than a direct 'your' question."
     },
     {
       "text": "Stop calling your chatbot an AI agent.",

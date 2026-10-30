@@ -24,8 +24,8 @@ def test_fixture_package_has_five_distinct_hooks_and_valid_shape() -> None:
 
 @pytest.mark.parametrize("break_it,expected", [
     (lambda s: s.replace("## Relevance", "## Why"), "sections must be"),
-    (lambda s: s.replace("Why does your chatbot stop before work?",
-                         "Why does your chatbot always stop right before the real work begins?"),
+    (lambda s: s.replace("Your chatbot answers. Why can't it act?",
+                         "Your chatbot answers questions all day, so why can't it act for you?"),
      "hook takes"),
     (lambda s: s.replace("## Takeaway", "## Takeaway\nExplore AI learning at ziro.digital."),
      "CTA must appear exactly once"),
