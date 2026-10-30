@@ -1,0 +1,25 @@
+# Pipeline configuration. Snapshotted into runs/<project_id>/config.yaml at creation.
+
+# Attempts per stage (brief §08 / ARCHITECTURE §4). Only RetryableError is retried.
+retries:
+  researching: 3
+  scripting: 3
+  rendering: 2       # render 2 (TTS gets 4 inside the node in Phase 4)
+  mock_published: 5
+backoff:
+  initial_seconds: 1.0
+  factor: 2.0
+  max_seconds: 30.0
+
+# Reaper: a run with no progress past its stage deadline is re-enqueued.
+reaper_interval_seconds: 60
+stage_deadline_seconds:
+  default: 300
+  researching: 900
+  rendering: 1800
+
+# Unit prices (USD) per provider unit; filled per phase from the provider's price page.
+prices: {}
+
+# Hard cap on recorded spend per video (USD).
+spend_cap_usd: 5.0

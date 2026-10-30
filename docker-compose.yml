@@ -1,0 +1,47 @@
+# Local sandbox stack (D-16). Postgres is reachable only inside this network, so it uses
+# trust auth and needs no password; nothing here touches Ziro systems.
+x-app-env: &app-env
+  DATABASE_URL: postgresql://postgres@postgres:5432/ziro
+  REDIS_URL: redis://redis:6379/0
+  RUNS_DIR: /app/runs
+
+services:
+  postgres:
+    image: postgres:16.15
+    environment:
+      POSTGRES_DB: ziro
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 2s
+      retries: 30
+
+  redis:
+    image: redis:7.4.12
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      retries: 30
+
+  api:
+    build: .
+    environment: *app-env
+    command: sh -c "alembic upgrade head && python -m app.graph.build && uvicorn app.api.main:app --host 0.0.0.0 --port 8000"
+    ports: ["127.0.0.1:8000:8000"]
+    volumes: [./runs:/app/runs, ./outputs:/app/outputs]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+
+  worker:
+    build: .
+    environment: *app-env
+    command: rq worker --url redis://redis:6379/0 ziro
+    volumes: [./runs:/app/runs]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+
+volumes:
+  pgdata:
