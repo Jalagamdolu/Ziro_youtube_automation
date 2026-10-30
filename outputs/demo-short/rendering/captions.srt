@@ -1,0 +1,127 @@
+1
+00:00:00,000 --> 00:00:01,664
+Your chatbot answers.
+
+2
+00:00:01,814 --> 00:00:03,222
+Why can't it act?
+
+3
+00:00:03,722 --> 00:00:05,152
+If you are building AI
+
+4
+00:00:05,152 --> 00:00:07,623
+projects, this difference decides what
+
+5
+00:00:07,623 --> 00:00:09,183
+you actually build next.
+
+6
+00:00:09,683 --> 00:00:11,207
+A chatbot is a software
+
+7
+00:00:11,207 --> 00:00:13,922
+application that communicates with people
+
+8
+00:00:13,922 --> 00:00:15,379
+through text or voice.
+
+9
+00:00:15,529 --> 00:00:16,867
+Ask it when your exam
+
+10
+00:00:16,867 --> 00:00:18,396
+is, and it answers, then
+
+11
+00:00:18,396 --> 00:00:20,180
+waits for your next message.
+
+12
+00:00:20,330 --> 00:00:21,982
+An agent is different: a
+
+13
+00:00:21,982 --> 00:00:24,666
+system that autonomously performs tasks
+
+14
+00:00:24,666 --> 00:00:27,213
+by designing workflows with available
+
+15
+00:00:27,213 --> 00:00:27,626
+tools.
+
+16
+00:00:27,776 --> 00:00:28,963
+Give it a goal like
+
+17
+00:00:28,963 --> 00:00:31,211
+"shortlist internships that match my
+
+18
+00:00:31,211 --> 00:00:32,959
+résumé and add the deadlines
+
+19
+00:00:32,959 --> 00:00:34,396
+to my calendar", and it
+
+20
+00:00:34,396 --> 00:00:36,457
+plans the steps, searches, reads,
+
+21
+00:00:36,457 --> 00:00:38,518
+shortlists and writes the entries
+
+22
+00:00:38,518 --> 00:00:38,955
+itself.
+
+23
+00:00:39,105 --> 00:00:41,606
+Anthropic describes agents as systems
+
+24
+00:00:41,606 --> 00:00:43,431
+where the model directs its
+
+25
+00:00:43,431 --> 00:00:45,121
+own process and tool use.
+
+26
+00:00:45,621 --> 00:00:47,306
+So here is the test.
+
+27
+00:00:47,456 --> 00:00:48,995
+If it only talks, it
+
+28
+00:00:48,995 --> 00:00:49,995
+is a chatbot.
+
+29
+00:00:50,145 --> 00:00:51,492
+If it pursues a goal
+
+30
+00:00:51,492 --> 00:00:53,379
+and completes tasks for you,
+
+31
+00:00:53,379 --> 00:00:54,390
+it is an agent.
+
+32
+00:00:54,890 --> 00:00:58,261
+Explore AI learning at ziro.digital.

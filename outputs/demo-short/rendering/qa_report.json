@@ -1,0 +1,13 @@
+{
+  "duration_s": 58.8,
+  "duration_ok": true,
+  "resolution": "1080x1920",
+  "loudness_target_lufs": -14,
+  "cues": 32,
+  "deferred": [
+    "chapters",
+    "dead-air",
+    "vtt",
+    "end card"
+  ]
+}

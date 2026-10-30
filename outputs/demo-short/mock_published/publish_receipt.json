@@ -1,0 +1,29 @@
+{
+  "request": {
+    "snippet": {
+      "title": "AI Agents vs Chatbots, Explained in 60 Seconds",
+      "description": "What actually separates an AI agent from a chatbot? In under a minute: a chatbot answers you in conversation, while an agent pursues a goal, plans the steps and uses tools to complete the task. The internship example is illustrative.\n\nSources:\n- IBM, What is a chatbot?: https://www.ibm.com/think/topics/chatbots\n- IBM, What are AI agents?: https://www.ibm.com/think/topics/ai-agents\n- Anthropic, Building effective agents: https://www.anthropic.com/engineering/building-effective-agents\n- Google Cloud, What are AI agents?: https://cloud.google.com/discover/what-are-ai-agents\n\nExplore AI learning at ziro.digital",
+      "tags": [
+        "ai agents",
+        "chatbot",
+        "ai agent vs chatbot",
+        "agentic ai",
+        "generative ai",
+        "llm",
+        "ai for students",
+        "learn ai",
+        "ai explained",
+        "ziro"
+      ],
+      "categoryId": "27",
+      "defaultLanguage": "en"
+    },
+    "status": {
+      "privacyStatus": "private",
+      "selfDeclaredMadeForKids": false
+    }
+  },
+  "video_id": "mock-c12965e3e7c",
+  "idempotency_key": "b847aeb02165456b8326a26c75e6b065",
+  "mocked": true
+}

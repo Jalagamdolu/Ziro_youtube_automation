@@ -1,0 +1,9 @@
+[
+  {
+    "id": "S1",
+    "text": "## Hook\n[ON SCREEN: \"Chatbot\" and \"Agent\" side by side, a question mark between them]\nYour chatbot answers. Why can't it act?\n\n## Relevance\n[ON SCREEN: a student's project board with \"Build an AI agent\" pinned at the top]\nIf you are building AI projects, this difference decides what you actually build next.\n\n## Example\n[ON SCREEN: definition card - \"What is a chatbot?\", source: IBM]\nA chatbot is a software application that communicates with people through text or voice. [C2]\n[ON SCREEN: a chat bubble asking \"When is my exam?\" and a single reply]\nAsk it when your exam is, and it answers, then waits for your next message.\n[ON SCREEN: definition card - \"What are AI agents?\", source: IBM]\nAn agent is different: a system that autonomously performs tasks by designing workflows with available tools. [C3]\n[ON SCREEN: illustrative flow, labelled \"example\": search, read, shortlist, calendar]\nGive it a goal like \"shortlist internships that match my résumé and add the deadlines to my calendar\", and it plans the steps, searches, reads, shortlists and writes the entries itself.\n[ON SCREEN: quote card, source: Anthropic, \"Building effective agents\"]\nAnthropic describes agents as systems where the model directs its own process and tool use. [C1]\n\n## Takeaway\n[ON SCREEN: two-line checklist - \"Only talks: chatbot\" / \"Pursues a goal, uses tools, acts: agent\"]\nSo here is the test. If it only talks, it is a chatbot. If it pursues a goal and completes tasks for you, it is an agent. [C4]\n\n## CTA\n[ON SCREEN: Ziro logo and \"ziro.digital\"]\nExplore AI learning at ziro.digital.\n",
+    "visual_type": "title",
+    "asset": null,
+    "duration": 60
+  }
+]
