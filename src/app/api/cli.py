@@ -5,14 +5,12 @@ import shutil
 import time
 from pathlib import Path
 
-from sqlalchemy import select
-
-from app.api.main import CreateRequest, create_project
+from app.api.actions import CreateRequest, create_project, latest_artifacts
 from app.core import config, db
-from app.core.models import Artifact, Project
+from app.core.models import Project
 from app.graph.stages import CANCELLED, DONE, FAILED, GATES
 
-REVIEW_URL = "http://localhost:8000/projects/{}"
+REVIEW_URL = "http://localhost:8000/ui/projects/{}"
 
 
 def video(args: argparse.Namespace) -> None:
@@ -37,10 +35,7 @@ def video(args: argparse.Namespace) -> None:
 def export(args: argparse.Namespace) -> None:
     """Copy the latest non-stale version of every artifact into DEST/<stage>/."""
     with db.session() as s:
-        rows = s.scalars(select(Artifact).where(Artifact.project_id == args.run,
-                                                Artifact.stale.is_(False))
-                         .order_by(Artifact.version))
-        latest = {(a.stage, a.type): a.storage_path for a in rows}
+        latest = latest_artifacts(s, args.run)
     for (stage, name), key in latest.items():
         target = args.dest / stage / name
         target.parent.mkdir(parents=True, exist_ok=True)

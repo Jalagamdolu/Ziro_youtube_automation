@@ -1,0 +1,31 @@
+<section>
+  <h2>Research review — check every claim against its source</h2>
+  <p class="muted small">Keep, edit or remove each claim. Scripts may only use the claims you approve here; removed claims are blocked by the claim check.</p>
+  <form method="post" action="/ui/projects/{{ run.id }}/decide">
+    <input type="hidden" name="decision" value="approve">
+    <table>
+      <tr><th style="width:4em">Claim</th><th style="width:40%">Wording used in the script</th><th>Source and quote</th><th style="width:7em">Keep?</th></tr>
+      {% for c in gate.claims %}
+      <tr>
+        <td><strong>{{ c.id }}</strong></td>
+        <td><textarea rows="3" name="text_{{ c.id }}" aria-label="Wording for {{ c.id }}">{{ c.claim }}</textarea></td>
+        <td class="small">
+          <a href="{{ c.url }}" target="_blank" rel="noopener noreferrer">{{ c.title }}</a><br>
+          <q>{{ c.quote }}</q><br>
+          <span class="muted">published {{ c.published_at[:10] if c.published_at else "undated" }} · accessed {{ c.accessed_at[:10] }} · {{ c.verification_status }}</span>
+        </td>
+        <td>
+          <label class="small" style="font-weight:normal"><input type="radio" name="action_{{ c.id }}" value="keep" checked> keep</label>
+          <label class="small" style="font-weight:normal"><input type="radio" name="action_{{ c.id }}" value="remove"> remove</label>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    <div class="row">
+      <div><label for="rr-reviewer">Reviewer</label><input type="text" id="rr-reviewer" name="reviewer" value="Dolender" required></div>
+      <div><label for="rr-notes">Notes (optional)</label><input type="text" id="rr-notes" name="notes"></div>
+    </div>
+    <p><button class="primary" type="submit">Approve claims</button></p>
+  </form>
+</section>
+{% include "_reject.html" %}

@@ -1,0 +1,41 @@
+{% set p = gate.package %}
+<section>
+  <h2>QA review — watch the preview before approving</h2>
+  <div class="row">
+    <div>
+      <h3>Video</h3>
+      {% if gate.video %}<video controls preload="metadata" style="width:100%;max-height:480px;background:#000"
+             src="/ui/projects/{{ run.id }}/files/{{ gate.video }}"></video>{% else %}<p class="muted">No video artifact.</p>{% endif %}
+    </div>
+    <div>
+      <h3>Thumbnail</h3>
+      {% if gate.thumbnail %}<img alt="Thumbnail preview" style="width:100%;border:1px solid var(--line)"
+           src="/ui/projects/{{ run.id }}/files/{{ gate.thumbnail }}">{% else %}<p class="muted">No thumbnail artifact.</p>{% endif %}
+      <h3>Metadata</h3>
+      <table>
+        <tr><th>Title</th><td>{{ p.top_titles[0] }}</td></tr>
+        <tr><th>Tags</th><td class="small">{{ p.tags | join(", ") }}</td></tr>
+      </table>
+    </div>
+  </div>
+  <h3>Description</h3><pre>{{ p.description }}</pre>
+  <h3>Automated QA report</h3><pre>{{ gate.qa_report | tojson(indent=2) }}</pre>
+
+  <form method="post" action="/ui/projects/{{ run.id }}/decide">
+    <input type="hidden" name="decision" value="approve">
+    <fieldset style="border:1px solid var(--line);border-radius:6px;margin:12px 0">
+      <legend><strong>AI disclosure (required)</strong></legend>
+      <p class="small muted">Per YouTube's altered or synthetic content policy: does this video contain realistic synthetic media that viewers could mistake for real?</p>
+      <label style="font-weight:normal"><input type="radio" name="ai_synthetic" value="yes" required> Yes — label as altered/synthetic</label>
+      <label style="font-weight:normal"><input type="radio" name="ai_synthetic" value="no"> No</label>
+      <label for="qa-reason">Reason</label>
+      <input type="text" id="qa-reason" name="ai_reason" required placeholder="e.g. synthetic narration voice">
+    </fieldset>
+    <div class="row">
+      <div><label for="qa-reviewer">Reviewer</label><input type="text" id="qa-reviewer" name="reviewer" value="Dolender" required></div>
+      <div><label for="qa-notes">Notes (optional)</label><input type="text" id="qa-notes" name="notes"></div>
+    </div>
+    <p><button class="primary" type="submit">Approve for export (mock publish only)</button></p>
+  </form>
+</section>
+{% include "_reject.html" %}

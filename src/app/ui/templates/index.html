@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Runs{% endblock %}
+{% block content %}
+<section>
+  <h2>New run</h2>
+  <form method="post" action="/ui/projects">
+    <label for="prompt">Topic</label>
+    <input type="text" id="prompt" name="prompt" required
+           value="What makes an AI agent different from a chatbot?">
+    <div class="row">
+      <div>
+        <label for="format">Format</label>
+        <select id="format" name="format">
+          <option value="short">Short (45–75 s, 9:16)</option>
+          <option value="long">Long (3–5 min, 16:9)</option>
+        </select>
+      </div>
+      <div>
+        <label for="target_seconds">Target seconds <span class="muted">(blank = 60 short / 240 long)</span></label>
+        <input type="text" id="target_seconds" name="target_seconds" inputmode="numeric">
+      </div>
+    </div>
+    <label for="audience">Audience</label>
+    <input type="text" id="audience" name="audience"
+           value="Indian students, early-career developers and career switchers">
+    <label for="cta">CTA</label>
+    <input type="text" id="cta" name="cta" value="Explore AI learning at ziro.digital">
+    <p class="muted small">Prototype mode only has content for topics with a fixture; other topics stop at research with a clear error.</p>
+    <button class="primary" type="submit">Start run</button>
+  </form>
+</section>
+
+<section>
+  <h2>Recent runs</h2>
+  {% if projects %}
+  <table>
+    <tr><th>Topic</th><th>Format</th><th>Status</th><th>Created (UTC)</th></tr>
+    {% for p in projects %}
+    <tr>
+      <td><a href="/ui/projects/{{ p.id }}">{{ p.topic }}</a></td>
+      <td>{{ p.format }}</td>
+      <td><span class="pill">{{ p.status }}</span></td>
+      <td class="small">{{ p.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}<p class="muted">No runs yet.</p>{% endif %}
+</section>
+{% endblock %}
