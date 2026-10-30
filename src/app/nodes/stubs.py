@@ -11,6 +11,7 @@ from app.core import costs, db
 from app.core.contracts import Brief, ContentPackage
 from app.nodes.context import Outputs, StageContext
 
+
 def _dump(data: object) -> str:
     return json.dumps(data, indent=2, ensure_ascii=False, default=str)
 

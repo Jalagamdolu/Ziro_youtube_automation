@@ -1,9 +1,9 @@
 from collections.abc import Callable
 
 from app.nodes import stubs
+from app.nodes.context import Outputs, StageContext
 from app.nodes.researching import researching
 from app.nodes.scripting import scripting
-from app.nodes.context import Outputs, StageContext
 
 # Stage name -> implementation. Looked up at call time, so tests can swap entries to inject faults.
 FUNCS: dict[str, Callable[[StageContext], Outputs]] = {
