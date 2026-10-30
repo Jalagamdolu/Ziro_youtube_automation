@@ -38,15 +38,32 @@ class Claim(BaseModel):
     verification_status: Literal["verified", "unverified"]
 
 
-class Hook(BaseModel):
+class HookDraft(BaseModel):
     text: str
-    score: float
     explanation: str
+
+
+class Hook(HookDraft):
+    score: float
+    formula: str = ""
 
 
 class Chapter(BaseModel):
     start_seconds: int = Field(ge=0)
     title: str
+
+
+class PackageDraft(BaseModel):
+    """What the LLM adapter writes; scripting scores, lints and checks it into a ContentPackage."""
+
+    script: str
+    hooks: list[HookDraft] = Field(min_length=5, max_length=5)
+    titles: list[str] = Field(min_length=10, max_length=10)
+    thumbnail_text: str
+    description: str
+    tags: list[str] = Field(max_length=15)
+    target_queries: list[str] = Field(min_length=3, max_length=3)
+    chapters: list[Chapter]
 
 
 class ContentPackage(BaseModel):
@@ -57,6 +74,7 @@ class ContentPackage(BaseModel):
     claims: list[Claim]
     script: str
     hooks: list[Hook] = Field(min_length=5, max_length=5)
+    top_hooks: list[str] = Field(min_length=2, max_length=2)
     titles: list[str] = Field(min_length=10, max_length=10)
     top_titles: list[str] = Field(min_length=3, max_length=3)
     thumbnail_text: str
@@ -87,6 +105,8 @@ class Decision(BaseModel):
     notes: str = ""
     target: str | None = None
     ai_disclosure: AiDisclosure | None = None
+    removed_claims: list[str] = []
+    edited_claims: dict[str, str] = {}
     decided_at: datetime
 
     @model_validator(mode="after")
@@ -95,4 +115,6 @@ class Decision(BaseModel):
             raise ValueError("reject requires a target stage and notes")
         if self.gate == "qa_review" and self.decision == "approve" and self.ai_disclosure is None:
             raise ValueError("qa_review approval requires ai_disclosure")
+        if (self.removed_claims or self.edited_claims) and self.gate != "research_review":
+            raise ValueError("claim edits belong to research_review")
         return self
