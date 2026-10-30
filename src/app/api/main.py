@@ -39,6 +39,8 @@ class DecisionRequest(BaseModel):
     notes: str = ""
     target: str | None = None
     ai_disclosure: AiDisclosure | None = None
+    removed_claims: list[str] = []  # research_review only (D-20)
+    edited_claims: dict[str, str] = {}
 
 
 @asynccontextmanager
@@ -147,6 +149,11 @@ def _decide(project_id: str, kind: Literal["approve", "reject"], body: DecisionR
         if gate not in GATES:
             raise HTTPException(409, f"run is not at a gate (status: {gate})")
         opening = audit.gate_openings(s, project_id, gate)
+        touched = set(body.removed_claims) | set(body.edited_claims)
+        if touched and gate == "research_review":
+            unknown = touched - _claim_ids(s, project_id)
+            if unknown:
+                raise HTTPException(422, f"unknown claim ids: {', '.join(sorted(unknown))}")
     if kind == "reject" and body.target not in REJECT_TARGETS[gate]:
         raise HTTPException(422, f"{gate} can reject to: {', '.join(REJECT_TARGETS[gate])}")
     decision_id = f"{project_id}:{gate}:{opening}"
@@ -158,6 +165,13 @@ def _decide(project_id: str, kind: Literal["approve", "reject"], body: DecisionR
     if not enqueue_once(decision_id, project_id, decision.model_dump(mode="json")):
         raise HTTPException(409, "a decision for this gate was already submitted")
     return {"decision_id": decision_id}
+
+
+def _claim_ids(s: Any, project_id: str) -> set[str]:
+    key = s.scalars(select(Artifact.storage_path).where(
+        Artifact.project_id == project_id, Artifact.type == "claims.json",
+        Artifact.stale.is_(False)).order_by(Artifact.version.desc())).first()
+    return {c["id"] for c in json.loads(storage.get().read(key))} if key else set()
 
 
 def _errors(error: ValidationError) -> list[Any]:

@@ -1,5 +1,8 @@
 # Pipeline configuration. Snapshotted into runs/<project_id>/config.yaml at creation.
 
+# prototype: fixture LLM + research, local media tools, $0 API cost (D-19). production: real APIs.
+mode: prototype
+
 # Attempts per stage (brief §08 / ARCHITECTURE §4). Only RetryableError is retried.
 retries:
   researching: 3

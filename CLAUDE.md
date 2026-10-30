@@ -83,6 +83,14 @@ Target: the smallest codebase that passes the current phase's "done" criteria.
 - Small commits (one logical step). Branch per phase; PRs map to YT-02..YT-10, all Dolender's. The user reviews and merges PRs; Claude merges only after CI is green and only when the user says so. Commit/push only when the user asks.
 - `runs/` is git-ignored; only exported `outputs/` are committed.
 
+## ZERO-COST PROTOTYPE MODE (current, D-19)
+- `src/config.yaml` → `mode: prototype | production`. Current: **prototype**. Goal: full pipeline end to end, real playable MP4, $0 external API cost (CEO demo).
+- Prototype: LLM = fixture adapter (hand-written script/hooks/titles/SEO); research = fixture `claims.json` with manually verified real URLs; TTS = local/free engine with ZAIRO pronunciation (Sarvam adapter built but production-only); WhisperX, Remotion, FFmpeg run for real; publish stays mock.
+- App must start and run fully WITHOUT `ANTHROPIC_API_KEY` / `SARVAM_API_KEY`.
+- Production adapters stay interfaces. Do NOT build real LLM/Sarvam calls until the user says "production mode".
+- Topics without a fixture fail clearly in prototype mode (never fake content).
+- Phase order now: **2P** fixtures + claim check on fixtures + voice.md → **3** review UI → **4P** local TTS + WhisperX + SRT/VTT + chapters → **5** Remotion + FFmpeg + thumbnail + QA → **6P** export + receipt + cost report ($0 observed, production estimate per video). The original Phase 2 (real LLM/research) waits for "production mode".
+
 ## Phases — ONE at a time. After each: run all tests, report results + anything skipped/assumed, STOP for the user's "go".
 1. **Skeleton + orchestration** (Gate A/D groundwork): pyproject, compose, Alembic (all §6 tables), core (models, db, errors, retry, costs, logging), full graph with stub nodes writing fake artifacts, 3 gates, retry policies, `advance` job, reaper, API (create/status/approve/reject/retry/cancel), content_package contract, Makefile targets.
 2. **Content engine** (Gate B): research agent + claim ledger; scripting with hookscore.py/hooks.json (5 hooks, top 2) and title.py (10 titles, top 3); claim check + banned-claim scan; script shapes (SHORT 45–75 s hook ≤3 s; LONG 3–5 min hook+outcome ≤15 s; 150 wpm); SEO; draft chapters; voice.md with TODOs.

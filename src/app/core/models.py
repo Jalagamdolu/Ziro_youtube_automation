@@ -71,6 +71,7 @@ class Approval(Base):
     target_stage: Mapped[str | None]
     notes: Mapped[str] = mapped_column(Text, default="")
     ai_disclosure: Mapped[dict[str, Any] | None]
+    claim_edits: Mapped[dict[str, Any] | None]
     artifact_version: Mapped[int]
     opened_at: Mapped[datetime]
     timestamp: Mapped[datetime] = mapped_column(default=now)

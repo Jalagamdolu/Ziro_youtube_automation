@@ -1,13 +1,15 @@
 from collections.abc import Callable
 
 from app.nodes import stubs
-from app.nodes.context import StageContext
+from app.nodes.context import Outputs, StageContext
+from app.nodes.researching import researching
+from app.nodes.scripting import scripting
 
 # Stage name -> implementation. Looked up at call time, so tests can swap entries to inject faults.
-FUNCS: dict[str, Callable[[StageContext], stubs.Outputs]] = {
+FUNCS: dict[str, Callable[[StageContext], Outputs]] = {
     "draft": stubs.draft,
-    "researching": stubs.researching,
-    "scripting": stubs.scripting,
+    "researching": researching,
+    "scripting": scripting,
     "storyboarding": stubs.storyboarding,
     "rendering": stubs.rendering,
     "export_ready": stubs.export_ready,

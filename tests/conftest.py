@@ -85,10 +85,11 @@ def client(pipeline: None) -> Any:
 
 
 DISCLOSURE = {"synthetic": True, "reason": "AI narration and generated visuals"}
+SHORT_TOPIC = "What makes an AI agent different from a chatbot?"  # has a prototype fixture
 
 
 def create(client: Any, **overrides: Any) -> str:
-    body = {"prompt": "What makes an AI agent different from a chatbot?", "format": "short"}
+    body = {"prompt": SHORT_TOPIC, "format": "short"}
     response = client.post("/projects", json=body | overrides)
     assert response.status_code == 201, response.text
     return str(response.json()["id"])

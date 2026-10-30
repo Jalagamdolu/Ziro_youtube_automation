@@ -42,6 +42,8 @@ def _record(project_id: str, gate: str, decision: Decision, state: State) -> Non
             target_stage=decision.target,
             notes=decision.notes,
             ai_disclosure=decision.ai_disclosure.model_dump() if decision.ai_disclosure else None,
+            claim_edits={"removed": decision.removed_claims, "edited": decision.edited_claims}
+            if gate == "research_review" else None,
             artifact_version=int(reviewed.rsplit("/v", 1)[1]) if reviewed else 0,
             opened_at=audit.gate_opened_at(s, project_id, gate),
             timestamp=decision.decided_at,

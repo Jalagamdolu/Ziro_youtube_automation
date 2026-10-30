@@ -4,6 +4,8 @@ from typing import Any
 
 from app.adapters.storage import Storage
 
+Outputs = dict[str, str | bytes]  # file name -> content, written by the runner
+
 
 @dataclass(frozen=True)
 class StageContext:

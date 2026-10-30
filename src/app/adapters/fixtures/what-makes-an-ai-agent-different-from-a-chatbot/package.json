@@ -1,0 +1,60 @@
+{
+  "hooks": [
+    {
+      "text": "Why does your chatbot stop before work?",
+      "explanation": "Question formula: opens the gap the video closes (talking versus doing) and says 'your' in the first three words, inside the 3-second hook window."
+    },
+    {
+      "text": "Before you build, know agent versus chatbot.",
+      "explanation": "Warning formula: ties the distinction to the viewer's next project, which is why this audience cares; no open question, so less pull."
+    },
+    {
+      "text": "Why your chatbot never finishes the job.",
+      "explanation": "Frames the chatbot's limit as the viewer's own problem; reads as a statement, so the curiosity gap is weaker than a real question."
+    },
+    {
+      "text": "Stop calling your chatbot an AI agent.",
+      "explanation": "Mistake formula: corrects a mix-up head-on; risks sounding preachy to beginners and promises a correction rather than a payoff."
+    },
+    {
+      "text": "Your chatbot answers. An agent acts.",
+      "explanation": "The clearest six-word contrast, but it answers itself, so there is no gap left to close; best reused as the takeaway line."
+    }
+  ],
+  "titles": [
+    "AI Agent vs Chatbot: The One Test That Tells Them Apart",
+    "Chatbot or AI Agent? What Actually Changes",
+    "What Makes an AI Agent Different From a Chatbot?",
+    "AI Agents vs Chatbots, Explained in 60 Seconds",
+    "Your Chatbot Talks. An AI Agent Acts.",
+    "AI Agent vs Chatbot for Students",
+    "Stop Calling Your Chatbot an AI Agent",
+    "The Real Difference Between Chatbots and AI Agents",
+    "Chatbot vs Agent: Explained With One Example",
+    "How an AI Agent Plans, Uses Tools and Acts"
+  ],
+  "thumbnail_text": "TALK OR DO?",
+  "description": "What actually separates an AI agent from a chatbot? In under a minute: a chatbot answers you in conversation, while an agent pursues a goal, plans the steps and uses tools to complete the task. The internship example is illustrative.\n\nSources:\n- IBM, What is a chatbot?: https://www.ibm.com/think/topics/chatbots\n- IBM, What are AI agents?: https://www.ibm.com/think/topics/ai-agents\n- Anthropic, Building effective agents: https://www.anthropic.com/engineering/building-effective-agents\n- Google Cloud, What are AI agents?: https://cloud.google.com/discover/what-are-ai-agents\n\n{cta}",
+  "tags": [
+    "ai agents",
+    "chatbot",
+    "ai agent vs chatbot",
+    "agentic ai",
+    "generative ai",
+    "llm",
+    "ai for students",
+    "learn ai",
+    "ai explained",
+    "ziro"
+  ],
+  "target_queries": [
+    "ai agent vs chatbot",
+    "what is an ai agent",
+    "difference between chatbot and ai agent"
+  ],
+  "chapters": [
+    {"start_seconds": 0, "title": "Why it matters"},
+    {"start_seconds": 10, "title": "Chatbot vs agent"},
+    {"start_seconds": 45, "title": "The one test"}
+  ]
+}
