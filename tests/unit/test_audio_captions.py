@@ -1,7 +1,8 @@
-"""Pronunciation handling (brief §07: written "Ziro", spoken "ZAIRO") and SRT timing."""
+"""Pronunciation (brief §07: written "Ziro", spoken "ZAIRO"), word-timed captions and SRT/VTT."""
 
-from app.adapters.tts import spoken_parts
-from app.nodes.rendering import sentences, split_cue, to_srt
+from app.adapters.aligner import EvenAligner
+from app.adapters.tts import spoken_parts, spoken_text
+from app.nodes.rendering import make_cues, sentences, to_srt, to_vtt, written_words
 
 PRONUNCIATION = {"replace": {"ziro.digital": "Ziro dot digital"}, "phonemes": {"Ziro": "zˈaɪɹoʊ"}}
 
@@ -21,8 +22,21 @@ def test_sentences_drop_claim_markers() -> None:
                                                                      "An agent acts!"]
 
 
-def test_cues_cover_the_sentence_exactly() -> None:
-    cues = split_cue(2.0, 5.0, "one two three four five six seven")
-    assert [c[2] for c in cues] == ["one two three four five", "six seven"]
-    assert cues[0][0] == 2.0 and abs(cues[-1][1] - 5.0) < 1e-9
-    assert to_srt(cues).startswith("1\n00:00:02,000 --> 00:00:04,")
+def test_captions_show_written_brand_with_spoken_timing() -> None:
+    written = "Explore AI learning at ziro.digital."
+    segment = {"text": spoken_text(written, PRONUNCIATION), "written": written,
+               "start": 1.0, "end": 4.0}
+    spoken = EvenAligner().align(None, [segment])
+    assert [w["text"] for w in spoken][-3:] == ["Ziro", "dot", "digital."]
+    words = written_words(spoken, [segment])
+    assert [w["text"] for w in words] == ["Explore", "AI", "learning", "at", "ziro.digital."]
+    assert words[-1]["start"] == spoken[-3]["start"] and words[-1]["end"] == 4.0
+
+
+def test_cues_stop_at_five_words_and_at_sentence_ends() -> None:
+    tokens = ["one", "two", "three", "four", "five", "six.", "seven"]
+    words = [{"text": t, "start": float(i), "end": i + 0.5} for i, t in enumerate(tokens)]
+    cues = make_cues(words)
+    assert [len(c["words"]) for c in cues] == [5, 1, 1]
+    assert to_srt(cues).startswith("1\n00:00:00,000 --> 00:00:04,500\none two three four five")
+    assert to_vtt(cues).startswith("WEBVTT\n\n00:00:00.000 --> 00:00:04.500\n")

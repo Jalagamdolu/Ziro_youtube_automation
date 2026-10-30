@@ -26,10 +26,16 @@ class TTS(Protocol):
         ...
 
 
-def spoken_parts(text: str, pronunciation: dict[str, Any]) -> list[tuple[str, bool]]:
-    """Written text -> [(piece, is_phonemes)]: replacements applied, dictionary words phonemised."""
+def spoken_text(text: str, pronunciation: dict[str, Any]) -> str:
+    """Written text as the narrator says it, in words (e.g. ziro.digital -> Ziro dot digital)."""
     for written, said in pronunciation.get("replace", {}).items():
         text = re.sub(re.escape(written), said, text, flags=re.IGNORECASE)
+    return text
+
+
+def spoken_parts(text: str, pronunciation: dict[str, Any]) -> list[tuple[str, bool]]:
+    """Written text -> [(piece, is_phonemes)]: replacements applied, dictionary words phonemised."""
+    text = spoken_text(text, pronunciation)
     words = pronunciation.get("phonemes", {})
     if not words:
         return [(text, False)]

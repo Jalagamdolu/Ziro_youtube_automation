@@ -22,18 +22,6 @@ def draft(ctx: StageContext) -> Outputs:
     return {"brief.json": brief.model_dump_json(indent=2)}
 
 
-def storyboarding(ctx: StageContext) -> Outputs:
-    package = ContentPackage.model_validate(ctx.read_json("scripting", "content_package.json"))
-    scene = {
-        "id": "S1",
-        "text": package.script,
-        "visual_type": "title",
-        "asset": None,
-        "duration": package.brief.target_seconds,
-    }
-    return {"scenes.json": _dump([scene])}
-
-
 def rendering(ctx: StageContext) -> Outputs:
     scenes = ctx.read_json("storyboarding", "scenes.json")
     return {

@@ -1,28 +1,28 @@
-"""rendering (demo triage, D-25): narration WAV, SRT captions, MP4 and thumbnail with FFmpeg.
+"""rendering: narration (TTS) → word alignment (WhisperX) → SRT/VTT → Remotion video → FFmpeg
+loudness finishing → thumbnail + preview frame (§4, D-07, D-08).
 
-Each sentence is synthesised on its own, so caption times come from the exact length of the audio
-we generated. WhisperX word alignment, VTT, chapters, dead-air QA and Remotion templates follow
-after the demo.
+Scenes come from storyboarding's scenes.json; their start/end are the exact times of the audio
+synthesised for them. Shorts only for now (D-26); chapters, dead-air QA and the end card follow.
 """
 
 import json
 import re
 import subprocess
 import tempfile
-import textwrap
 from pathlib import Path
 from typing import Any
 
-from app.adapters import tts
-from app.core import costs, db
+from app.adapters import aligner, tts
+from app.core import config, costs, db
 from app.core.contracts import ContentPackage
+from app.core.errors import FatalError
 from app.nodes import script_checks
 from app.nodes.context import Outputs, StageContext
 
 SENTENCE_PAUSE, SECTION_PAUSE = 0.15, 0.35
 CUE_WORDS = 5  # short cues read well on a phone
-SIZE = {"short": (1080, 1920), "long": (1920, 1080)}
 FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+TEMPLATES = Path(__file__).resolve().parents[3] / "templates" / "remotion"
 
 
 def rendering(ctx: StageContext) -> Outputs:
@@ -30,43 +30,79 @@ def rendering(ctx: StageContext) -> Outputs:
     import soundfile as sf
 
     package = ContentPackage.model_validate(ctx.read_json("scripting", "content_package.json"))
+    if package.brief.format != "short":
+        raise FatalError("Remotion templates exist for Shorts only so far (D-26)")
+    scenes: list[dict[str, Any]] = ctx.read_json("storyboarding", "scenes.json")
+    pronunciation = config.load()["pronunciation"]
     voice = tts.get()
+
     audio: list[Any] = []
-    cues: list[tuple[float, float, str]] = []
-    clock, characters = 0.0, 0
-    for lines in script_checks.sections(package.script).values():
-        for sentence in sentences(lines):
+    segments: list[dict[str, Any]] = []
+    clock, section, characters = 0.0, None, 0
+    for scene in scenes:
+        if section is not None and scene["section"] != section:
+            audio.append(np.zeros(int(SECTION_PAUSE * tts.RATE), dtype=np.float32))
+            clock += SECTION_PAUSE
+        section, scene["start"] = scene["section"], clock
+        for sentence in sentences([scene["text"]]):
             samples = voice.synthesize(sentence)
             length = len(samples) / tts.RATE
-            cues += split_cue(clock, clock + length, sentence)
+            segments.append({"text": tts.spoken_text(sentence, pronunciation), "written": sentence,
+                             "start": clock, "end": clock + length})
             audio += [samples, np.zeros(int(SENTENCE_PAUSE * tts.RATE), dtype=np.float32)]
             clock += length + SENTENCE_PAUSE
             characters += len(sentence)
-        audio.append(np.zeros(int(SECTION_PAUSE * tts.RATE), dtype=np.float32))
-        clock += SECTION_PAUSE
+        scene["end"] = clock
     with db.session() as s, s.begin():
         costs.record_cost(s, ctx.project_id, "rendering", "kokoro-local", characters)
 
-    width, height = SIZE[package.brief.format]
+    narration = np.concatenate(audio)
+    spoken = aligner.get().align(_resample(narration, tts.RATE, aligner.RATE), segments)
+    words = written_words(spoken, segments)
+    cues = make_cues(words)
+
     with tempfile.TemporaryDirectory() as folder:
         work = Path(folder)
-        sf.write(work / "narration.wav", np.concatenate(audio), tts.RATE)
-        (work / "captions.srt").write_text(to_srt(cues), encoding="utf-8")
-        (work / "title.txt").write_text(textwrap.fill(package.brief.topic, 24), encoding="utf-8")
+        (work / "public").mkdir()
+        sf.write(work / "public" / "narration.wav", narration, tts.RATE)
+        (work / "props.json").write_text(json.dumps({
+            "title": package.brief.topic, "audio": "narration.wav", "duration": clock,
+            "scenes": [{k: scene[k] for k in ("id", "visual_type", "start", "end", "props")}
+                       for scene in scenes],
+            "cues": cues}), encoding="utf-8")
+        _run(["npx", "remotion", "render", "src/index.ts", "Short", str(work / "raw.mp4"),
+              f"--props={work / 'props.json'}", f"--public-dir={work / 'public'}"], TEMPLATES)
+        _run(["ffmpeg", "-y", "-i", "raw.mp4", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
+              "-c:v", "copy", "-c:a", "aac", "-b:a", "160k", "-ar", "48000",
+              "-movflags", "+faststart", "video.mp4"], work)
         (work / "thumb.txt").write_text(package.thumbnail_text, encoding="utf-8")
-        _ffmpeg(work, width, height)
-        duration = _probe_seconds(work / "video.mp4")
-        low, high = script_checks.RUNTIME[package.brief.format]
-        report = {"duration_s": round(duration, 1), "duration_ok": low <= duration <= high,
-                  "resolution": f"{width}x{height}", "loudness_target_lufs": -14,
-                  "cues": len(cues), "deferred": ["chapters", "dead-air", "vtt", "end card"]}
-        return {
-            "narration.wav": (work / "narration.wav").read_bytes(),
-            "captions.srt": (work / "captions.srt").read_text(encoding="utf-8"),
+        _run(["ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=0x0F131A:s=1280x720", "-frames:v", "1",
+              "-vf", f"drawtext=fontfile={FONT}:textfile=thumb.txt:fontcolor=white:fontsize=120:"
+                     "x=(w-text_w)/2:y=(h-text_h)/2", "thumbnail.png"], work)
+        outputs: Outputs = {
+            "narration.wav": (work / "public" / "narration.wav").read_bytes(),
+            "words.json": json.dumps(words, indent=2, ensure_ascii=False),
+            "captions.srt": to_srt(cues),
+            "captions.vtt": to_vtt(cues),
+            "scenes_timed.json": json.dumps(scenes, indent=2, ensure_ascii=False),
             "video.mp4": (work / "video.mp4").read_bytes(),
             "thumbnail.png": (work / "thumbnail.png").read_bytes(),
-            "qa_report.json": json.dumps(report, indent=2),
         }
+        card = next((s for s in scenes if s["visual_type"] == "definition_card"), None)
+        if card:
+            moment = (card["start"] + card["end"]) / 2
+            _run(["ffmpeg", "-y", "-ss", f"{moment:.2f}", "-i", "video.mp4", "-frames:v", "1",
+                  "preview_definition_card.png"], work)
+            outputs["preview_definition_card.png"] = (work / "preview_definition_card.png"
+                                                      ).read_bytes()
+        duration = _probe_seconds(work / "video.mp4")
+    low, high = script_checks.RUNTIME[package.brief.format]
+    outputs["qa_report.json"] = json.dumps({
+        "duration_s": round(duration, 1), "duration_ok": low <= duration <= high,
+        "resolution": "1080x1920", "loudness_target_lufs": -14, "words": len(words),
+        "cues": len(cues), "templates_built": ["definition_card"],
+        "deferred": ["chapters", "dead-air", "end card", "five remaining templates"]}, indent=2)
+    return outputs
 
 
 def sentences(lines: list[str]) -> list[str]:
@@ -74,44 +110,60 @@ def sentences(lines: list[str]) -> list[str]:
     return [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
 
 
-def split_cue(start: float, end: float, sentence: str) -> list[tuple[float, float, str]]:
-    """One sentence -> cues of at most CUE_WORDS words, timed by their share of the characters."""
-    words = sentence.split()
-    chunks = [" ".join(words[i:i + CUE_WORDS]) for i in range(0, len(words), CUE_WORDS)]
-    total = sum(len(c) for c in chunks)
-    cues, t = [], start
-    for chunk in chunks:
-        step = (end - start) * len(chunk) / total
-        cues.append((t, t + step, chunk))
-        t += step
+def written_words(spoken: list[dict[str, Any]], segments: list[dict[str, Any]]
+                  ) -> list[dict[str, Any]]:
+    """Aligned spoken words back to the written script (captions show "ziro.digital", while the
+    narrator said "Ziro dot digital"). Each written token takes the times of the spoken words it
+    became."""
+    words: list[dict[str, Any]] = []
+    queue = list(spoken)
+    pronunciation = config.load()["pronunciation"]
+    for segment in segments:
+        for token in segment["written"].split():
+            said = len(tts.spoken_text(token, pronunciation).split())
+            taken, queue = queue[:said], queue[said:]
+            if taken:
+                words.append({"text": token, "start": taken[0]["start"], "end": taken[-1]["end"]})
+    return words
+
+
+def make_cues(words: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Cues of at most CUE_WORDS words that never span two sentences."""
+    cues: list[dict[str, Any]] = []
+    current: list[dict[str, Any]] = []
+    for word in words:
+        current.append(word)
+        if len(current) == CUE_WORDS or word["text"][-1] in ".?!":
+            cues.append({"start": current[0]["start"], "end": current[-1]["end"], "words": current})
+            current = []
+    if current:
+        cues.append({"start": current[0]["start"], "end": current[-1]["end"], "words": current})
     return cues
 
 
-def to_srt(cues: list[tuple[float, float, str]]) -> str:
-    def stamp(t: float) -> str:
-        ms = round(t * 1000)
-        hours, minutes, seconds = ms // 3_600_000, ms // 60_000 % 60, ms // 1000 % 60
-        return f"{hours:02d}:{minutes:02d}:{seconds:02d},{ms % 1000:03d}"
-
-    return "\n".join(f"{i}\n{stamp(a)} --> {stamp(b)}\n{text}\n"
-                     for i, (a, b, text) in enumerate(cues, 1))
+def _stamp(t: float, sep: str) -> str:
+    ms = round(t * 1000)
+    hours, minutes, seconds = ms // 3_600_000, ms // 60_000 % 60, ms // 1000 % 60
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}{sep}{ms % 1000:03d}"
 
 
-def _ffmpeg(work: Path, width: int, height: int) -> None:
-    style = ("FontName=DejaVu Sans,Bold=1,FontSize=11,PrimaryColour=&H00FFFFFF,"
-             "OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=0,Alignment=2,MarginV=60")
-    video = (f"[0:v]drawtext=fontfile={FONT}:textfile=title.txt:fontcolor=white:fontsize="
-             f"{width // 16}:line_spacing=12:x=(w-text_w)/2:y=h*0.12,"
-             f"subtitles=captions.srt:force_style='{style}'[v]")
-    _run(["ffmpeg", "-y", "-f", "lavfi", "-i", f"color=c=0x0f172a:s={width}x{height}:r=30",
-          "-i", "narration.wav", "-filter_complex",
-          f"{video};[1:a]loudnorm=I=-14:TP=-1.5:LRA=11[a]", "-map", "[v]", "-map", "[a]",
-          "-shortest", "-c:v", "libx264", "-preset", "veryfast", "-crf", "22",
-          "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k", "-ar", "48000",
-          "-movflags", "+faststart", "video.mp4"], work)
-    _run(["ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=0x0f172a:s=1280x720", "-frames:v", "1",
-          "-vf", f"drawtext=fontfile={FONT}:textfile=thumb.txt:fontcolor=white:fontsize=120:"
-                 "x=(w-text_w)/2:y=(h-text_h)/2", "thumbnail.png"], work)
+def to_srt(cues: list[dict[str, Any]]) -> str:
+    return "\n".join(f"{i}\n{_stamp(c['start'], ',')} --> {_stamp(c['end'], ',')}\n"
+                     f"{' '.join(w['text'] for w in c['words'])}\n" for i, c in enumerate(cues, 1))
+
+
+def to_vtt(cues: list[dict[str, Any]]) -> str:
+    return "WEBVTT\n\n" + "\n".join(
+        f"{_stamp(c['start'], '.')} --> {_stamp(c['end'], '.')}\n"
+        f"{' '.join(w['text'] for w in c['words'])}\n" for c in cues)
+
+
+def _resample(samples: Any, rate: int, target: int) -> Any:
+    import numpy as np
+
+    n = int(len(samples) * target / rate)
+    return np.interp(np.linspace(0, len(samples) - 1, n), np.arange(len(samples)),
+                     samples).astype(np.float32)
 
 
 def _probe_seconds(path: Path) -> float:
@@ -121,4 +173,6 @@ def _probe_seconds(path: Path) -> float:
 
 
 def _run(command: list[str], cwd: Path) -> None:
-    subprocess.run(command, cwd=cwd, capture_output=True, check=True, timeout=900)
+    done = subprocess.run(command, cwd=cwd, capture_output=True, text=True, timeout=1800)
+    if done.returncode:
+        raise FatalError(f"{command[0]} {command[1]} failed: {done.stderr[-800:]}")
