@@ -25,7 +25,7 @@ services:
       retries: 30
 
   api:
-    build: .
+    build: {context: ., target: api}
     environment: *app-env
     command: sh -c "alembic upgrade head && python -m app.graph.build && uvicorn app.api.main:app --host 0.0.0.0 --port 8000"
     ports: ["127.0.0.1:8000:8000"]
@@ -35,13 +35,14 @@ services:
       redis: {condition: service_healthy}
 
   worker:
-    build: .
+    build: {context: ., target: worker}
     environment: *app-env
     command: rq worker --url redis://redis:6379/0 ziro
-    volumes: [./runs:/app/runs]
+    volumes: [./runs:/app/runs, models:/models]
     depends_on:
       postgres: {condition: service_healthy}
       redis: {condition: service_healthy}
 
 volumes:
   pgdata:
+  models:

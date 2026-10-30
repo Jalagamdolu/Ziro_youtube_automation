@@ -28,8 +28,17 @@ dev = [
   "types-pyyaml==6.0.12.20260906",
 ]
 
+# Worker image only (D-24, demo triage D-25): local TTS. WhisperX + CPU torch come back post-demo.
+media = [
+  "kokoro-onnx==0.6.1",
+  "soundfile==0.14.0",
+]
+
 [tool.uv]
 package = false
+# Two-week rule: onnxruntime 1.31.x is newer than 2026-10-16.
+constraint-dependencies = ["onnxruntime==1.30.0"]
+
 
 [tool.ruff]
 line-length = 100
@@ -46,9 +55,16 @@ packages = ["app"]
 strict = true
 exclude = ["src/vendor"]
 
+# Worker-image-only media libraries (D-24); the API/test image type-checks without them.
+[[tool.mypy.overrides]]
+module = ["kokoro_onnx", "numpy", "soundfile"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+markers = ["media: needs the worker image (real TTS + alignment models)"]
+addopts = "-m 'not media'"
 
 [tool.alembic]
 script_location = "src/app/core/migrations"
