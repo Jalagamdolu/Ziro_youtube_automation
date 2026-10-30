@@ -1,6 +1,9 @@
 """T03: every figure or date traces to an approved claim; invented and banned claims are blocked."""
 
+import html
+import re
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 
@@ -42,6 +45,23 @@ def test_banned_claim_language_is_blocked(narration: str) -> None:
 
 def test_learning_is_not_mistaken_for_earning() -> None:
     assert claim_problems(_script("Keep learning by building."), CLAIMS) == []
+
+
+SNAPSHOTS = Path(__file__).resolve().parents[1] / "manual_qa" / "source-snapshots"
+
+
+def _page_text(path: Path) -> str:
+    raw = re.sub(r"(?s)<(script|style)[^>]*>.*?</\1>", " ", path.read_text(encoding="utf-8"))
+    text = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", raw)))
+    return re.sub(r"\s+([,.;:!?])", r"\1", text)
+
+
+def test_fixture_quotes_appear_in_saved_snapshots() -> None:
+    brief = Brief(topic="What makes an AI agent different from a chatbot?", audience="a",
+                  learning_outcome="o", language="en", format="short", target_seconds=60, cta="c")
+    for claim in FixtureResearch().find_claims(brief):
+        name = re.sub(r"[^a-z0-9]+", "-", claim.url.removeprefix("https://")).strip("-")
+        assert claim.quote in _page_text(SNAPSHOTS / f"{name}.html"), claim.id
 
 
 def test_fixture_ledger_is_fully_sourced() -> None:
