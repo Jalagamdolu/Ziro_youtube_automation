@@ -21,8 +21,23 @@ stage_deadline_seconds:
   researching: 900
   rendering: 1800
 
+# Narration (D-23, provisional). Overrule the voice here; rendering re-synthesises from scratch.
+tts:
+  engine: kokoro          # prototype: local + free. production: sarvam (not built, D-19)
+  voice: hf_alpha         # fallback: bf_emma (phonemes: en-gb)
+  phonemes: en-us
+  speed: 1.0
+
+# Written form -> how the narrator says it (brief §07: written "Ziro", spoken "ZAIRO").
+pronunciation:
+  replace:
+    ziro.digital: Ziro dot digital
+  phonemes:
+    Ziro: zˈaɪɹoʊ
+
 # Unit prices (USD) per provider unit; filled per phase from the provider's price page.
-prices: {}
+prices:
+  kokoro-local: 0.0       # characters synthesised on our own CPU
 
 # Hard cap on recorded spend per video (USD).
 spend_cap_usd: 5.0

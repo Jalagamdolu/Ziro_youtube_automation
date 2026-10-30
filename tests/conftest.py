@@ -45,6 +45,11 @@ def pipeline(database: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     from app.jobs import queue
 
     queue.redis().flushdb()
+    import app.nodes as nodes
+    from app.nodes import stubs
+
+    # The API/test image has no media stack (D-24); real rendering runs in the worker image.
+    monkeypatch.setitem(nodes.FUNCS, "rendering", stubs.rendering)
     monkeypatch.setenv("RUNS_DIR", str(tmp_path))
     cfg = config.load()
     cfg["backoff"] = {"initial_seconds": 0.01, "factor": 2.0, "max_seconds": 0.05}
