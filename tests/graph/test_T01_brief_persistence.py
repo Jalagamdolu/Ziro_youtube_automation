@@ -4,15 +4,15 @@ import json
 import os
 from pathlib import Path
 
-from conftest import DISCLOSURE, approve, run_to_qa_review, status
+from conftest import DISCLOSURE, SHORT_TOPIC, approve, create, run_to_qa_review, status
 
 BRIEF = {
-    "prompt": "Three practical GenAI portfolio projects for freshers",
-    "format": "long",
+    "prompt": SHORT_TOPIC,
+    "format": "short",
     "audience": "Final-year engineering students",
     "language": "en",
     "cta": "Find project guides at ziro.digital",
-    "target_seconds": 200,
+    "target_seconds": 50,
 }
 
 
@@ -25,21 +25,25 @@ def test_brief_fields_persist_into_outputs(client) -> None:
     approve(client, project_id, ai_disclosure=DISCLOSURE)
     run = status(client, project_id)
 
-    assert run["brief"] == {"topic": BRIEF["prompt"], "audience": BRIEF["audience"],
-                            "language": "en", "format": "long", "target_seconds": 200,
-                            "cta": BRIEF["cta"]}
+    assert run["brief"] == {"topic": SHORT_TOPIC, "audience": BRIEF["audience"], "language": "en",
+                            "format": "short", "target_seconds": 50, "cta": BRIEF["cta"]}
 
     paths = {a["type"]: a["storage_path"] for a in run["artifacts"]}
     brief = _read(paths["brief.json"])
     package = _read(paths["content_package.json"])
     receipt = _read(paths["publish_receipt.json"])
-    assert brief["topic"] == BRIEF["prompt"] and brief["target_seconds"] == 200
+    assert brief["audience"] == BRIEF["audience"] and brief["target_seconds"] == 50
     assert package["brief"] == brief
+    assert BRIEF["cta"] in package["script"] and BRIEF["cta"] in package["description"]
     assert BRIEF["cta"] in receipt["request"]["snippet"]["description"]
     assert receipt["request"]["snippet"]["defaultLanguage"] == "en"
 
 
-def test_changed_topic_needs_no_code_change(client) -> None:
-    first = run_to_qa_review(client)
-    second = run_to_qa_review(client, prompt="A different topic entirely")
-    assert status(client, first)["brief"]["topic"] != status(client, second)["brief"]["topic"]
+def test_prototype_mode_fails_clearly_without_a_fixture(client) -> None:
+    """D-19: a topic without a fixture stops at researching with a clear reason, no fake content."""
+    project_id = create(client, prompt="A topic with no prototype fixture")
+    run = status(client, project_id)
+    assert run["status"] == "failed"
+    research = [j for j in run["jobs"] if j["stage"] == "researching"]
+    assert "no fixture for this topic in prototype mode" in research[-1]["error_message"]
+    assert not any(a["stage"] == "scripting" for a in run["artifacts"])

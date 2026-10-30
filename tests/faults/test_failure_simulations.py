@@ -1,7 +1,5 @@
-"""Brief §08 failure simulations that Phase 1 can exercise on stubs.
-
-Missing OAuth token waits for the publisher work in Phase 6; unsourced claim waits for the claim
-check in Phase 2.
+"""Brief §08 failure simulations. Unsourced claim lives in graph/test_claim_ledger_review.py;
+missing OAuth token waits for the publisher work in Phase 6P.
 """
 
 import os

@@ -15,6 +15,7 @@ def _package(**overrides: object) -> ContentPackage:
     fields: dict[str, object] = {
         "brief": BRIEF, "claims": [], "script": "s",
         "hooks": [Hook(text=f"h{i}", score=1, explanation="e") for i in range(5)],
+        "top_hooks": ["h0", "h1"],
         "titles": [f"t{i}" for i in range(10)], "top_titles": ["t0", "t1", "t2"],
         "thumbnail_text": "Agents vs bots", "description": "d", "tags": ["x"],
         "target_queries": ["q1", "q2", "q3"], "chapters": [Chapter(start_seconds=0, title="i")],
