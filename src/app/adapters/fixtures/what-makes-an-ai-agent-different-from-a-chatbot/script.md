@@ -1,6 +1,6 @@
 ## Hook
 [ON SCREEN: "Chatbot" and "Agent" side by side, a question mark between them]
-Why does your chatbot stop before work?
+Your chatbot answers. Why can't it act?
 
 ## Relevance
 [ON SCREEN: a student's project board with "Build an AI agent" pinned at the top]
