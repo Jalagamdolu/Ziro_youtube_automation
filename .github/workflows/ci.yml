@@ -1,0 +1,11 @@
+# T10: every push builds from a fresh checkout and runs lint + the full test suite in containers.
+name: ci
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: make lint
+      - run: make test
