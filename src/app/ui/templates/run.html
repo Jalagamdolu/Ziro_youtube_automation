@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}{{ run.brief.topic }}{% endblock %}
+{% block content %}
+<section>
+  <h1>{{ run.brief.topic }}</h1>
+  <p class="muted small">
+    {{ run.brief.format }} · {{ run.brief.target_seconds }} s · {{ run.brief.language }} ·
+    audience: {{ run.brief.audience }} · CTA: “{{ run.brief.cta }}” · run {{ run.id }}
+  </p>
+  <p>
+    <a href="/ui/projects/{{ run.id }}/bundle.zip"><button type="button">Download bundle</button></a>
+    {% if run.status == "failed" %}
+    <form method="post" action="/ui/projects/{{ run.id }}/retry" style="display:inline">
+      <button class="primary" type="submit">Retry from the failed stage</button></form>
+    {% endif %}
+    {% if run.status not in ("done", "cancelled") %}
+    <form method="post" action="/ui/projects/{{ run.id }}/cancel" style="display:inline">
+      <button class="danger" type="submit">Cancel run</button></form>
+    {% endif %}
+  </p>
+</section>
+
+{% if waiting %}<section><p>Decision recorded. Resuming the run…</p></section>
+{% elif run.status == "research_review" %}{% include "_research_review.html" %}
+{% elif run.status == "script_review" %}{% include "_script_review.html" %}
+{% elif run.status == "qa_review" %}{% include "_qa_review.html" %}
+{% endif %}
+
+<div hx-get="/ui/projects/{{ run.id }}/live?seen={{ run.events | length }}" hx-trigger="every 2s"
+     hx-swap="innerHTML">{% include "_live.html" %}</div>
+{% endblock %}

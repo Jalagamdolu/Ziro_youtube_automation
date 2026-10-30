@@ -1,0 +1,18 @@
+<section>
+  <h2>Reject</h2>
+  <form method="post" action="/ui/projects/{{ run.id }}/decide">
+    <input type="hidden" name="decision" value="reject">
+    <div class="row">
+      <div>
+        <label for="rj-target">Send back to</label>
+        <select id="rj-target" name="target" required>
+          {% for t in reject_targets %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+        </select>
+      </div>
+      <div><label for="rj-reviewer">Reviewer</label><input type="text" id="rj-reviewer" name="reviewer" value="Dolender" required></div>
+    </div>
+    <label for="rj-notes">What must change (required; passed to that stage)</label>
+    <textarea id="rj-notes" name="notes" required></textarea>
+    <p><button class="danger" type="submit">Reject and send back</button></p>
+  </form>
+</section>

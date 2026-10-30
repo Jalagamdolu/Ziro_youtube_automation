@@ -1,0 +1,57 @@
+{% set p = gate.package %}
+<section>
+  <h2>Script review</h2>
+  <div class="row">
+    <div>
+      <h3>Script <span class="muted small">([C#] = approved claim, [ON SCREEN] = visual)</span></h3>
+      <pre>{{ p.script }}</pre>
+    </div>
+    <div>
+      <h3>Claims used</h3>
+      <table>
+        {% for c in p.claims %}
+        <tr><td><strong>{{ c.id }}</strong></td><td class="small">{{ c.claim }}<br>
+          <a href="{{ c.url }}" target="_blank" rel="noopener noreferrer">{{ c.title }}</a></td></tr>
+        {% endfor %}
+      </table>
+    </div>
+  </div>
+
+  <h3>Five hooks <span class="muted small">(scored by the skill pack's hookscore.py; top two kept)</span></h3>
+  <table>
+    <tr><th>Hook</th><th>Score</th><th>Formula</th><th>Why</th></tr>
+    {% for h in p.hooks %}
+    <tr class="{{ 'top' if h.text in p.top_hooks }}"><td>{{ h.text }}{% if h.text in p.top_hooks %} <span class="pill ok">top 2</span>{% endif %}</td>
+        <td>{{ h.score | int }}</td><td>{{ h.formula }}</td><td class="small">{{ h.explanation }}</td></tr>
+    {% endfor %}
+  </table>
+
+  <h3>Titles <span class="muted small">(linted by title.py against the thumbnail text; top three kept)</span></h3>
+  <table>
+    <tr><th>Title</th><th>Chars</th><th>Score</th><th>Issues</th></tr>
+    {% for t in p.titles %}{% set lint = gate.title_lint.get(t, {}) %}
+    <tr class="{{ 'top' if t in p.top_titles }}"><td>{{ t }}{% if t in p.top_titles %} <span class="pill ok">top 3</span>{% endif %}</td>
+        <td>{{ t | length }}</td><td>{{ lint.score }}</td>
+        <td class="small">{% for issue, why in lint.issues or [] %}{{ issue }}: {{ why }}{% if not loop.last %}<br>{% endif %}{% endfor %}</td></tr>
+    {% endfor %}
+  </table>
+
+  <h3>Package</h3>
+  <table>
+    <tr><th style="width:11em">Thumbnail text</th><td>{{ p.thumbnail_text }}</td></tr>
+    <tr><th>Description</th><td><pre>{{ p.description }}</pre></td></tr>
+    <tr><th>Tags ({{ p.tags | length }})</th><td>{{ p.tags | join(", ") }}</td></tr>
+    <tr><th>Target queries</th><td>{{ p.target_queries | join(" · ") }}</td></tr>
+    <tr><th>Draft chapters</th><td>{% for c in p.chapters %}{{ "%d:%02d" | format(c.start_seconds // 60, c.start_seconds % 60) }} {{ c.title }}{% if not loop.last %} · {% endif %}{% endfor %}</td></tr>
+  </table>
+
+  <form method="post" action="/ui/projects/{{ run.id }}/decide">
+    <input type="hidden" name="decision" value="approve">
+    <div class="row">
+      <div><label for="sr-reviewer">Reviewer</label><input type="text" id="sr-reviewer" name="reviewer" value="Dolender" required></div>
+      <div><label for="sr-notes">Notes (optional)</label><input type="text" id="sr-notes" name="notes"></div>
+    </div>
+    <p><button class="primary" type="submit">Approve script and package</button></p>
+  </form>
+</section>
+{% include "_reject.html" %}

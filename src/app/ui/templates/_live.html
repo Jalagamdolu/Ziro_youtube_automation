@@ -1,0 +1,52 @@
+{% set failed_job = run.jobs | selectattr("status", "equalto", "failed") | list | last %}
+<section>
+  <h2>Status: <span class="pill {{ 'ok' if run.status == 'done' else 'bad' if run.status == 'failed' else 'warn' if run.awaiting_gate else '' }}">{{ run.status }}</span></h2>
+  {% if run.status == "failed" and failed_job %}
+  <p class="error">Failed at <strong>{{ failed_job.stage }}</strong> ({{ failed_job.error_code }}): {{ failed_job.error_message }}</p>
+  {% elif run.awaiting_gate %}<p>Waiting for your decision at <strong>{{ run.awaiting_gate }}</strong>.</p>
+  {% elif run.status not in ("done", "cancelled") %}<p class="muted">Working… this view refreshes every 2 seconds.</p>
+  {% endif %}
+  <p class="small muted">Recorded spend: ${{ "%.4f" | format(run.total_cost_usd) }}</p>
+</section>
+
+<section>
+  <h2>State timeline</h2>
+  <table>
+    <tr><th>At (UTC)</th><th>From</th><th>To</th><th>Actor</th></tr>
+    {% for e in run.events %}
+    <tr><td class="small">{{ e.at.strftime("%H:%M:%S") }}</td><td>{{ e.from_state or "—" }}</td>
+        <td>{{ e.to_state }}</td><td>{{ e.actor }}</td></tr>
+    {% endfor %}
+  </table>
+</section>
+
+<section>
+  <h2>Run log (every attempt)</h2>
+  <table>
+    <tr><th>Stage</th><th>Attempt</th><th>Result</th><th>Started</th><th>Finished</th><th>Error</th></tr>
+    {% for j in run.jobs %}
+    <tr><td>{{ j.stage }}</td><td>{{ j.retry_count + 1 }}</td>
+        <td><span class="pill {{ 'ok' if j.status in ('succeeded', 'cached') else 'bad' if j.status in ('failed', 'abandoned') else '' }}">{{ j.status }}</span></td>
+        <td class="small">{{ j.started_at.strftime("%H:%M:%S") }}</td>
+        <td class="small">{{ j.finished_at.strftime("%H:%M:%S") if j.finished_at else "—" }}</td>
+        <td class="small">{{ (j.error_code ~ ": " ~ j.error_message) if j.error_code else "" }}</td></tr>
+    {% endfor %}
+  </table>
+</section>
+
+{% if run.approvals %}
+<section>
+  <h2>Decisions</h2>
+  <table>
+    <tr><th>Gate</th><th>Decision</th><th>Reviewer</th><th>Target</th><th>Notes</th><th>Review time</th></tr>
+    {% for a in run.approvals %}
+    <tr><td>{{ a.stage }}</td><td><span class="pill {{ 'ok' if a.decision == 'approve' else 'bad' }}">{{ a.decision }}</span></td>
+        <td>{{ a.approver }}</td><td>{{ a.target_stage or "" }}</td>
+        <td class="small">{{ a.notes }}
+          {% if a.claim_edits and (a.claim_edits.removed or a.claim_edits.edited) %}<br>claims removed: {{ a.claim_edits.removed | join(", ") or "none" }}; edited: {{ a.claim_edits.edited.keys() | join(", ") or "none" }}{% endif %}
+          {% if a.ai_disclosure %}<br>AI disclosure: {{ "yes" if a.ai_disclosure.synthetic else "no" }} — {{ a.ai_disclosure.reason }}{% endif %}</td>
+        <td class="small">{{ "%.1f" | format((a.timestamp - a.opened_at).total_seconds() / 60) }} min</td></tr>
+    {% endfor %}
+  </table>
+</section>
+{% endif %}
