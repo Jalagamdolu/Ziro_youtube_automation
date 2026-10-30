@@ -43,3 +43,9 @@ Dolender builds both halves; `content_package.json` (versioned, Pydantic) remain
 
 ## D-14 Solo-schedule risk policy
 Cut from the bottom only: Shorts-from-long, Hindi/Telugu, sandbox YouTube adapter, second-topic render (script+package suffices per brief). Never cut gates, claim checking, retries or tests — they are the pass/fail definition.
+
+## D-15 Schema additions beyond §6 (brief §07 wins on publication dates)
+Brief §07 requires a publication date and citation for topical claims; §4/§6 omit it. Add nullable `published_at` to `claims.json` and `sources`. Also add implementation columns the architecture implies but does not list: surrogate `id` + `created_at` on every table; `jobs.attempt` and `jobs.error_message` ("fatal failure ends failed with reason"); `approvals.decision_id` (unique) so a replayed gate resume cannot double-record a decision; `approvals.ai_disclosure` (yes/no + reason, qa_review only); `costs.created_at`. Trade-off: schema slightly wider than §6; nothing in §6 removed or renamed.
+
+## D-16 Linux containers for worker and DB-backed tests; Windows host runs only docker + make
+RQ's default worker uses `os.fork` (absent on Windows), and WhisperX/Remotion/FFmpeg are simpler to pin in a Linux image. Worker, API and DB-backed tests run in Docker Compose; GitHub Actions runs on Ubuntu; the host needs only Docker Desktop, uv and make. `.gitattributes` forces LF so scripts work inside containers. Trade-off: local test runs need Docker up; `make test` is slower than bare pytest. Pure unit tests still run on the host with uv.

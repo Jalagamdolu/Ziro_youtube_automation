@@ -66,6 +66,16 @@ LLM · Search/Fetch · TTS · Aligner · Renderer · Thumbnail · Storage (local
 - Graph suite: stub run end to end; worker killed mid-node → reaper resumes without re-running completed nodes; reject re-runs downstream only; publish unreachable without approval.
 - Layout: `tests/{unit,graph,faults,golden,manual_qa}`.
 
+## KEEP IT LEAN (standing rule, every phase)
+Complexity must trace to a requirement: a brief section, a T01–T12 test, or a decisions.md entry.
+- No abstraction with only one implementation — except the adapter interfaces in ARCHITECTURE.md (they exist for mocks).
+- No config options, parameters or "future flexibility" beyond what the architecture lists. YAGNI.
+- Plain functions over classes, flat over clever, stdlib over a new dependency. Every new dependency gets one sentence of justification in decisions.md.
+- Small files, obvious names, minimal indirection: a reader finds where anything happens in one hop.
+- Docstrings only where intent isn't obvious from the name.
+- Unsure whether something is needed → leave it out and note it.
+Target: the smallest codebase that passes the current phase's "done" criteria.
+
 ## Engineering rules
 - Type hints everywhere; `ruff` + `mypy` clean; pinned deps; Alembic migrations.
 - structlog JSON; every line carries `project_id`, `stage`, `attempt`; no sensitive data.
