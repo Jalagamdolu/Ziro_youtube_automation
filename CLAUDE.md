@@ -3,7 +3,7 @@
 Prompt-to-video pipeline: one content brief in → researched, fact-checked, scripted, branded, rendered YouTube video out, with three human approval gates and MOCKED publishing.
 
 ## Sources of truth (precedence on conflict: brief > architecture > session prompt — and tell the user)
-- `docs/BRIEF.md` — requirements. The user is **Dolender** (nickname Dolu), sole implementation engineer; **Hemu** is lead and reviewer at all three gates.
+- `docs/BRIEF.md` — requirements (do not edit it). The user is **Dolender** (nickname Dolu) and does everything: engineering, PR review/merge, and review at all three pipeline gates (the approvals table records the user as approver). The brief's mentions of Hemu stay in the brief but are not part of the operational workflow — never wait on or reference a Hemu review step. Reports (workboard.md, sign-off.md) show the sign-off as the user's.
 - `architecture/ARCHITECTURE.md` — design, ALREADY DECIDED. Implement it; do not redesign. Section refs below (§n) point there.
 - `architecture/decisions.md` — D-01..D-14 reasoning. Any deviation → new numbered entry (D-15, …) AND tell the user before proceeding.
 - `architecture/REUSE.md` — every vendored file used and where; what is custom. Keep current.
@@ -80,7 +80,7 @@ Target: the smallest codebase that passes the current phase's "done" criteria.
 - Type hints everywhere; `ruff` + `mypy` clean; pinned deps; Alembic migrations.
 - structlog JSON; every line carries `project_id`, `stage`, `attempt`; no sensitive data.
 - `src/config.yaml` holds models, prices, retries, gates, spend cap.
-- Small commits (one logical step). Branch per phase; PRs map to YT-02..YT-10 (all Dolender's, Hemu reviews). Commit/push only when the user asks.
+- Small commits (one logical step). Branch per phase; PRs map to YT-02..YT-10, all Dolender's. The user reviews and merges PRs; Claude merges only after CI is green and only when the user says so. Commit/push only when the user asks.
 - `runs/` is git-ignored; only exported `outputs/` are committed.
 
 ## Phases — ONE at a time. After each: run all tests, report results + anything skipped/assumed, STOP for the user's "go".

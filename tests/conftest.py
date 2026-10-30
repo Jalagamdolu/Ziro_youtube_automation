@@ -95,12 +95,12 @@ def create(client: Any, **overrides: Any) -> str:
 
 
 def approve(client: Any, project_id: str, **extra: Any) -> Any:
-    return client.post(f"/projects/{project_id}/approve", json={"reviewer": "Hemu"} | extra)
+    return client.post(f"/projects/{project_id}/approve", json={"reviewer": "Dolender"} | extra)
 
 
 def reject(client: Any, project_id: str, target: str, notes: str = "needs work") -> Any:
     return client.post(f"/projects/{project_id}/reject",
-                       json={"reviewer": "Hemu", "target": target, "notes": notes})
+                       json={"reviewer": "Dolender", "target": target, "notes": notes})
 
 
 def status(client: Any, project_id: str) -> dict[str, Any]:

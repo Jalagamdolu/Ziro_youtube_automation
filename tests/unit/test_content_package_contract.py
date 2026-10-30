@@ -48,8 +48,8 @@ def test_brief_duration_must_fit_format(fmt: str, seconds: int) -> None:
 def test_decision_rules() -> None:
     now = datetime.now(UTC)
     with pytest.raises(ValidationError):
-        Decision(decision_id="d", gate="script_review", decision="reject", reviewer="Hemu",
+        Decision(decision_id="d", gate="script_review", decision="reject", reviewer="Dolender",
                  decided_at=now)
     with pytest.raises(ValidationError):
-        Decision(decision_id="d", gate="qa_review", decision="approve", reviewer="Hemu",
+        Decision(decision_id="d", gate="qa_review", decision="approve", reviewer="Dolender",
                  decided_at=now)

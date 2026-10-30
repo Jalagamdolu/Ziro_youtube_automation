@@ -23,6 +23,7 @@ def test_stub_run_passes_all_gates_to_done(client, calls: Counter[str]) -> None:
 
     approvals = run["approvals"]
     assert [a["stage"] for a in approvals] == ["research_review", "script_review", "qa_review"]
-    assert all(a["approver"] == "Hemu" and a["opened_at"] <= a["timestamp"] for a in approvals)
+    assert all(a["approver"] == "Dolender" for a in approvals)
+    assert all(a["opened_at"] <= a["timestamp"] for a in approvals)
     assert approvals[2]["ai_disclosure"] == DISCLOSURE
     assert {a["type"] for a in run["artifacts"]} >= {"metrics.json", "publish_receipt.json"}
