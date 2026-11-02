@@ -70,3 +70,48 @@ def test_fixture_ledger_is_fully_sourced() -> None:
     for claim in FixtureResearch().find_claims(brief):
         assert claim.url.startswith("https://") and claim.quote and claim.title
         assert claim.verification_status == "verified"
+
+
+def test_packaging_cannot_claim_what_no_approved_claim_says() -> None:
+    from app.nodes.script_checks import packaging_problems
+
+    rag = Claim(id="C1", claim="RAG connects a model to external knowledge bases.", url="u",
+                title="t", quote="RAG connects a model to external knowledge bases.",
+                accessed_at=datetime(2026, 11, 2), verification_status="verified")
+    problems = packaging_problems(["How RAG Fixes AI Hallucinations",
+                                   "How RAG Connects Models To Data",
+                                   "Learn RAG. Placements guaranteed.\n\nSources:\n- IBM: u"],
+                                  [rag])
+    assert [p.split("'")[1] for p in problems] == ["Fixes", "Hallucinations", "Placements",
+                                                   "guaranteed"]
+    accurate = rag.model_copy(update={"claim": "RAG makes answers more accurate."})
+    assert packaging_problems(["Why RAG Answers Are More Accurate"], [accurate]) == []
+
+
+def test_screen_shows_only_what_the_voice_says() -> None:
+    from app.nodes.script_checks import on_screen_problems
+
+    script = ('## Relevance\n[ON SCREEN: "Real-time external knowledge bases"]\n'
+              "It connects a model to external knowledge bases.\n"
+              '## Example\n[ON SCREEN: "Stale data" and "Fetched facts" side by side]\n'
+              "A plain model guesses from stale data; RAG fetches facts first.\n")
+    problems = on_screen_problems(script, [], "What is RAG?")
+    assert len(problems) == 1 and "'real-time'" in problems[0]
+
+
+def test_narration_cannot_claim_outcomes_no_claim_states() -> None:
+    rag = Claim(id="C1", claim="RAG connects a model to external knowledge bases.", url="u",
+                title="t", quote="RAG connects a model to external knowledge bases.",
+                accessed_at=datetime(2026, 11, 2), verification_status="verified")
+    script = ("## Example\n[ON SCREEN: \"RAG\"]\n"
+              "RAG connects a model to external knowledge bases to improve answers. [C1]\n"
+              "This makes answers reliable.\n")
+    assert [p.split("'")[1] for p in claim_problems(script, [rag])] == ["improve", "reliable"]
+
+
+def test_screen_may_show_filler_words_unspoken() -> None:
+    from app.nodes.script_checks import on_screen_problems
+
+    script = ('## Example\n[ON SCREEN: chat bubble asking "When is my exam?"]\n'
+              "Ask a plain model the exam date and it guesses.\n")
+    assert on_screen_problems(script, [], "What is RAG?") == []
