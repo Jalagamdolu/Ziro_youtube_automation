@@ -1,25 +1,18 @@
 """Stub stages: fake but contract-valid artifacts so the full graph runs end to end.
 
-Each phase replaces entries in app.nodes.FUNCS with real stages. `draft` is already final for
-prototype mode: the brief comes straight from the request (an LLM refines it in production).
+Each phase replaces entries in app.nodes.FUNCS with real stages.
 """
 
 import json
 
 from app.adapters.publisher import MockPublisher, approved_run
 from app.core import costs, db
-from app.core.contracts import Brief, ContentPackage
+from app.core.contracts import ContentPackage
 from app.nodes.context import Outputs, StageContext
 
 
 def _dump(data: object) -> str:
     return json.dumps(data, indent=2, ensure_ascii=False, default=str)
-
-
-def draft(ctx: StageContext) -> Outputs:
-    request = json.loads(ctx.storage.read(f"{ctx.project_id}/request.json"))
-    brief = Brief.model_validate(request["brief"])
-    return {"brief.json": brief.model_dump_json(indent=2)}
 
 
 def rendering(ctx: StageContext) -> Outputs:

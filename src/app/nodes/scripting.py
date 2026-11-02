@@ -10,7 +10,7 @@ from typing import Any
 from sqlalchemy import select
 
 from app.adapters import llm
-from app.core import db
+from app.core import costs, db
 from app.core.contracts import Brief, Claim, ContentPackage, Hook, PackageDraft
 from app.core.errors import FatalError
 from app.core.models import Approval
@@ -24,17 +24,10 @@ def scripting(ctx: StageContext) -> Outputs:
     brief = Brief.model_validate(ctx.read_json("draft", "brief.json"))
     claims = approved_claims(ctx.project_id, ctx.read_json("researching", "claims.json"))
     writer = llm.get()
-    notes = ctx.notes
-    for _ in range(1 + MAX_REVISIONS):
-        draft = writer.write_package(brief, claims, notes)
-        hooks = skills.score_hooks([h.text for h in draft.hooks])
-        titles = skills.lint_titles(draft.titles, draft.thumbnail_text)
-        problems = _problems(draft, brief, claims, hooks, titles)
-        if not problems:
-            break
-        notes = "Fix: " + "; ".join(problems)
-    else:
-        raise FatalError(f"script failed checks after {MAX_REVISIONS} revisions: {notes}")
+    try:
+        draft, hooks, titles = _write(writer, brief, claims, ctx.notes)
+    finally:
+        costs.record_usage(ctx.project_id, "scripting", writer.calls)
 
     explanations = {h.text: h.explanation for h in draft.hooks}
     package = ContentPackage(
@@ -58,6 +51,19 @@ def scripting(ctx: StageContext) -> Outputs:
         "hook_scores.json": json.dumps(hooks, indent=2, ensure_ascii=False),
         "title_lint.json": json.dumps(titles, indent=2, ensure_ascii=False),
     }
+
+
+def _write(writer: llm.LLM, brief: Brief, claims: list[Claim], notes: str | None
+           ) -> tuple[PackageDraft, list[dict[str, Any]], list[dict[str, Any]]]:
+    for _ in range(1 + MAX_REVISIONS):
+        draft = writer.write_package(brief, claims, notes)
+        hooks = skills.score_hooks([h.text for h in draft.hooks])
+        titles = skills.lint_titles(draft.titles, draft.thumbnail_text)
+        problems = _problems(draft, brief, claims, hooks, titles)
+        if not problems:
+            return draft, hooks, titles
+        notes = "Fix: " + "; ".join(problems)
+    raise FatalError(f"script failed checks after {MAX_REVISIONS} revisions: {notes}")
 
 
 def approved_claims(project_id: str, researched: list[dict[str, Any]]) -> list[Claim]:

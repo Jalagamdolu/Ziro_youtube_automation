@@ -4,6 +4,10 @@ x-app-env: &app-env
   DATABASE_URL: postgresql://postgres@postgres:5432/ziro
   REDIS_URL: redis://redis:6379/0
   RUNS_DIR: /app/runs
+  # mode: production only (D-27); read from the git-ignored .env, empty otherwise.
+  GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+  GROQ_API_KEY: ${GROQ_API_KEY:-}
+  TAVILY_API_KEY: ${TAVILY_API_KEY:-}
 
 services:
   postgres:

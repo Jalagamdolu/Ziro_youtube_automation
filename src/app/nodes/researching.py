@@ -5,7 +5,7 @@ import json
 from sqlalchemy import delete
 
 from app.adapters import research
-from app.core import db
+from app.core import costs, db
 from app.core.contracts import Brief
 from app.core.errors import FatalError
 from app.core.log import log
@@ -15,7 +15,11 @@ from app.nodes.context import Outputs, StageContext
 
 def researching(ctx: StageContext) -> Outputs:
     brief = Brief.model_validate(ctx.read_json("draft", "brief.json"))
-    found = research.get().find_claims(brief)
+    agent = research.get()
+    try:
+        found = agent.find_claims(brief)
+    finally:
+        costs.record_usage(ctx.project_id, "researching", agent.calls)
     claims = [c for c in found if c.verification_status == "verified"]
     if len(claims) < len(found):
         log.warning("dropped unverified claims", dropped=len(found) - len(claims))

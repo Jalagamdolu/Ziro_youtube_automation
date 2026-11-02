@@ -1,5 +1,5 @@
-"""TTS adapter (D-07, D-23). Prototype: Kokoro-82M through kokoro-onnx, local and free.
-Sarvam is the production adapter and is not built until production mode (D-19).
+"""TTS adapter (D-07, D-23). Kokoro-82M through kokoro-onnx, local and free, in both modes during
+the evaluation phase (D-27). Sarvam is the paid production upgrade and is not built yet (D-19).
 """
 
 import hashlib
@@ -80,6 +80,6 @@ def _model(folder: Path, name: str) -> Path:
 
 def get() -> TTS:
     cfg = config.load()
-    if cfg["mode"] == "prototype" and cfg["tts"]["engine"] == "kokoro":
+    if cfg["tts"]["engine"] == "kokoro":  # both modes during the evaluation phase (D-27)
         return KokoroTTS(cfg["tts"], cfg["pronunciation"])
-    raise FatalError("production TTS (Sarvam) is not built yet (D-19)")
+    raise FatalError("Sarvam TTS is not built yet (D-19)")
