@@ -1,0 +1,97 @@
+WEBVTT
+
+00:00:00.081 --> 00:00:01.441
+Your chatbot answers.
+
+00:00:01.915 --> 00:00:03.081
+Why can't it act?
+
+00:00:03.802 --> 00:00:05.268
+If you are building AI
+
+00:00:05.308 --> 00:00:07.657
+projects, this difference decides what
+
+00:00:07.698 --> 00:00:09.023
+you actually build next.
+
+00:00:09.764 --> 00:00:11.308
+A chatbot is a software
+
+00:00:11.368 --> 00:00:13.775
+application that communicates with people
+
+00:00:13.915 --> 00:00:15.239
+through text or voice.
+
+00:00:15.670 --> 00:00:16.892
+Ask it when your exam
+
+00:00:17.033 --> 00:00:18.616
+is, and it answers, then
+
+00:00:18.697 --> 00:00:20.000
+waits for your next message.
+
+00:00:20.390 --> 00:00:22.174
+An agent is different: a
+
+00:00:22.234 --> 00:00:24.780
+system that autonomously performs tasks
+
+00:00:24.920 --> 00:00:27.045
+by designing workflows with available
+
+00:00:27.105 --> 00:00:27.446
+tools.
+
+00:00:27.796 --> 00:00:28.718
+Give it a goal like
+
+00:00:28.738 --> 00:00:30.921
+"shortlist internships that match my
+
+00:00:30.981 --> 00:00:32.724
+résumé and add the deadlines
+
+00:00:32.784 --> 00:00:34.067
+to my calendar", and it
+
+00:00:34.087 --> 00:00:36.390
+plans the steps, searches, reads,
+
+00:00:36.551 --> 00:00:38.354
+shortlists and writes the entries
+
+00:00:38.414 --> 00:00:38.814
+itself.
+
+00:00:39.205 --> 00:00:41.712
+Anthropic describes agents as systems
+
+00:00:42.012 --> 00:00:43.276
+where the model directs its
+
+00:00:43.396 --> 00:00:44.980
+own process and tool use.
+
+00:00:45.741 --> 00:00:47.166
+So here is the test.
+
+00:00:47.557 --> 00:00:49.048
+If it only talks, it
+
+00:00:49.108 --> 00:00:49.874
+is a chatbot.
+
+00:00:50.225 --> 00:00:51.346
+If it pursues a goal
+
+00:00:51.586 --> 00:00:52.988
+and completes tasks for you,
+
+00:00:53.329 --> 00:00:54.250
+it is an agent.
+
+00:00:55.010 --> 00:00:58.180
+Explore AI learning at ziro.digital.

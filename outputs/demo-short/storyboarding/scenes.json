@@ -1,0 +1,147 @@
+[
+  {
+    "id": "S1",
+    "section": "Hook",
+    "on_screen": "\"Chatbot\" and \"Agent\" side by side, a question mark between them",
+    "visual_type": "comparison",
+    "text": "Your chatbot answers. Why can't it act?",
+    "asset": null,
+    "props": {
+      "headline": "Chatbot",
+      "source": "",
+      "left": "Chatbot",
+      "right": "Agent",
+      "between": "?"
+    },
+    "duration": 2.8
+  },
+  {
+    "id": "S2",
+    "section": "Relevance",
+    "on_screen": "a student's project board with \"Build an AI agent\" pinned at the top",
+    "visual_type": "title",
+    "text": "If you are building AI projects, this difference decides what you actually build next.",
+    "asset": null,
+    "props": {
+      "headline": "Build an AI agent",
+      "source": ""
+    },
+    "duration": 5.6
+  },
+  {
+    "id": "S3",
+    "section": "Example",
+    "on_screen": "definition card - \"What is a chatbot?\", source: IBM",
+    "visual_type": "definition_card",
+    "text": "A chatbot is a software application that communicates with people through text or voice. [C2]",
+    "asset": null,
+    "props": {
+      "headline": "What is a chatbot?",
+      "source": "IBM",
+      "label": "DEFINITION",
+      "definition": "A chatbot is a software application that communicates with people through text or voice.",
+      "source_title": "What is a chatbot? (IBM Think)",
+      "source_url": "https://www.ibm.com/think/topics/chatbots"
+    },
+    "duration": 5.6
+  },
+  {
+    "id": "S4",
+    "section": "Example",
+    "on_screen": "a chat bubble asking \"When is my exam?\" and a single reply",
+    "visual_type": "chat_bubble",
+    "text": "Ask it when your exam is, and it answers, then waits for your next message.",
+    "asset": null,
+    "props": {
+      "headline": "When is my exam?",
+      "source": "",
+      "message": "When is my exam?"
+    },
+    "duration": 6.0
+  },
+  {
+    "id": "S5",
+    "section": "Example",
+    "on_screen": "definition card - \"What are AI agents?\", source: IBM",
+    "visual_type": "definition_card",
+    "text": "An agent is different: a system that autonomously performs tasks by designing workflows with available tools. [C3]",
+    "asset": null,
+    "props": {
+      "headline": "What are AI agents?",
+      "source": "IBM",
+      "label": "DEFINITION",
+      "definition": "An AI agent is a system that autonomously performs tasks by designing workflows with available tools.",
+      "source_title": "What are AI agents? (IBM Think)",
+      "source_url": "https://www.ibm.com/think/topics/ai-agents"
+    },
+    "duration": 6.4
+  },
+  {
+    "id": "S6",
+    "section": "Example",
+    "on_screen": "illustrative flow, labelled \"example\": search, read, shortlist, calendar",
+    "visual_type": "flow",
+    "text": "Give it a goal like \"shortlist internships that match my résumé and add the deadlines to my calendar\", and it plans the steps, searches, reads, shortlists and writes the entries itself.",
+    "asset": null,
+    "props": {
+      "headline": "example",
+      "source": "",
+      "label": "example",
+      "steps": [
+        "search",
+        "read",
+        "shortlist",
+        "calendar"
+      ]
+    },
+    "duration": 12.4
+  },
+  {
+    "id": "S7",
+    "section": "Example",
+    "on_screen": "quote card, source: Anthropic, \"Building effective agents\"",
+    "visual_type": "quote_card",
+    "text": "Anthropic describes agents as systems where the model directs its own process and tool use. [C1]",
+    "asset": null,
+    "props": {
+      "headline": "Building effective agents",
+      "source": "Anthropic",
+      "label": "QUOTE",
+      "definition": "“Agents, on the other hand, are systems where LLMs dynamically direct their own processes and tool usage, maintaining control over how they accomplish tasks.”",
+      "source_title": "Building effective agents (Anthropic Engineering)",
+      "source_url": "https://www.anthropic.com/engineering/building-effective-agents"
+    },
+    "duration": 6.0
+  },
+  {
+    "id": "S8",
+    "section": "Takeaway",
+    "on_screen": "two-line checklist - \"Only talks: chatbot\" / \"Pursues a goal, uses tools, acts: agent\"",
+    "visual_type": "checklist",
+    "text": "So here is the test. If it only talks, it is a chatbot. If it pursues a goal and completes tasks for you, it is an agent. [C4]",
+    "asset": null,
+    "props": {
+      "headline": "Only talks: chatbot",
+      "source": "",
+      "items": [
+        "Only talks: chatbot",
+        "Pursues a goal, uses tools, acts: agent"
+      ]
+    },
+    "duration": 10.8
+  },
+  {
+    "id": "S9",
+    "section": "CTA",
+    "on_screen": "Ziro logo and \"ziro.digital\"",
+    "visual_type": "end_card",
+    "text": "Explore AI learning at ziro.digital.",
+    "asset": null,
+    "props": {
+      "headline": "ziro.digital",
+      "source": "",
+      "url": "ziro.digital"
+    },
+    "duration": 2.0
+  }
+]

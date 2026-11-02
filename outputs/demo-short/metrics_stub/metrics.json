@@ -1,0 +1,19 @@
+{
+  "source": "stub",
+  "columnHeaders": [
+    "views",
+    "estimatedMinutesWatched",
+    "averageViewDuration",
+    "averageViewPercentage",
+    "subscribersGained"
+  ],
+  "rows": [
+    [
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  ]
+}

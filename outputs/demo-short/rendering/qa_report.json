@@ -1,0 +1,22 @@
+{
+  "duration_s": 58.5,
+  "duration_ok": true,
+  "resolution": "1080x1920",
+  "loudness_target_lufs": -14,
+  "words": 144,
+  "cues": 32,
+  "scene_types": [
+    "chat_bubble",
+    "checklist",
+    "comparison",
+    "definition_card",
+    "end_card",
+    "flow",
+    "quote_card",
+    "title"
+  ],
+  "deferred": [
+    "chapters",
+    "dead-air"
+  ]
+}

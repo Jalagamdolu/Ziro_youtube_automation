@@ -1,0 +1,67 @@
+[
+  {
+    "hook": "Before you build, know agent versus chatbot.",
+    "properties": {
+      "SPECIFICITY": 34,
+      "ADDRESS": 76,
+      "STAKES": 48,
+      "CURIOSITY": 41,
+      "BREVITY": 78
+    },
+    "verdict": 47,
+    "band": "WEAK",
+    "formula": "The Warning"
+  },
+  {
+    "hook": "Your chatbot answers. Why can't it act?",
+    "properties": {
+      "SPECIFICITY": 40,
+      "ADDRESS": 76,
+      "STAKES": 22,
+      "CURIOSITY": 59,
+      "BREVITY": 78
+    },
+    "verdict": 42,
+    "band": "WEAK",
+    "formula": "The Question"
+  },
+  {
+    "hook": "Stop calling your chatbot an AI agent.",
+    "properties": {
+      "SPECIFICITY": 40,
+      "ADDRESS": 76,
+      "STAKES": 48,
+      "CURIOSITY": 24,
+      "BREVITY": 78
+    },
+    "verdict": 42,
+    "band": "WEAK",
+    "formula": "The Mistake"
+  },
+  {
+    "hook": "Your chatbot answers. An agent acts.",
+    "properties": {
+      "SPECIFICITY": 40,
+      "ADDRESS": 76,
+      "STAKES": 22,
+      "CURIOSITY": 24,
+      "BREVITY": 67
+    },
+    "verdict": 36,
+    "band": "WEAK",
+    "formula": "Unclassified"
+  },
+  {
+    "hook": "Chatbot or agent: which one runs tasks?",
+    "properties": {
+      "SPECIFICITY": 34,
+      "ADDRESS": 26,
+      "STAKES": 22,
+      "CURIOSITY": 59,
+      "BREVITY": 78
+    },
+    "verdict": 35,
+    "band": "WEAK",
+    "formula": "The Question"
+  }
+]

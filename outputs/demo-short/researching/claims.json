@@ -1,0 +1,42 @@
+[
+  {
+    "id": "C1",
+    "claim": "Anthropic distinguishes agents from workflows: agents are systems where LLMs dynamically direct their own processes and tool usage.",
+    "url": "https://www.anthropic.com/engineering/building-effective-agents",
+    "title": "Building effective agents (Anthropic Engineering)",
+    "quote": "Agents, on the other hand, are systems where LLMs dynamically direct their own processes and tool usage, maintaining control over how they accomplish tasks.",
+    "accessed_at": "2026-10-30T06:38:39Z",
+    "published_at": "2024-12-19T00:00:00Z",
+    "verification_status": "verified"
+  },
+  {
+    "id": "C2",
+    "claim": "A chatbot is a software application that communicates with people through text or voice.",
+    "url": "https://www.ibm.com/think/topics/chatbots",
+    "title": "What is a chatbot? (IBM Think)",
+    "quote": "A chatbot is a software application that communicates with people through text or voice.",
+    "accessed_at": "2026-10-30T06:38:42Z",
+    "published_at": "2021-10-15T00:00:00Z",
+    "verification_status": "verified"
+  },
+  {
+    "id": "C3",
+    "claim": "An AI agent is a system that autonomously performs tasks by designing workflows with available tools.",
+    "url": "https://www.ibm.com/think/topics/ai-agents",
+    "title": "What are AI agents? (IBM Think)",
+    "quote": "An artificial intelligence (AI) agent is a system that autonomously performs tasks by designing workflows with available tools.",
+    "accessed_at": "2026-10-30T06:38:41Z",
+    "published_at": "2024-07-03T00:00:00Z",
+    "verification_status": "verified"
+  },
+  {
+    "id": "C4",
+    "claim": "AI agents use AI to pursue goals and complete tasks on behalf of users.",
+    "url": "https://cloud.google.com/discover/what-are-ai-agents",
+    "title": "What are AI agents? (Google Cloud)",
+    "quote": "AI agents are software systems that use AI to pursue goals and complete tasks on behalf of users.",
+    "accessed_at": "2026-10-30T06:38:45Z",
+    "published_at": null,
+    "verification_status": "verified"
+  }
+]
