@@ -5,6 +5,7 @@ requires-python = "==3.12.*"
 dependencies = [
   "alembic==1.20.1",
   "fastapi==0.162.0",
+  "httpx==0.28.1",
   "jinja2==3.1.6",
   "langgraph==1.2.18",
   "langgraph-checkpoint-postgres==3.2.0",
@@ -16,14 +17,15 @@ dependencies = [
   "rq==3.0.0",
   "sqlalchemy==2.1.6",
   "structlog==26.1.0",
+  "trafilatura==2.3.1",
   "uvicorn==0.54.0",
 ]
 
 [dependency-groups]
 dev = [
-  "httpx==0.28.1",
   "mypy==2.4.1",
   "pytest==9.2.0",
+  "respx==0.23.1",
   "ruff==0.17.3",
   "types-pyyaml==6.0.12.20260906",
 ]
@@ -79,8 +81,11 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
-markers = ["media: needs the worker image (real TTS + alignment models)"]
-addopts = "-m 'not media'"
+markers = [
+  "media: needs the worker image (real TTS + alignment models)",
+  "live: calls the free-tier LLM and search APIs (D-27); needs ZIRO_LIVE=1 and keys",
+]
+addopts = "-m 'not media and not live'"
 
 [tool.alembic]
 script_location = "src/app/core/migrations"
