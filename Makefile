@@ -8,7 +8,7 @@ UNTIL    ?= end
 AUDIENCE ?= Indian students, early-career developers and career switchers
 CTA      ?= Explore AI learning at ziro.digital
 
-.PHONY: up down test lint video export install-voice demo-short demo-long second-topic
+.PHONY: up down test test-live lint video export install-voice demo-short demo-long second-topic
 
 up:
 	$(COMPOSE) up -d --build
@@ -19,6 +19,11 @@ down:
 test:
 	$(COMPOSE) build api
 	$(APP) pytest -q
+
+# Free-tier smoke test (D-27): a few real requests; keys from .env.
+test-live:
+	$(COMPOSE) build api
+	$(APP) sh -c "ZIRO_LIVE=1 pytest -q -m live"
 
 lint:
 	$(COMPOSE) build api
