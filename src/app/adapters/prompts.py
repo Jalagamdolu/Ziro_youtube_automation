@@ -55,6 +55,7 @@ def package(brief: Brief, claims: list[Claim], notes: str | None) -> tuple[str, 
              "and the next action.")
     # hookscore.py prefers longer hooks; for a Short the brief's 3-second rule wins (D-21), so
     # every candidate is short and whichever two score best still fit.
+    outcome_words = script_checks.OUTCOME_WORDS
     hook_length = ("Every hook is 5-7 words." if brief.format == "short"
                    else "Every hook is at most 25 words.")
     system = "\n\n".join([
@@ -95,9 +96,15 @@ def package(brief: Brief, claims: list[Claim], notes: str | None) -> tuple[str, 
 7. The Hook section's narration is exactly the text of one of your five hooks.
 8. hooks: five distinct hooks, each with a one-sentence explanation naming its formula.
    {hook_length}
-9. Narration, on-screen text, titles, thumbnail text, description and tags use no outcome or
-   quality words (fixes, solves, better, faster, accurate, reliable, hallucinations, best, #1,
-   reduces, improves, boost) unless a claim in the ledger uses that exact word.
+9. No hype and no invented outcomes, anywhere: narration, on-screen text, titles, thumbnail,
+   description, tags. These words are rejected unless a claim in the ledger uses that exact
+   word: {outcome_words}. Say what the thing DOES (connects, fetches, retrieves, references),
+   never how much better it makes something. A cited sentence may only say what its claim says.
+   PASS: "How RAG Connects Models To Data" | "What Is RAG? Fetch First, Then Answer" |
+         "RAG adds a retrieval step that pulls information from a new data source [C4]."
+   FAIL: "Boost AI Answers With RAG" | "How RAG Fixes Hallucinations" |
+         "Make LLM Answers Accurate" |
+         "It references a knowledge base, improving the response [C2]."
 10. titles: ten distinct titles, at most 60 characters, no more than two ALL-CAPS words.
 11. thumbnail_text: at most 3 words, not repeating words from the best title.
 12. description: 2-4 plain sentences, then "Sources:" with one line per cited claim
