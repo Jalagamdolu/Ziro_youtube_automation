@@ -23,14 +23,29 @@ VISUAL_TYPES = [
     ("logo", "end_card"),
 ]
 QUOTED = re.compile(r'"([^"]+)"')
+# Fields a template cannot render without; scripting rejects beats that leave them empty.
+REQUIRED = {"definition_card": "definition", "quote_card": "definition", "comparison": "right",
+            "chat_bubble": "message", "flow": "steps", "checklist": "items", "end_card": "url"}
 
 
 def storyboarding(ctx: StageContext) -> Outputs:
     package = ContentPackage.model_validate(ctx.read_json("scripting", "content_package.json"))
-    claims = {c.id: c for c in package.claims}
+    return {"scenes.json": json.dumps(parse(package.script, package.claims), indent=2,
+                                      ensure_ascii=False)}
+
+
+def visual_problems(script: str, claims: list[Claim]) -> list[str]:
+    return [f"visual {s['on_screen']!r} gives the {s['visual_type']} template no "
+            f"{REQUIRED[s['visual_type']]}; use the beat syntax from the rules"
+            for s in parse(script, claims)
+            if s["visual_type"] in REQUIRED and not s["props"].get(REQUIRED[s["visual_type"]])]
+
+
+def parse(script: str, approved: list[Claim]) -> list[dict[str, Any]]:
+    claims = {c.id: c for c in approved}
     scenes: list[dict[str, Any]] = []
     section = ""
-    for line in package.script.splitlines():
+    for line in script.splitlines():
         line = line.strip()
         if line.startswith("## "):
             section = line[3:].strip()
@@ -44,11 +59,11 @@ def storyboarding(ctx: StageContext) -> Outputs:
         scene["props"] = props(scene, claims)
         words = script_checks.spoken_words([scene["text"]])
         scene["duration"] = round(words / script_checks.WORDS_PER_SECOND, 2)  # estimate at 150 wpm
-    return {"scenes.json": json.dumps(scenes, indent=2, ensure_ascii=False)}
+    return scenes
 
 
 def visual_type(beat: str) -> str:
-    lowered = beat.lower()
+    lowered = QUOTED.sub("", beat).lower()  # on-screen words never pick the template
     return next((kind for key, kind in VISUAL_TYPES if key in lowered), "title")
 
 
@@ -77,6 +92,8 @@ def props(scene: dict[str, Any], claims: dict[str, Claim]) -> dict[str, str | li
     elif kind == "flow" and ":" in beat:  # 'illustrative flow, labelled "example": search, read'
         fields |= {"label": quoted[0] if quoted else "",
                    "steps": [s.strip() for s in beat.rsplit(":", 1)[1].split(",") if s.strip()]}
+    elif kind == "flow" and len(quoted) >= 2:  # 'flow - "Question" to "Search" to "Answer"'
+        fields |= {"label": "", "steps": quoted}
     elif kind == "checklist":
         fields["items"] = quoted
     elif kind == "end_card":

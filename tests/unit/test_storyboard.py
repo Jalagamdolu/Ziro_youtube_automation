@@ -5,7 +5,7 @@ import json
 from app.adapters.llm import FixtureLLM
 from app.adapters.research import FixtureResearch
 from app.core.contracts import Brief, ContentPackage, Hook
-from app.nodes.storyboarding import storyboarding, visual_type
+from app.nodes.storyboarding import parse, storyboarding, visual_problems, visual_type
 
 BRIEF = Brief(topic="What makes an AI agent different from a chatbot?", audience="a",
               learning_outcome="o", language="en", format="short", target_seconds=60,
@@ -54,3 +54,19 @@ def test_fixture_script_becomes_scenes_with_sourced_definition_cards() -> None:
 def test_unknown_beats_fall_back_to_title() -> None:
     assert visual_type("a student's project board") == "title"
     assert visual_type('quote card, source: Anthropic') == "quote_card"
+
+
+def test_quoted_flow_steps_and_keywords_inside_quotes() -> None:
+    script = '## Example\n[ON SCREEN: flow - "Ask" to "Retrieve" to "Answer"]\nIt looks first.\n'
+    assert parse(script, [])[0]["props"]["steps"] == ["Ask", "Retrieve", "Answer"]
+    assert visual_type('"Workflow basics"') == "title"
+
+
+def test_beats_a_template_cannot_render_are_reported() -> None:
+    script = ("## Hook\n[ON SCREEN: chat bubble with a query]\nWhy?\n"
+              '## Example\n[ON SCREEN: flow - "Only one step"]\nThen.\n'
+              '[ON SCREEN: definition card - "RAG", source: IBM]\nNo citation here.\n'
+              '## CTA\n[ON SCREEN: checklist - "Fetch first" / "Then answer"]\nGo.\n')
+    problems = visual_problems(script, [])
+    assert [p.split("template no ")[1].split(";")[0] for p in problems] == [
+        "message", "steps", "definition"]
