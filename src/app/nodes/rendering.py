@@ -2,7 +2,7 @@
 loudness finishing → thumbnail + preview frame (§4, D-07, D-08).
 
 Scenes come from storyboarding's scenes.json; their start/end are the exact times of the audio
-synthesised for them. Shorts only for now (D-26); chapters, dead-air QA and the end card follow.
+synthesised for them. Shorts only for now (D-26); chapters and dead-air QA follow.
 """
 
 import json
@@ -20,6 +20,7 @@ from app.nodes import script_checks
 from app.nodes.context import Outputs, StageContext
 
 SENTENCE_PAUSE, SECTION_PAUSE = 0.15, 0.35
+END_CARD_SECONDS = 2.0  # voice.md: end card about 2 seconds
 CUE_WORDS = 5  # short cues read well on a phone
 FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 TEMPLATES = Path(__file__).resolve().parents[3] / "templates" / "remotion"
@@ -52,6 +53,10 @@ def rendering(ctx: StageContext) -> Outputs:
             audio += [samples, np.zeros(int(SENTENCE_PAUSE * tts.RATE), dtype=np.float32)]
             clock += length + SENTENCE_PAUSE
             characters += len(sentence)
+        if scene["visual_type"] == "end_card" and clock - scene["start"] < END_CARD_SECONDS:
+            hold = scene["start"] + END_CARD_SECONDS - clock
+            audio.append(np.zeros(int(hold * tts.RATE), dtype=np.float32))
+            clock += hold
         scene["end"] = clock
     with db.session() as s, s.begin():
         costs.record_cost(s, ctx.project_id, "rendering", "kokoro-local", characters)
@@ -88,20 +93,20 @@ def rendering(ctx: StageContext) -> Outputs:
             "video.mp4": (work / "video.mp4").read_bytes(),
             "thumbnail.png": (work / "thumbnail.png").read_bytes(),
         }
-        card = next((s for s in scenes if s["visual_type"] == "definition_card"), None)
-        if card:
-            moment = (card["start"] + card["end"]) / 2
+        for kind in dict.fromkeys(s["visual_type"] for s in scenes):  # one still per scene type
+            scene = next(s for s in scenes if s["visual_type"] == kind)
+            moment = scene["start"] + 0.75 * (scene["end"] - scene["start"])
+            name = f"preview_{kind}.png"
             _run(["ffmpeg", "-y", "-ss", f"{moment:.2f}", "-i", "video.mp4", "-frames:v", "1",
-                  "preview_definition_card.png"], work)
-            outputs["preview_definition_card.png"] = (work / "preview_definition_card.png"
-                                                      ).read_bytes()
+                  name], work)
+            outputs[name] = (work / name).read_bytes()
         duration = _probe_seconds(work / "video.mp4")
     low, high = script_checks.RUNTIME[package.brief.format]
     outputs["qa_report.json"] = json.dumps({
         "duration_s": round(duration, 1), "duration_ok": low <= duration <= high,
         "resolution": "1080x1920", "loudness_target_lufs": -14, "words": len(words),
-        "cues": len(cues), "templates_built": ["definition_card"],
-        "deferred": ["chapters", "dead-air", "end card", "five remaining templates"]}, indent=2)
+        "cues": len(cues), "scene_types": sorted({s["visual_type"] for s in scenes}),
+        "deferred": ["chapters", "dead-air"]}, indent=2)
     return outputs
 
 

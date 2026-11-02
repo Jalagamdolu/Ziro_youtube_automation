@@ -52,16 +52,33 @@ def visual_type(beat: str) -> str:
     return next((kind for key, kind in VISUAL_TYPES if key in lowered), "title")
 
 
-def props(scene: dict[str, Any], claims: dict[str, Claim]) -> dict[str, str]:
-    """Template fields. A definition card shows the approved wording of the claim it cites."""
-    beat = scene["on_screen"]
+def props(scene: dict[str, Any], claims: dict[str, Claim]) -> dict[str, str | list[str]]:
+    """Template fields, taken only from the beat and the approved claims it cites. A definition
+    card shows the claim's approved wording; a quote card the source's verified quote."""
+    beat, kind = scene["on_screen"], scene["visual_type"]
     quoted = QUOTED.findall(beat)
     source = re.search(r"source:\s*([^,\]]+)", beat, re.IGNORECASE)
     cited = [claims[f"C{n}"] for n in script_checks.MARKER.findall(scene["text"])
              if f"C{n}" in claims]
-    fields = {"headline": quoted[0] if quoted else "", "source": source.group(1).strip() if source
-              else ""}
-    if scene["visual_type"] == "definition_card" and cited:
-        fields |= {"definition": cited[0].claim, "source_title": cited[0].title,
-                   "source_url": cited[0].url}
+    fields: dict[str, str | list[str]] = {
+        "headline": quoted[0] if quoted else "",
+        "source": source.group(1).strip() if source else ""}
+    if kind in ("definition_card", "quote_card") and cited:
+        quote = kind == "quote_card"
+        fields |= {"label": "QUOTE" if quote else "DEFINITION",
+                   "definition": f"“{cited[0].quote}”" if quote else cited[0].claim,
+                   "source_title": cited[0].title, "source_url": cited[0].url}
+    elif kind == "comparison":
+        fields |= {"left": quoted[0] if quoted else "",
+                   "right": quoted[1] if len(quoted) > 1 else "",
+                   "between": "?" if "question mark" in beat.lower() else "vs"}
+    elif kind == "chat_bubble":
+        fields["message"] = quoted[0] if quoted else ""
+    elif kind == "flow" and ":" in beat:  # 'illustrative flow, labelled "example": search, read'
+        fields |= {"label": quoted[0] if quoted else "",
+                   "steps": [s.strip() for s in beat.rsplit(":", 1)[1].split(",") if s.strip()]}
+    elif kind == "checklist":
+        fields["items"] = quoted
+    elif kind == "end_card":
+        fields["url"] = next((q for q in quoted if "." in q), "")
     return fields

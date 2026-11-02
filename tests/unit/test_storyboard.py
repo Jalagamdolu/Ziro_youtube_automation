@@ -39,6 +39,17 @@ def test_fixture_script_becomes_scenes_with_sourced_definition_cards() -> None:
     assert cards[0]["props"]["definition"] == claims[1].claim  # C2, approved wording
     assert cards[0]["props"]["source"] == "IBM"
 
+    by_type = {s["visual_type"]: s["props"] for s in scenes}
+    assert by_type["comparison"].items() >= {"left": "Chatbot", "right": "Agent",
+                                             "between": "?"}.items()
+    assert by_type["chat_bubble"]["message"] == "When is my exam?"
+    assert by_type["flow"]["steps"] == ["search", "read", "shortlist", "calendar"]
+    assert by_type["flow"]["label"] == "example"
+    assert by_type["quote_card"]["definition"] == f"“{claims[0].quote}”"  # C1, verified quote
+    assert by_type["checklist"]["items"] == ["Only talks: chatbot",
+                                             "Pursues a goal, uses tools, acts: agent"]
+    assert by_type["end_card"]["url"] == "ziro.digital"
+
 
 def test_unknown_beats_fall_back_to_title() -> None:
     assert visual_type("a student's project board") == "title"
