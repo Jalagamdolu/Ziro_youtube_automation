@@ -131,7 +131,9 @@ def photos(project_id: str, scenes: list[dict[str, Any]], public: Path) -> dict[
     store = storage.get()
     chosen_key = PHOTO_CHOICES.format(project_id)
     choices = json.loads(store.read(chosen_key)) if store.exists(chosen_key) else {}
-    report, used, searches = [], [], 0
+    report: list[dict[str, Any]] = []
+    used: list[tuple[stock.Photo, str]] = []  # (photo, its search phrase)
+    searches = 0
     for scene in scenes:
         if not (scene.get("photo_query") and providers):
             continue
@@ -139,7 +141,10 @@ def photos(project_id: str, scenes: list[dict[str, Any]], public: Path) -> dict[
         searches += made
         if not found:
             continue
-        pick = min(int(choices.get(scene["id"], 0)), len(found) - 1)
+        taken = {photo.id for photo, _ in used}  # no photo twice in one video
+        fresh = [i for i, c in enumerate(found) if c.id not in taken] or [0]
+        pick = (min(int(choices[scene["id"]]), len(found) - 1) if scene["id"] in choices
+                else fresh[0])  # the reviewer's swap always wins
         scene["photo"] = f"photo_{scene['id']}.jpg"
         (public / scene["photo"]).write_bytes(stock.download(found[pick]))
         used.append((found[pick], scene["photo_query"]))

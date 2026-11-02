@@ -29,7 +29,12 @@ EXCLUDED = re.compile(
     r"\b(portrait|face|faces|headshot|selfie|smil(e|ing)|close-?up|beauty|model|eyes|"
     r"child(ren)?|kids?|baby|toddler|pupils?|boy|girl|teen(ager)?|"
     r"logo|brand|trademark|apple|macbook|iphone|ipad|google|microsoft|windows|amazon|facebook|"
-    r"instagram|youtube|samsung|android|chatgpt|openai|nike)\b", re.IGNORECASE)
+    r"instagram|youtube|samsung|android|chatgpt|openai|nike|"
+    # Hardware, industrial and consumer brands that show up in tech stock photos. A list can
+    # never be complete; the reviewer's look at qa_review is the real gate (D-34).
+    r"kawasaki|kuka|fanuc|abb|yaskawa|siemens|bosch|tesla|dell|lenovo|hp|asus|acer|intel|amd|"
+    r"nvidia|sony|lg|huawei|xiaomi|oneplus|cisco|ibm|oracle|adidas|coca-?cola|pepsi|starbucks|"
+    r"mcdonalds|toyota|bmw|mercedes|audi|ford|honda|lego|mindstorms?)\b", re.IGNORECASE)
 STOPWORDS = {"and", "are", "can", "does", "for", "from", "how", "into", "its", "that", "the",
              "their", "this", "was", "what", "when", "where", "which", "who", "why", "will",
              "with", "you", "your", "versus", "actually", "really", "make", "makes", "made",
@@ -104,7 +109,8 @@ def candidates(stock: list[Stock], query: str) -> tuple[list[Photo], int]:
         key = f"_stock/{hashlib.sha256(f'{provider.name}:photo:{query}'.encode()).hexdigest()[:16]}"
         store = storage.get()
         if store.exists(f"{key}/results.json"):
-            photos = [Photo(**p) for p in json.loads(store.read(f"{key}/results.json"))]
+            photos = [Photo(**p) for p in json.loads(store.read(f"{key}/results.json"))
+                      if not EXCLUDED.search(p["tags"])]  # filters may have grown since
         else:
             photos = provider.search(query)
             searches += 1

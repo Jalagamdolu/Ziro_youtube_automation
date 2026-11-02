@@ -173,3 +173,43 @@ def test_mock_publish_credits_the_images(client, monkeypatch) -> None:
     description = json.loads(storage.get().read(receipt["storage_path"]))["request"]["snippet"][
         "description"]
     assert description.endswith("\n\nImages: Pixabay")
+
+
+def test_a_photo_is_not_used_twice_unless_the_reviewer_picks_it(client, monkeypatch, tmp_path
+                                                                 ) -> None:
+    from conftest import create
+
+    from app.adapters import storage
+    from app.nodes.rendering import PHOTO_CHOICES, photos
+
+    class Same:
+        name = "pixabay"
+
+        def search(self, query: str) -> list[stock.Photo]:
+            return [stock.Photo("pixabay", f"p{i}", "u", "f", "p", "desk", "Pixabay License",
+                                "l") for i in range(3)]
+
+    monkeypatch.setattr(stock, "get", lambda: [Same()])
+    monkeypatch.setattr(stock, "download", lambda photo: photo.id.encode())
+    project_id = create(client)
+    scenes = [{"id": f"S{i}", "photo_query": f"desk {i}"} for i in range(1, 4)]
+    photos(project_id, scenes, tmp_path)
+    assert [(tmp_path / s["photo"]).read_bytes() for s in scenes] == [b"p0", b"p1", b"p2"]
+
+    storage.get().write(PHOTO_CHOICES.format(project_id), b'{"S3": 0}')
+    photos(project_id, scenes, tmp_path)
+    assert (tmp_path / "photo_S3.jpg").read_bytes() == b"p0"  # the reviewer's swap wins
+
+
+def test_cached_results_are_refiltered_when_the_brand_list_grows(runs) -> None:
+    import hashlib
+
+    from app.adapters import storage
+
+    key = f"_stock/{hashlib.sha256(b'pixabay:photo:robot arm').hexdigest()[:16]}/results.json"
+    cached = [json.loads(json.dumps(stock.Photo("pixabay", str(i), "u", "f", "p", tags,
+                                                "Pixabay License", "l").__dict__))
+              for i, tags in enumerate(["robot, kawasaki, orange", "robot, machine"])]
+    storage.get().write(key, json.dumps(cached).encode())
+    photos, searches = stock.candidates([stock.PixabayStock("key")], "robot arm")
+    assert ([p.id for p in photos], searches) == (["1"], 0)

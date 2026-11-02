@@ -48,10 +48,13 @@ def photo_queries(brief: Brief, scenes: list[dict[str, Any]]) -> tuple[str, str]
                         for i, s in enumerate(scenes))
     prompt = f"""Video: {brief.topic}
 
-For each scene, write a 2-5 word search phrase for a REAL photograph (not an illustration) that
-shows what the narration explains, so the photos alone tell the story.
-- Concrete and photographable: objects, places, actions (e.g. "student notebook exam timetable",
-  "server room cables", "hands typing laptop code").
+For each scene, write a search phrase for a REAL photograph (not an illustration) that shows what
+the narration explains, so the photos alone tell the story.
+- 2-4 plain nouns naming the literal object, document or place the narration talks about. Stock
+  search matches words, not ideas: "exam schedule paper", "paper calendar deadlines", "checklist
+  paper pen", "server room cables", "hand holding phone".
+- Never abstract words ("concept", "AI", "agent", "intelligence", "future", "innovation") and no
+  metaphors: they return illustrations and robots, not photos of the thing.
 - People only when not identifiable: hands, from behind, over the shoulder, or far away. Never
   faces, portraits, selfies or children.
 - No brand names, logos, product screenshots or readable app interfaces.
