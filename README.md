@@ -11,6 +11,16 @@ Set in `src/config.yaml` → `mode`:
 
 Narration is local Kokoro TTS in both modes. WhisperX, Remotion and FFmpeg run locally, and publishing is always mocked.
 
+## Use it
+
+```
+docker compose up -d --build
+```
+
+Open http://localhost:8000. Type a topic, pick Short or Long, and start the run. The run page updates by itself: approve or edit the claims at research_review; approve, reject with notes, or edit the script yourself at script_review; watch the video and set the AI disclosure at qa_review. When the run finishes, the same page plays the video and offers every export file for download. All runs are listed on the home page.
+
+**No login.** The UI has no authentication and the reviewer name is a text field. It is meant for a single reviewer on a local machine. Add authentication, with reviewer identity taken from the login, before deploying it anywhere.
+
 ## Limitations
 
 - **Free tiers (D-27):** quality is below paid models, and daily quotas are small and change without notice. A run that hits the daily quota on every provider stops at `failed` before rendering, with "Retry the run after the quota resets"; re-run it the next day. Google's free tier may use prompts and responses to improve its products, so never put sensitive data in a brief.
