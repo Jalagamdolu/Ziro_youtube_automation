@@ -9,7 +9,7 @@ Set in `src/config.yaml` → `mode`:
 - **prototype** (default, D-19): a fixture script and claim ledger for the preset Short. Needs no API keys and costs $0.
 - **production** (evaluation phase, D-27): any topic. The Gemini free tier (Groq as fallback) writes the brief's learning outcome and the script. A research agent finds sources through Tavily's free plan and keeps only quotes verified on the fetched page. Copy `.env.example` to `.env` and set `GEMINI_API_KEY` (and/or `GROQ_API_KEY`) and `TAVILY_API_KEY`. `make test-live` checks the keys with a few real requests.
 
-Narration is local Kokoro TTS in both modes. Scene backgrounds are stock clips from Pixabay when `PIXABAY_API_KEY` is set (Pexels optional, D-33), otherwise a solid brand colour. WhisperX, Remotion and FFmpeg run locally, and publishing is always mocked.
+Narration is local Kokoro TTS in both modes. Each scene is carried by a real stock photo from Pixabay when `PIXABAY_API_KEY` is set (Pexels optional; no AI images, no identifiable faces; you can swap any photo at qa_review, D-34), otherwise a solid brand colour. WhisperX, Remotion and FFmpeg run locally, and publishing is always mocked.
 
 ## Use it
 
