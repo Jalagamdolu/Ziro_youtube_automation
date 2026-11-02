@@ -54,3 +54,37 @@ def test_script_reject_hands_the_reviewed_script_to_the_writer(client, monkeypat
     assert seen[0] is None
     assert seen[1].startswith("tighten the hook")
     assert "The reviewed script, to edit rather than rewrite:\n## Hook" in seen[1]
+
+
+def test_human_edited_script_goes_through_every_check(client, monkeypatch) -> None:
+    from app.adapters import llm, storage
+    from app.adapters.research import FixtureResearch
+    from app.core.contracts import Brief
+    from app.nodes import human_edit
+
+    project_id = create(client)
+    brief = Brief.model_validate(status(client, project_id)["brief"] | {
+        "learning_outcome": "o"})
+    draft = llm.FixtureLLM().write_package(brief, FixtureResearch().find_claims(brief), None)
+    bad = draft.model_copy(update={"titles": ["Boost Your Chatbot Into An Agent"]
+                                   + draft.titles[1:]})
+    store = storage.get()
+    store.write(human_edit.KEY.format(project_id),
+                human_edit.render(bad, [], "Dolender").encode())
+    monkeypatch.setattr(llm, "get", lambda stage="default": (_ for _ in ()).throw(
+        AssertionError("a human-edited package must not call the model")))
+
+    approve(client, project_id)
+    run = status(client, project_id)
+    assert run["status"] == "failed"
+    assert "failed checks after 0 revisions" in run["jobs"][-1]["error_message"]
+    assert "'Boost'" in run["jobs"][-1]["error_message"]
+
+    store.write(human_edit.KEY.format(project_id),
+                human_edit.render(draft, [], "Dolender").encode())
+    client.post(f"/projects/{project_id}/retry", json={"reviewer": "Dolender"})
+    run = status(client, project_id)
+    assert run["status"] == "script_review"
+    trail = [a for a in run["artifacts"] if a["type"] == "human_edit.json"]
+    assert trail and json.loads((Path(os.environ["RUNS_DIR"]) / trail[0]["storage_path"])
+                                .read_text())["edited_by"] == "Dolender"
