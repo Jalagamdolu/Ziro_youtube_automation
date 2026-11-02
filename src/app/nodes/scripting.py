@@ -36,6 +36,7 @@ def scripting(ctx: StageContext) -> Outputs:
             raise FatalError(f"human-edited draft is malformed: {error}") from error
         draft, hooks, titles = _write(lambda _: package_draft, brief, claims, None, revisions=0)
         log.info("script human-edited", editor=editor)
+        ctx.storage.delete(edited)  # used once: a later reject goes back to the model
         trail = {"human_draft.txt": text,
                  "human_edit.json": json.dumps({"edited_by": editor, "source": edited})}
     else:

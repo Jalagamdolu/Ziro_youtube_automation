@@ -13,6 +13,7 @@ class Storage(Protocol):
     def write(self, key: str, data: bytes) -> str: ...
     def read(self, key: str) -> bytes: ...
     def exists(self, key: str) -> bool: ...
+    def delete(self, key: str) -> None: ...
 
 
 class LocalStorage:
@@ -30,6 +31,9 @@ class LocalStorage:
 
     def exists(self, key: str) -> bool:
         return (self.root / key).exists()
+
+    def delete(self, key: str) -> None:
+        (self.root / key).unlink(missing_ok=True)
 
 
 def get() -> Storage:
