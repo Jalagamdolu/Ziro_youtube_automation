@@ -4,10 +4,14 @@
 # production: real LLM + research agent on free tiers (evaluation phase, D-27), still $0.
 mode: prototype
 
-# Production LLM (D-27): Gemini free tier first, Groq free tier as fallback; keys from env.
+# Production LLM (D-27, D-28): free tiers; keys from env. Per stage, the first provider in its
+# order that has a key is primary, the rest are fallbacks.
 llm:
-  gemini_model: gemini-flash-latest
-  groq_model: llama-3.3-70b-versatile
+  gemini_model: gemini-flash-lite-latest  # Flash took ~140 s per call on this free tier (D-27)
+  groq_model: openai/gpt-oss-120b         # Llama 3.3 70B is no longer offered on Groq (D-28)
+  order:
+    default: [gemini, groq]               # draft, research agent
+    scripting: [groq, gemini]             # Flash-Lite could not pass the script checks (D-28)
   rate_limit_wait_max_seconds: 60   # per-minute 429s waited out in place up to this long
 
 # Production research agent (D-03, D-27): search -> fetch -> verify quote, at most max_turns.

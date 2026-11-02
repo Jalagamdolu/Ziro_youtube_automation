@@ -22,6 +22,7 @@ GEMINI = "https://generativelanguage.googleapis.com/v1beta/models/{}:generateCon
 GROQ = "https://api.groq.com/openai/v1/chat/completions"
 TIMEOUT = 180.0
 MINUTE_RETRIES = 3  # per-minute 429s are waited out in place before the stage retry takes over
+MAX_OUTPUT_TOKENS = 4000
 
 # Usage of one paid call, as (price key in config.yaml, units). Free tier still records tokens.
 Usage = tuple[str, float]
@@ -122,11 +123,23 @@ class GroqChat:
         self.calls: list[Usage] = []
 
     def json(self, system: str, prompt: str) -> Any:
-        body = {"model": self.model, "temperature": 0.7,
+        # gpt-oss spends hidden reasoning tokens before the JSON; keep reasoning low and the
+        # output cap inside the free tier's 8,000 tokens/minute (D-28).
+        body = {"model": self.model, "temperature": 0.7, "reasoning_effort": "low",
+                "max_completion_tokens": MAX_OUTPUT_TOKENS,
                 "response_format": {"type": "json_object"},
                 "messages": [{"role": "system", "content": system},
                              {"role": "user", "content": prompt}]}
-        data = _post(self, GROQ, {"authorization": f"Bearer {self.key}"}, body)
+        for _ in range(2):  # Groq's own JSON validation can reject one generation; try again
+            try:
+                data = _post(self, GROQ, {"authorization": f"Bearer {self.key}"}, body)
+                break
+            except FatalError as error:
+                if "json_validate_failed" not in str(error):
+                    raise
+                log.info("llm returned invalid JSON, asking again", provider=self.name)
+        else:
+            raise RetryableError("groq could not produce valid JSON twice")
         usage = data.get("usage", {})
         self.calls += [("groq-input", usage.get("prompt_tokens", 0)),
                        ("groq-output", usage.get("completion_tokens", 0))]
@@ -216,20 +229,23 @@ def fixture_dir(topic: str) -> Path:
     return folder
 
 
-def chat() -> FallbackChat:
-    """Production chat: every provider with a key, primary first."""
+def chat(stage: str = "default") -> FallbackChat:
+    """Production chat for a stage: every provider with a key, in the stage's configured order
+    (config.yaml llm.order; D-28)."""
     cfg = config.load()["llm"]
+    wait = cfg["rate_limit_wait_max_seconds"]
+    keys = {"gemini": os.environ.get("GEMINI_API_KEY"), "groq": os.environ.get("GROQ_API_KEY")}
     found: list[GeminiChat | GroqChat] = []
-    if key := os.environ.get("GEMINI_API_KEY"):
-        found.append(GeminiChat(cfg["gemini_model"], key, cfg["rate_limit_wait_max_seconds"]))
-    if key := os.environ.get("GROQ_API_KEY"):
-        found.append(GroqChat(cfg["groq_model"], key, cfg["rate_limit_wait_max_seconds"]))
+    for name in cfg["order"].get(stage, cfg["order"]["default"]):
+        if key := keys[name]:
+            found.append(GeminiChat(cfg["gemini_model"], key, wait) if name == "gemini"
+                         else GroqChat(cfg["groq_model"], key, wait))
     if not found:
         raise FatalError("production mode needs GEMINI_API_KEY or GROQ_API_KEY (see .env.example)")
     return FallbackChat(found)
 
 
-def get() -> LLM:
+def get(stage: str = "default") -> LLM:
     if config.load()["mode"] == "prototype":
         return FixtureLLM()
-    return ModelLLM(chat())
+    return ModelLLM(chat(stage))

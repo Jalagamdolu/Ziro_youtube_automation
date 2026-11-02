@@ -117,3 +117,22 @@ def test_production_without_keys_fails_with_a_clear_message(monkeypatch: pytest.
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
     with pytest.raises(FatalError, match="GEMINI_API_KEY or GROQ_API_KEY"):
         llm.chat()
+
+
+def test_each_stage_uses_its_configured_provider_order(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GEMINI_API_KEY", "g-key")
+    monkeypatch.setenv("GROQ_API_KEY", "q-key")
+    assert [c.name for c in llm.chat().chats] == ["gemini", "groq"]
+    assert [c.name for c in llm.chat("scripting").chats] == ["groq", "gemini"]
+    monkeypatch.delenv("GROQ_API_KEY")
+    assert [c.name for c in llm.chat("scripting").chats] == ["gemini"]  # no key, no provider
+
+
+@respx.mock
+def test_groq_json_validation_failure_is_asked_again() -> None:
+    bad = httpx.Response(400, json={"error": {"code": "json_validate_failed",
+                                              "failed_generation": ""}})
+    route = respx.post(llm.GROQ).mock(side_effect=[bad, groq_reply({"ok": True})])
+    assert llm.GroqChat("groq-test", "q-key", 60).json("s", "p") == {"ok": True}
+    assert route.call_count == 2
+    assert json.loads(route.calls[0].request.content)["reasoning_effort"] == "low"

@@ -35,9 +35,9 @@ def gemini(payload: object) -> httpx.Response:
         "usageMetadata": {"promptTokenCount": 1000, "candidatesTokenCount": 200}})
 
 
-def page(quote: str) -> httpx.Response:
+def page(title: str, quote: str) -> httpx.Response:
     filler = "This page explains the topic for developers in plain language. " * 8
-    html = f"<html><head><title>Source</title></head><body><article><h1>Source</h1>" \
+    html = f"<html><head><title>{title}</title></head><body><article><h1>{title}</h1>" \
            f"<p>{filler}</p><p>{quote}</p><p>{filler}</p></article></body></html>"
     return httpx.Response(200, html=html)
 
@@ -51,15 +51,17 @@ def test_any_topic_reaches_script_review_through_real_adapters(client, productio
     respx.post(search.TAVILY).mock(return_value=httpx.Response(200, json={
         "results": [{"url": c["url"], "title": c["title"]} for c in claims]}))
     for c in claims:
-        respx.get(c["url"]).mock(return_value=page(c["quote"]))
+        respx.get(c["url"]).mock(return_value=page(c["title"], c["quote"]))
     respx.post(GEMINI_URL).mock(side_effect=[
         gemini({"learning_outcome": "Tell a chatbot from an AI agent with one test."}),
         gemini({"actions": [{"action": "search", "query": "AI agent vs chatbot definition"}]}),
         gemini({"actions": [{"action": "fetch", "url": c["url"]} for c in claims]}),
         gemini({"actions": [{"action": "claim", "url": c["url"], "quote": c["quote"],
                              "claim": c["claim"]} for c in claims] + [{"action": "done"}]}),
-        gemini(package),
     ])
+    groq = respx.post(llm.GROQ).mock(return_value=httpx.Response(200, json={  # scripting (D-28)
+        "choices": [{"message": {"content": json.dumps(package)}}],
+        "usage": {"prompt_tokens": 1500, "completion_tokens": 300}}))
 
     project_id = create(client, prompt=TOPIC)
     run = status(client, project_id)
@@ -71,9 +73,11 @@ def test_any_topic_reaches_script_review_through_real_adapters(client, productio
     assert run["brief"]["topic"] == TOPIC  # T01: the entered topic survives unchanged
     with db.session() as s:
         rows = s.scalars(select(Cost).where(Cost.project_id == project_id)).all()
-    tokens = {stage: sum(r.units for r in rows if r.stage == stage and r.provider == "gemini-input")
-              for stage in ("draft", "researching", "scripting")}
-    assert tokens == {"draft": 1000, "researching": 3000, "scripting": 1000}
+    tokens = {(r.stage, r.provider): r.units for r in rows if r.provider.endswith("-input")}
+    tokens = {k: sum(r.units for r in rows if (r.stage, r.provider) == k) for k in tokens}
+    assert tokens == {("draft", "gemini-input"): 1000, ("researching", "gemini-input"): 3000,
+                      ("scripting", "groq-input"): 1500}  # scripting is Groq-first (D-28)
+    assert groq.call_count == 1
     assert sum(r.units for r in rows if r.provider == "tavily-search") == 1
     assert run["total_cost_usd"] == 0.0  # free tier, counts kept for the paid estimate
 
