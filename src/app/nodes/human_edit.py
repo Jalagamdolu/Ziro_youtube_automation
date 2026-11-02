@@ -3,14 +3,14 @@ normal checks, nothing skipped (D-30).
 
 The editable file is plain text: `=== SECTION ===` headers, and `!!` lines that are notes (which
 rule a line breaks and an example fix); notes are ignored when the file is read back. Scripting
-uses the file instead of the LLM when it exists at `<project_id>/scripting/human_draft.md`.
+uses the file instead of the LLM when it exists at `<project_id>/scripting/human_draft.txt`.
 """
 
 import re
 
 from app.core.contracts import Chapter, HookDraft, PackageDraft
 
-KEY = "{}/scripting/human_draft.md"
+KEY = "{}/scripting/human_draft.txt"  # .txt: Windows Notepad reformats .md files on save
 HEADER = re.compile(r"^=== (.+) ===$", re.MULTILINE)
 # Problem text -> example fix shown under the line that breaks it.
 FIXES = [
