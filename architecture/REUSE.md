@@ -17,9 +17,10 @@ Filled in as each phase wires a vendored file into the pipeline (file → where 
 | Vendored file | Used by | How |
 |---|---|---|
 | `skills/yt-script/hookscore.py` | `src/app/nodes/skills.py` → `scripting` | Subprocess `--json` on the 5 hooks; verdict, band and formula recorded per hook; top 2 kept (`hook_scores.json`, `content_package.json`). |
-| `skills/yt-script/hooks.json` | read by `hookscore.py` | The 21 formulas `hookscore.py` classifies against; not read by our code directly. |
+| `skills/yt-script/hooks.json` | read by `hookscore.py`; `src/app/adapters/prompts.py` | The 21 formulas `hookscore.py` classifies against. In production mode (D-27) its rules and each formula's name and shape also go into the scripting prompt (read only). |
 | `skills/yt-package/title.py` | `src/app/nodes/skills.py` → `scripting` | Subprocess `--json --thumb` on the 10 titles; top 3 kept; a title that repeats the thumbnail text fails the stage (`title_lint.json`). |
-| `skills/yt-script/SKILL.md` | `src/app/nodes/script_checks.py` (rules, not text) | Its rules are enforced as code: five hooks scored and two kept, an `[ON SCREEN: ...]` visual in every section, 150 wpm runtime, one CTA. Its prompt text is used only by the production LLM adapter (not built yet, D-19), with "ship it, or change it?" stripped. |
+| `skills/yt-script/SKILL.md` | `src/app/nodes/script_checks.py` (rules, not text) | Its rules are enforced as code: five hooks scored and two kept, an `[ON SCREEN: ...]` visual in every section, 150 wpm runtime, one CTA. In production mode (D-27) `src/app/adapters/prompts.py` reads its text into the scripting prompt, minus front matter, tool-usage blocks, "The gate" and every "ask the user" / "ship it, or change it?" line. |
+| `skills/yt-package/SKILL.md` | `src/app/adapters/prompts.py` (production mode, D-27) | Same treatment as yt-script: its packaging rules (ten titles, a thumbnail of three words at most, no repetition) go into the prompt, and `title.py` still lints the result. |
 | `templates/voice.md` | `src/voice/voice.md` | Section structure copied (MIT, attributed in the file) and filled from the brief, with TODOs for Dolender. |
 
 ## Custom (not from the skill pack)
@@ -29,4 +30,5 @@ Filled in as each phase wires a vendored file into the pipeline (file → where 
 | Claim traceability + banned-claim scan | `src/app/nodes/script_checks.py` | The pack says "never invent a number" as an instruction; D-10 needs it enforced as code. |
 | Script shape (brief §07 timings) | `src/app/nodes/script_checks.py` | The pack has no notion of the brief's Short/Long section timings. |
 | Claim ledger + per-claim review | `src/app/nodes/researching.py`, research_review gate | The pack's yt-viral researches angles, not citable claims with verified quotes. |
-| Fixture LLM + research (prototype mode) | `src/app/adapters/llm.py`, `research.py`, `fixtures/` | D-19: $0 demo; production adapters come later. |
+| Fixture LLM + research (prototype mode) | `src/app/adapters/llm.py`, `research.py`, `fixtures/` | D-19: $0 demo. |
+| Free-tier LLM adapters, research agent, search + fetch (production mode) | `src/app/adapters/llm.py`, `research.py`, `search.py`, `prompts.py` | D-27: the pack has no API client, agent loop or quote verification. |
