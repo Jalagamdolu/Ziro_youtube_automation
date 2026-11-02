@@ -25,6 +25,7 @@ from app.core.contracts import ContentPackage, HookDraft, PackageDraft
 from app.core.models import Artifact, Cost, Project
 from app.graph.stages import GATES, ORDER, REJECT_TARGETS
 from app.nodes import human_edit
+from app.nodes.rendering import PHOTO_CHOICES
 
 router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
@@ -150,6 +151,28 @@ async def edit(request: Request, project_id: str) -> RedirectResponse:
     return RedirectResponse(page, status_code=303)
 
 
+@router.post("/ui/projects/{project_id}/photo")
+async def swap_photo(request: Request, project_id: str) -> RedirectResponse:
+    """qa_review: use another candidate photo for one scene (D-34). The choice is stored and the
+    run goes back to rendering with a note naming the reviewer and the swap."""
+    form = {k: str(v) for k, v in (await request.form()).items()}
+    reviewer = form.get("reviewer", "").strip() or "Dolender"
+    scene, index = form.get("scene", ""), int(form.get("index", "0") or 0)
+    page = f"/ui/projects/{project_id}"
+    if actions.run_status(project_id)["status"] != "qa_review":
+        return _back(page, HTTPException(409, "photos can be swapped at qa_review"))
+    store, key = storage.get(), PHOTO_CHOICES.format(project_id)
+    choices = json.loads(store.read(key)) if store.exists(key) else {}
+    store.write(key, json.dumps(choices | {scene: index}).encode("utf-8"))
+    try:
+        actions.decide(project_id, "reject", DecisionRequest(
+            reviewer=reviewer, target="rendering",
+            notes=f"Photo swap by {reviewer}: scene {scene} uses candidate {index + 1}."))
+    except HTTPException as error:
+        return _back(page, error)
+    return RedirectResponse(f"{page}?submitted=qa_review", status_code=303)
+
+
 @router.post("/ui/projects/{project_id}/retry")
 def retry(project_id: str) -> RedirectResponse:
     try:
@@ -208,7 +231,8 @@ def _gate_context(s: Any, project_id: str, status: str) -> dict[str, Any]:
         return {"package": load("content_package.json"), "title_lint": lint}
     if status == "qa_review":
         return {"package": load("content_package.json"), "qa_report": load("qa_report.json"),
-                "video": files.get("video.mp4"), "thumbnail": files.get("thumbnail.png")}
+                "video": files.get("video.mp4"), "thumbnail": files.get("thumbnail.png"),
+                "photos": (load("stock.json") or {}).get("scenes", [])}
     return {}
 
 

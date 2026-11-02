@@ -13,6 +13,8 @@ BRIEF = Brief(topic="What makes an AI agent different from a chatbot?", audience
 
 
 class _Ctx:
+    project_id = "p"
+
     def __init__(self, package: ContentPackage) -> None:
         self.package = package
 

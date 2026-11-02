@@ -18,6 +18,26 @@
       </table>
     </div>
   </div>
+  {% if gate.photos %}
+  <h3>Photos <span class="muted small">(one real photo per scene; Pixabay previews; using another one re-renders the video)</span></h3>
+  <table>
+    <tr><th style="width:12em">Scene · search</th><th>In the video</th><th>Alternatives</th></tr>
+    {% for ph in gate.photos %}{% set chosen = ph.candidates[ph.chosen] %}
+    <tr>
+      <td class="small"><strong>{{ ph.scene }}</strong><br>{{ ph.query }}</td>
+      <td><a href="{{ chosen.page_url }}" target="_blank" rel="noopener noreferrer"><img alt="Photo used in {{ ph.scene }}" src="{{ chosen.preview_url }}" style="height:150px;border:2px solid var(--accent);border-radius:4px"></a></td>
+      <td>{% for c in ph.candidates %}{% if loop.index0 != ph.chosen %}
+        <form method="post" action="/ui/projects/{{ run.id }}/photo" style="display:inline-block;margin:0 8px 8px 0;vertical-align:top;text-align:center">
+          <input type="hidden" name="scene" value="{{ ph.scene }}"><input type="hidden" name="index" value="{{ loop.index0 }}">
+          <input type="hidden" name="reviewer" value="Dolender">
+          <a href="{{ c.page_url }}" target="_blank" rel="noopener noreferrer"><img alt="Alternative photo for {{ ph.scene }}" src="{{ c.preview_url }}" style="height:110px;border-radius:4px"></a><br>
+          <button type="submit" class="small">Use this photo</button>
+        </form>{% endif %}{% endfor %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <p class="small muted">Approve only if no photo shows an identifiable face, a child, a logo or a readable product screen. Credit in the description: “{{ gate.qa_report.stock.credit }}”.</p>
+  {% endif %}
   <h3>Description</h3><pre>{{ p.description }}</pre>
   <h3>Automated QA report</h3><pre>{{ gate.qa_report | tojson(indent=2) }}</pre>
 

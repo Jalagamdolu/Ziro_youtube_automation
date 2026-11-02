@@ -1,5 +1,5 @@
-"""Stock footage (D-33): providers by key, code filters, query hash cache, license rows, credit.
-HTTP is mocked with respx; nothing is called."""
+"""Stock photos (D-33, D-34): providers by key, code filters, query-hash cache, license rows,
+reviewer swaps and the credit. HTTP is mocked with respx; nothing is called."""
 
 import json
 from pathlib import Path
@@ -11,10 +11,19 @@ import respx
 from app.adapters import stock
 
 
-def pixabay_hit(i: int, tags: str, ai: bool = False, size: int = 2_000_000) -> dict:
-    return {"id": i, "pageURL": f"https://pixabay.com/videos/clip-{i}/", "tags": tags,
-            "duration": 12, "isAiGenerated": ai,
-            "videos": {"medium": {"url": f"https://cdn.pixabay.com/{i}.mp4", "size": size}}}
+def hit(i: int, tags: str, ai: bool = False) -> dict:
+    return {"id": i, "pageURL": f"https://pixabay.com/photos/p-{i}/", "tags": tags,
+            "isAiGenerated": ai, "largeImageURL": f"https://pixabay.com/get/{i}_1280.jpg",
+            "webformatURL": f"https://pixabay.com/get/{i}_640.jpg"}
+
+
+class Fake:
+    name = "pixabay"
+
+    def search(self, query: str) -> list[stock.Photo]:
+        return [stock.Photo("pixabay", f"{query[:3]}{i}", f"https://pixabay.com/photos/{i}/",
+                            "u", "p", "desk, notebook", "Pixabay License", "https://lic")
+                for i in range(3)]
 
 
 @pytest.fixture
@@ -24,17 +33,18 @@ def runs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 @respx.mock
-def test_pixabay_drops_ai_generated_people_brands_and_huge_files() -> None:
+def test_pixabay_photos_drop_ai_faces_minors_and_brands() -> None:
     respx.get(stock.PIXABAY).mock(return_value=httpx.Response(200, json={"hits": [
-        pixabay_hit(1, "technology, abstract, network"),
-        pixabay_hit(2, "abstract, particles", ai=True),
-        pixabay_hit(3, "business, woman, laptop"),
-        pixabay_hit(4, "phone, apple, screen"),
-        pixabay_hit(5, "data, lines", size=90_000_000)]}))
-    clips = stock.PixabayStock("key").search("abstract technology")
-    assert [c.id for c in clips] == ["1"]
-    assert clips[0].license == "Pixabay License"
-    assert respx.calls[0].request.url.params["safesearch"] == "true"
+        hit(1, "desk, notebook, hands, laptop"),
+        hit(2, "office, abstract", ai=True),
+        hit(3, "woman, portrait, smiling"),
+        hit(4, "classroom, children, pupils"),
+        hit(5, "phone, iphone, screen")]}))
+    photos = stock.PixabayStock("key").search("student notebook")
+    assert [p.id for p in photos] == ["1"]
+    params = respx.calls[0].request.url.params
+    assert (params["image_type"], params["orientation"], params["safesearch"]) == (
+        "photo", "vertical", "true")
 
 
 def test_providers_follow_keys_and_a_missing_pexels_key_is_silent(monkeypatch) -> None:
@@ -45,94 +55,121 @@ def test_providers_follow_keys_and_a_missing_pexels_key_is_silent(monkeypatch) -
     assert [p.name for p in stock.get()] == ["pixabay", "pexels"]
     monkeypatch.delenv("PIXABAY_API_KEY")
     monkeypatch.delenv("PEXELS_API_KEY")
-    assert stock.get() == []  # no footage at all: solid backgrounds
-
-
-def test_background_query_comes_from_the_topic_in_code() -> None:
-    assert stock.background_query("What makes an AI agent different from a chatbot?") == \
-        "agent chatbot technology"
-    assert stock.background_query("Why is it so?") == stock.FALLBACK_QUERY
+    assert stock.get() == []  # no photos at all: solid backgrounds
 
 
 @respx.mock
-def test_results_are_cached_by_query_hash_and_the_fallback_query_fills_gaps(runs) -> None:
-    def answer(request: httpx.Request) -> httpx.Response:
-        rich = request.url.params["q"] == stock.FALLBACK_QUERY
-        hits = [pixabay_hit(i, "abstract, technology") for i in range(5 if rich else 1)]
-        return httpx.Response(200, json={"hits": hits})
+def test_pexels_filters_by_alt_text() -> None:
+    respx.get(stock.PEXELS).mock(return_value=httpx.Response(200, json={"photos": [
+        {"id": 7, "url": "https://www.pexels.com/photo/7/", "alt": "Server room cables",
+         "src": {"portrait": "https://images.pexels.com/7p.jpg", "medium": "m"}},
+        {"id": 8, "url": "https://www.pexels.com/photo/8/", "alt": "Smiling woman portrait",
+         "src": {"portrait": "https://images.pexels.com/8p.jpg", "medium": "m"}}]}))
+    assert [p.id for p in stock.PexelsStock("key").search("server")] == ["7"]
 
-    route = respx.get(stock.PIXABAY).mock(side_effect=answer)
+
+@respx.mock
+def test_candidates_are_cached_by_query_hash(runs) -> None:
+    route = respx.get(stock.PIXABAY).mock(return_value=httpx.Response(200, json={
+        "hits": [hit(i, "desk, notebook") for i in range(6)]}))
     provider = [stock.PixabayStock("key")]
-    query, clips, searches = stock.find(provider, "agent chatbot technology", 3)
-    assert (query, len(clips), searches) == (stock.FALLBACK_QUERY, 3, 2)
-    assert stock.find(provider, "agent chatbot technology", 3)[2] == 0  # all from the cache
-    assert route.call_count == 2
+    photos, searches = stock.candidates(provider, "student notebook")
+    assert (len(photos), searches) == (stock.CANDIDATES, 1)
+    assert stock.candidates(provider, "student notebook")[1] == 0
+    assert route.call_count == 1
 
 
-@respx.mock
-def test_pexels_filters_by_page_slug() -> None:
-    respx.get(stock.PEXELS).mock(return_value=httpx.Response(200, json={"videos": [
-        {"id": 7, "url": "https://www.pexels.com/video/abstract-blue-lines-7/", "duration": 9,
-         "video_files": [{"quality": "hd", "link": "https://videos.pexels.com/7.mp4"}]},
-        {"id": 8, "url": "https://www.pexels.com/video/woman-typing-on-laptop-8/", "duration": 9,
-         "video_files": [{"quality": "hd", "link": "https://videos.pexels.com/8.mp4"}]}]}))
-    assert [c.id for c in stock.PexelsStock("key").search("abstract")] == ["7"]
+def test_storyboard_phrases_come_from_the_model_or_the_scene_words() -> None:
+    from app.nodes.storyboarding import photo_query
+
+    flow = {"visual_type": "flow", "on_screen": 'flow - "Search" to "Read"',
+            "text": "It searches, reads and writes the calendar entries."}
+    assert photo_query(flow, "Hands typing on Apple MacBook keyboard") == \
+        "hands typing on keyboard"  # brands stripped from the model's phrase
+    assert photo_query(flow, "") == "search read searches"  # code fallback
+    assert photo_query({"visual_type": "end_card", "on_screen": "", "text": ""}, "x") is None
 
 
-def test_backgrounds_record_licenses_and_tint_every_scene_but_the_end_card(
-        client, monkeypatch, tmp_path) -> None:
+def test_photos_take_the_reviewers_swap_and_record_licenses(client, monkeypatch, tmp_path
+                                                            ) -> None:
     from conftest import create
 
+    from app.adapters import storage
     from app.core import db
     from app.core.models import AssetLicense, Cost
-    from app.nodes.rendering import backgrounds, stock_checks
-
-    class Fake:
-        name = "pixabay"
-
-        def search(self, query: str) -> list[stock.Clip]:
-            return [stock.Clip("pixabay", str(i), f"https://pixabay.com/videos/{i}/", "u", 8.0,
-                               "abstract, network", "Pixabay License", "https://lic")
-                    for i in range(3)]
+    from app.nodes.rendering import PHOTO_CHOICES, photos, stock_checks
 
     monkeypatch.setattr(stock, "get", lambda: [Fake()])
-    monkeypatch.setattr(stock, "download", lambda clip: b"MP4")
+    monkeypatch.setattr(stock, "download", lambda photo: photo.id.encode())
     project_id = create(client)
-    scenes = [{"visual_type": t} for t in ("title", "flow", "checklist", "chat_bubble",
-                                           "end_card")]
-    footage = backgrounds(project_id, "What makes an AI agent different?", scenes,
-                                    tmp_path)
+    storage.get().write(PHOTO_CHOICES.format(project_id), b'{"S2": 2}')
+    scenes = [{"id": "S1", "photo_query": "exam timetable"},
+              {"id": "S2", "photo_query": "server room"},
+              {"id": "S3", "photo_query": None}]
+    footage = photos(project_id, scenes, tmp_path)
 
-    assert [s.get("background") for s in scenes] == [
-        "background_0.mp4", "background_1.mp4", "background_2.mp4", "background_0.mp4", None]
-    assert (tmp_path / "background_2.mp4").read_bytes() == b"MP4"
-    assert footage["credit"] == "Stock footage: Pixabay"
+    assert [s.get("photo") for s in scenes] == ["photo_S1.jpg", "photo_S2.jpg", None]
+    assert (tmp_path / "photo_S2.jpg").read_bytes() == b"ser2"  # the reviewer's candidate
+    assert [r["chosen"] for r in footage["scenes"]] == [0, 2]
+    assert footage["credit"] == "Images: Pixabay"
     report = stock_checks(project_id, footage)
-    assert report["all_licensed"] and report["no_people_or_brand_tags"]
+    assert report["all_licensed"] and report["no_faces_minors_or_brands"]
     with db.session() as s:
         rows = s.query(AssetLicense).filter_by(project_id=project_id).all()
-        assert {(r.license, r.query) for r in rows} == {("Pixabay License",
-                                                         "agent technology")}
+        assert sorted(r.query for r in rows) == ["exam timetable", "server room"]
         assert s.query(Cost).filter_by(project_id=project_id,
-                                       provider="pixabay-search").count() == 1
+                                       provider="pixabay-search").one().units == 2
 
 
-def test_mock_publish_credits_the_footage(client, monkeypatch) -> None:
+def test_swapping_a_photo_at_qa_review_rerenders_with_a_recorded_note(client, monkeypatch
+                                                                      ) -> None:
+    from conftest import run_to_qa_review, status
+
+    import app.nodes as nodes
+    from app.adapters import storage
+    from app.nodes import stubs
+    from app.nodes.rendering import PHOTO_CHOICES
+
+    renders: list[str | None] = []
+    candidate = {"page_url": "https://pixabay.com/photos/1/", "preview_url": "https://p/1.jpg",
+                 "tags": "desk"}
+
+    def rendering_with_photos(ctx):  # type: ignore[no-untyped-def]
+        renders.append(ctx.notes)
+        return stubs.rendering(ctx) | {
+            "stock.json": json.dumps({"credit": "Images: Pixabay", "scenes": [
+                {"scene": "S1", "query": "desk", "chosen": 0,
+                 "candidates": [candidate, candidate | {"preview_url": "https://p/2.jpg"}]}]}),
+            "qa_report.json": json.dumps({"stock": {"credit": "Images: Pixabay"}})}
+
+    monkeypatch.setitem(nodes.FUNCS, "rendering", rendering_with_photos)
+    project_id = run_to_qa_review(client)
+    page = client.get(f"/ui/projects/{project_id}").text
+    assert "https://p/2.jpg" in page and "Use this photo" in page
+
+    client.post(f"/ui/projects/{project_id}/photo",
+                data={"scene": "S1", "index": "1", "reviewer": "Dolender"})
+    run = status(client, project_id)
+    assert run["status"] == "qa_review" and len(renders) == 2
+    assert renders[1] == "Photo swap by Dolender: scene S1 uses candidate 2."
+    assert json.loads(storage.get().read(PHOTO_CHOICES.format(project_id))) == {"S1": 1}
+
+
+def test_mock_publish_credits_the_images(client, monkeypatch) -> None:
     from conftest import DISCLOSURE, approve, run_to_qa_review, status
 
     import app.nodes as nodes
+    from app.adapters import storage
     from app.nodes import stubs
 
-    def rendering_with_footage(ctx):  # type: ignore[no-untyped-def]
-        return stubs.rendering(ctx) | {"stock.json": json.dumps(
-            {"credit": "Stock footage: Pixabay", "clips": []})}
+    def rendering_with_photos(ctx):  # type: ignore[no-untyped-def]
+        return stubs.rendering(ctx) | {"stock.json": json.dumps({"credit": "Images: Pixabay"})}
 
-    monkeypatch.setitem(nodes.FUNCS, "rendering", rendering_with_footage)
+    monkeypatch.setitem(nodes.FUNCS, "rendering", rendering_with_photos)
     project_id = run_to_qa_review(client)
     approve(client, project_id, ai_disclosure=DISCLOSURE)
     receipt = next(a for a in status(client, project_id)["artifacts"]
                    if a["type"] == "publish_receipt.json")
-    from app.adapters import storage
     description = json.loads(storage.get().read(receipt["storage_path"]))["request"]["snippet"][
         "description"]
-    assert description.endswith("\n\nStock footage: Pixabay")
+    assert description.endswith("\n\nImages: Pixabay")
