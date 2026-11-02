@@ -21,6 +21,7 @@ os.environ["REDIS_URL"] = REDIS_URL.rsplit("/", 1)[0] + "/1"
 # Tests never reach a real API, whatever .env holds; only the opt-in live smoke test keeps keys.
 if os.environ.get("ZIRO_LIVE") != "1":
     for _key in ("GEMINI_API_KEY", "GROQ_API_KEY", "TAVILY_API_KEY", "ANTHROPIC_API_KEY",
+                 "PIXABAY_API_KEY", "PEXELS_API_KEY",
                  "SARVAM_API_KEY"):
         os.environ.pop(_key, None)
 
