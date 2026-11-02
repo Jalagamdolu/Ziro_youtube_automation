@@ -22,6 +22,9 @@ from app.nodes.context import Outputs, StageContext
 SENTENCE_PAUSE, SECTION_PAUSE = 0.15, 0.35
 END_CARD_SECONDS = 2.0  # voice.md: end card about 2 seconds
 CUE_WORDS = 5  # short cues read well on a phone
+# A sentence ends at . ? or ! even when a closing quote or bracket follows ('startup."').
+SENTENCE_END = re.compile(r"[.!?][\"”’')]*$")
+SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s+|(?<=[.!?][\"”’')])\s+")
 FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 TEMPLATES = Path(__file__).resolve().parents[3] / "templates" / "remotion"
 
@@ -112,7 +115,7 @@ def rendering(ctx: StageContext) -> Outputs:
 
 def sentences(lines: list[str]) -> list[str]:
     text = " ".join(script_checks.MARKER.sub("", line).strip() for line in lines)
-    return [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
+    return [s.strip() for s in SENTENCE_BREAK.split(text) if s.strip()]
 
 
 def written_words(spoken: list[dict[str, Any]], segments: list[dict[str, Any]]
@@ -138,7 +141,7 @@ def make_cues(words: list[dict[str, Any]]) -> list[dict[str, Any]]:
     current: list[dict[str, Any]] = []
     for word in words:
         current.append(word)
-        if len(current) == CUE_WORDS or word["text"][-1] in ".?!":
+        if len(current) == CUE_WORDS or SENTENCE_END.search(word["text"]):
             cues.append({"start": current[0]["start"], "end": current[-1]["end"], "words": current})
             current = []
     if current:
