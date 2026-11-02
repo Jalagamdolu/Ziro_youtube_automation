@@ -1,7 +1,7 @@
 <section>
-  <h2>Edit the script myself</h2>
+  <h2>{% if run.status == "failed" %}Edit the last draft myself{% else %}Edit the script myself{% endif %}</h2>
   <p class="muted small">
-    {% if run.status == "failed" %}Your hand-edited script failed the checks below each <code>!!</code> line — fix those and resubmit.
+    {% if run.status == "failed" %}This is the last draft scripting wrote. Each <code>!! RULE</code> line sits under the line that broke it, with an example fix. Fix those and submit; on a pass the run goes to script_review as your hand-edited script.
     {% else %}Change anything (script, hooks, titles, description, tags, chapters). Lines starting with <code>!!</code> are notes and are ignored; keep the <code>=== headers ===</code> and the <code>[C#]</code> markers on cited sentences.{% endif %}
     Your version replaces the model for one scripting run and goes through <strong>every</strong> check (claims, banned and outcome words, shape and timing, visuals, hooks, titles), then comes back here for review. The trail records you as the editor.
   </p>

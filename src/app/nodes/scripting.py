@@ -23,33 +23,48 @@ from app.nodes.storyboarding import visual_problems
 MAX_REVISIONS = 2
 
 
+class ChecksFailed(FatalError):
+    """The last draft still broke checks after every allowed revision."""
+
+    def __init__(self, message: str, draft: PackageDraft, problems: list[str]) -> None:
+        super().__init__(message)
+        self.draft, self.problems = draft, problems
+
+
 def scripting(ctx: StageContext) -> Outputs:
     brief = Brief.model_validate(ctx.read_json("draft", "brief.json"))
     claims = approved_claims(ctx.project_id, ctx.read_json("researching", "claims.json"))
     trail: Outputs = {}
     edited = human_edit.KEY.format(ctx.project_id)
-    if ctx.storage.exists(edited):  # the reviewer's hand edit replaces the model, not the checks
-        text = ctx.storage.read(edited).decode("utf-8")
-        try:
-            package_draft, editor = human_edit.parse(text)
-        except ValueError as error:
-            raise FatalError(f"human-edited draft is malformed: {error}") from error
-        draft, hooks, titles = _write(lambda _: package_draft, brief, claims, None, revisions=0)
-        log.info("script human-edited", editor=editor)
-        ctx.storage.delete(edited)  # used once: a later reject goes back to the model
-        trail = {"human_draft.txt": text,
-                 "human_edit.json": json.dumps({"edited_by": editor, "source": edited})}
-    else:
-        writer = llm.get("scripting")
-        notes = ctx.notes
-        if notes and (previous := _previous_script(ctx)):  # a reject edits the reviewed script
-            notes += f"\nThe reviewed script, to edit rather than rewrite:\n{previous}"
-        try:
-            draft, hooks, titles = _write(
-                lambda n: writer.write_package(brief, claims, n), brief, claims, notes,
-                MAX_REVISIONS)
-        finally:
-            costs.record_usage(ctx.project_id, "scripting", writer.calls)
+    editor = "Dolender"
+    try:
+        if ctx.storage.exists(edited):  # the reviewer's hand edit replaces the model, not checks
+            text = ctx.storage.read(edited).decode("utf-8")
+            try:
+                package_draft, editor = human_edit.parse(text)
+            except ValueError as error:
+                raise FatalError(f"human-edited draft is malformed: {error}") from error
+            draft, hooks, titles = _write(lambda _: package_draft, brief, claims, None,
+                                          revisions=0)
+            log.info("script human-edited", editor=editor)
+            ctx.storage.delete(edited)  # used once: a later reject goes back to the model
+            trail = {"human_draft.txt": text,
+                     "human_edit.json": json.dumps({"edited_by": editor, "source": edited})}
+        else:
+            writer = llm.get("scripting")
+            notes = ctx.notes
+            if notes and (previous := _previous_script(ctx)):  # a reject edits the reviewed one
+                notes += f"\nThe reviewed script, to edit rather than rewrite:\n{previous}"
+            try:
+                draft, hooks, titles = _write(
+                    lambda n: writer.write_package(brief, claims, n), brief, claims, notes,
+                    MAX_REVISIONS)
+            finally:
+                costs.record_usage(ctx.project_id, "scripting", writer.calls)
+    except ChecksFailed as failed:  # keep the last draft, flagged, for the hand-edit bridge
+        ctx.storage.write(human_edit.LAST_FAILED.format(ctx.project_id),
+                          human_edit.render(failed.draft, failed.problems, editor).encode())
+        raise
 
     explanations = {h.text: h.explanation for h in draft.hooks}
     package = ContentPackage(
@@ -90,7 +105,8 @@ def _write(write: Callable[[str | None], PackageDraft], brief: Brief, claims: li
         # The model sees its own draft and exactly what to change, not just that it failed.
         notes = (f"{reviewer}Fix: " + "; ".join(problems)
                  + f"\nYour previous script, to revise rather than restart:\n{draft.script}")
-    raise FatalError(f"script failed checks after {revisions} revisions: " + "; ".join(problems))
+    raise ChecksFailed(f"script failed checks after {revisions} revisions: "
+                       + "; ".join(problems), draft, problems)
 
 
 def _previous_script(ctx: StageContext) -> str | None:

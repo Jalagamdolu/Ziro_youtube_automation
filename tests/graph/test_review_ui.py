@@ -169,3 +169,31 @@ def test_finished_run_shows_player_downloads_and_cost(client) -> None:
                   "Publish receipt (mock)", "Everything (ZIP)"):
         assert label in page, label
     assert "<h3>Cost</h3>" in page and "Edit the script myself" not in page
+
+
+def test_failed_scripting_offers_the_last_draft_flagged_and_a_fix_reaches_review(
+        client, monkeypatch) -> None:
+    from app.adapters import llm
+
+    class Hype(llm.FixtureLLM):
+        def write_package(self, brief, claims, notes):  # type: ignore[no-untyped-def]
+            good = super().write_package(brief, claims, notes)
+            return good.model_copy(update={"titles": ["Boost Your Chatbot Skills"]
+                                           + good.titles[1:]})
+
+    monkeypatch.setattr(llm, "get", lambda stage="default": Hype())
+    project_id = _start(client)
+    _decide(client, project_id, **_keep_all())
+    assert status(client, project_id)["status"] == "failed"  # the model never passed
+
+    page = html.unescape(client.get(f"/ui/projects/{project_id}").text)
+    assert "Edit the last draft myself" in page
+    draft = page.split('aria-label="Editable script package">')[1].split("</textarea>")[0]
+    assert "Boost Your Chatbot Skills\n!! RULE: packaging claims 'Boost'" in draft
+    assert "=== HOOKS ===" in draft and "=== DESCRIPTION ===" in draft  # the whole package
+
+    fixed = draft.replace("Boost Your Chatbot Skills", "AI Agent vs Chatbot for Students")
+    client.post(f"/ui/projects/{project_id}/edit", data={"text": fixed, "reviewer": "Dolender"})
+    run = status(client, project_id)
+    assert run["status"] == "script_review"
+    assert any(a["type"] == "human_edit.json" for a in run["artifacts"])

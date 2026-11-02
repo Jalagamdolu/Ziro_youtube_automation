@@ -11,6 +11,7 @@ import re
 from app.core.contracts import Chapter, HookDraft, PackageDraft
 
 KEY = "{}/scripting/human_draft.txt"  # .txt: Windows Notepad reformats .md files on save
+LAST_FAILED = "{}/scripting/last_failed_draft.txt"  # written when scripting fails its checks
 HEADER = re.compile(r"^=== (.+) ===$", re.MULTILINE)
 # Problem text -> example fix shown under the line that breaks it.
 FIXES = [

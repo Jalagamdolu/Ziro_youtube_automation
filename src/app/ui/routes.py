@@ -238,17 +238,13 @@ def _failed_stage(run: dict[str, Any]) -> str | None:
 
 
 def _edit_text(run: dict[str, Any]) -> str | None:
-    """The editable package for the hand-edit box, or None where editing doesn't apply. A hand
-    edit that failed its checks comes back annotated with the rules it broke."""
+    """The editable package for the hand-edit box, or None where editing doesn't apply. After a
+    failed scripting run it is the last draft, annotated with the rules it broke."""
     project_id = run["id"]
     if run["status"] == "failed" and _failed_stage(run) == "scripting":
-        store, key = storage.get(), human_edit.KEY.format(project_id)
-        if store.exists(key):
-            message = next(j["error_message"] for j in reversed(run["jobs"])
-                           if j["status"] == "failed")
-            problems = message.split(": ", 1)[1].split("; ") if "checks after" in message else []
-            draft, editor = human_edit.parse(store.read(key).decode("utf-8"))
-            return human_edit.render(draft, problems, editor)
+        store, key = storage.get(), human_edit.LAST_FAILED.format(project_id)
+        if store.exists(key):  # the draft that failed (model or hand-edited), flagged per rule
+            return store.read(key).decode("utf-8")
     elif run["status"] != "script_review":
         return None
     with db.session() as s:
