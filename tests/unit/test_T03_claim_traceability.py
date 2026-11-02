@@ -25,7 +25,7 @@ def test_sourced_figure_passes() -> None:
 
 @pytest.mark.parametrize("narration", [
     "Agents finished 40% of tasks in that study.",           # figure with no source
-    "This changed in March.",                                 # date with no source
+    "This changed on 4 March.",                               # date with no source
     "Agents finished 40% of tasks in that study. [C7]",       # cites an unapproved claim
 ])
 def test_unsourced_or_unapproved_claims_are_blocked(narration: str) -> None:
@@ -115,3 +115,19 @@ def test_screen_may_show_filler_words_unspoken() -> None:
     script = ('## Example\n[ON SCREEN: chat bubble asking "When is my exam?"]\n'
               "Ask a plain model the exam date and it guesses.\n")
     assert on_screen_problems(script, [], "What is RAG?") == []
+
+
+def test_month_words_are_dates_only_with_a_day_or_year() -> None:
+    script = ("## Example\n[ON SCREEN: \"RAG\"]\n"
+              "The model may guess wrong, so march on and check.\n"
+              "It launched on 3 May.\nIt launched in March 2024.\n")
+    problems = claim_problems(script, [])
+    assert [p.split("'")[1] for p in problems] == ["It launched on 3 May.",
+                                                   "It launched in March 2024."]
+
+
+def test_prompt_word_list_names_what_the_check_rejects() -> None:
+    from app.nodes.script_checks import OUTCOME, OUTCOME_WORDS
+
+    for word in re.split(r"[,/]\s*", OUTCOME_WORDS):
+        assert OUTCOME.search(word), word

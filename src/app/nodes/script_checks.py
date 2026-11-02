@@ -16,10 +16,9 @@ SECTIONS = {
 RUNTIME = {"short": (45, 75), "long": (180, 300)}
 
 MARKER = re.compile(r"\[C(\d+)\]")
-# Needs a source: any figure, percentage, year or calendar date.
-FACTUAL = re.compile(
-    r"\d|\b(january|february|march|april|may|june|july|august|september|october|november|"
-    r"december)\b", re.IGNORECASE)
+# Needs a source: any figure, percentage, year or calendar date. A month name states a date only
+# with a day or year next to it, and those are digits; a bare "may" or "march" is just a word.
+FACTUAL = re.compile(r"\d")
 # Never allowed without an approved fact (brief §01 guardrails, §07 quality rules).
 BANNED = re.compile(
     r"₹|\$\d|\b(salar(y|ies)|lpa|ctc|lakhs?|crores?|rs\.|placements?|placed|get hired|"
@@ -32,7 +31,12 @@ FILLER = {"what", "when", "where", "which", "while", "who's", "whose", "that", "
           "without", "from", "into", "onto", "about", "does", "doesn't", "have", "just", "only",
           "also", "each", "every", "here", "more", "most", "some", "such", "very", "will", "would",
           "should", "could", "it's", "isn't", "can't", "don't"}
-# Outcome and quality claims; in packaging only when an approved claim uses the same word.
+# Outcome and quality claims; allowed only when an approved claim uses the same word. The plain
+# list below is what the scripting prompt shows the model; keep the two in step.
+OUTCOME_WORDS = ("hallucinations, accurate/accuracy, error-free, reliable/reliability, fix/fixes, "
+                 "solve/solves, eliminate, prevent/prevents, guarantee, proven, best, #1, "
+                 "number one, better, faster, cheaper, outperform, reduce/reduces, "
+                 "improve/improves/improving, boost, perfect, 10x")
 OUTCOME = re.compile(
     r"#1|\b(hallucinat\w*|accura\w*|error[- ]free|reliab\w*|fix(es|ed)?|solv(e|es|ed)|"
     r"eliminat\w*|prevent\w*|guarantee\w*|proven|best|number one|better|faster|cheaper|"
