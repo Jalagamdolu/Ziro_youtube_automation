@@ -148,6 +148,7 @@ def test_hand_edit_from_the_browser_goes_through_every_check(client) -> None:
     assert run["approvals"][-1]["notes"].startswith("Hand-edited script submitted by Asha")
     page = html.unescape(client.get(f"/ui/projects/{project_id}").text)
     assert "!! RULE: packaging claims 'Boost'" in page  # the failed edit comes back annotated
+    assert not storage.get().exists(human_edit.KEY.format(project_id))  # retry won't reuse it
 
     client.post(f"/ui/projects/{project_id}/edit", data={"text": original, "reviewer": "Asha"})
     run = status(client, project_id)

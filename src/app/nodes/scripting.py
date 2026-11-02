@@ -40,6 +40,9 @@ def scripting(ctx: StageContext) -> Outputs:
     try:
         if ctx.storage.exists(edited):  # the reviewer's hand edit replaces the model, not checks
             text = ctx.storage.read(edited).decode("utf-8")
+            # Used once, pass or fail: a failed edit survives as the flagged last draft, and
+            # a later retry or reject goes back to the model instead of re-running this text.
+            ctx.storage.delete(edited)
             try:
                 package_draft, editor = human_edit.parse(text)
             except ValueError as error:
@@ -47,7 +50,6 @@ def scripting(ctx: StageContext) -> Outputs:
             draft, hooks, titles = _write(lambda _: package_draft, brief, claims, None,
                                           revisions=0)
             log.info("script human-edited", editor=editor)
-            ctx.storage.delete(edited)  # used once: a later reject goes back to the model
             trail = {"human_draft.txt": text,
                      "human_edit.json": json.dumps({"edited_by": editor, "source": edited})}
         else:
