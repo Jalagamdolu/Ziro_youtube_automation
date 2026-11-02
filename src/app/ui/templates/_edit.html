@@ -1,0 +1,15 @@
+<section>
+  <h2>Edit the script myself</h2>
+  <p class="muted small">
+    {% if run.status == "failed" %}Your hand-edited script failed the checks below each <code>!!</code> line — fix those and resubmit.
+    {% else %}Change anything (script, hooks, titles, description, tags, chapters). Lines starting with <code>!!</code> are notes and are ignored; keep the <code>=== headers ===</code> and the <code>[C#]</code> markers on cited sentences.{% endif %}
+    Your version replaces the model for one scripting run and goes through <strong>every</strong> check (claims, banned and outcome words, shape and timing, visuals, hooks, titles), then comes back here for review. The trail records you as the editor.
+  </p>
+  <form method="post" action="/ui/projects/{{ run.id }}/edit">
+    <textarea name="text" rows="28" style="font-family:ui-monospace,Consolas,monospace;font-size:13px" aria-label="Editable script package">{{ edit }}</textarea>
+    <div class="row" style="align-items:end">
+      <div><label for="ed-reviewer">Editor</label><input type="text" id="ed-reviewer" name="reviewer" value="Dolender" required></div>
+      <div><button class="primary" type="submit">Submit my edit through all checks</button></div>
+    </div>
+  </form>
+</section>

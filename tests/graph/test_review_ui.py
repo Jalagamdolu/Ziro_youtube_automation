@@ -1,6 +1,8 @@
 """Review UI (§8): the three gate screens, form decisions, run log, file serving and the bundle."""
 
+import html
 import io
+import json
 import zipfile
 from urllib.parse import parse_qs, urlparse
 
@@ -104,3 +106,66 @@ def test_decided_gate_is_hidden_until_the_run_moves(client) -> None:
     project_id = _start(client)
     page = client.get(f"/ui/projects/{project_id}", params={"submitted": "research_review"})
     assert "Decision recorded" in page.text and "Approve claims" not in page.text
+
+
+def test_first_visit_is_the_prompt_then_the_runs_list(client) -> None:
+    home = client.get("/").text
+    assert 'name="prompt"' in home and "All runs" not in home
+    project_id = _start(client)
+    runs = client.get("/").text
+    assert "All runs" in runs and f"/ui/projects/{project_id}" in runs and "$0.0000" in runs
+    assert 'name="prompt"' in client.get("/new").text
+
+
+def test_stage_table_shows_the_gate_waiting_and_approve_all_advances(client) -> None:
+    project_id = _start(client)
+    page = client.get(f"/ui/projects/{project_id}").text
+    assert "<h2>Stages</h2>" in page and "waiting for you" in page
+    assert "Approve all 4 claims as-is" in page
+    assert _decide(client, project_id, decision="approve", reviewer="Dolender") is None
+    run = status(client, project_id)
+    assert run["status"] == "script_review"
+    assert run["approvals"][0]["claim_edits"] == {"removed": [], "edited": {}}
+
+
+def test_hand_edit_from_the_browser_goes_through_every_check(client) -> None:
+    from app.adapters import storage
+    from app.nodes import human_edit
+
+    project_id = _start(client)
+    _decide(client, project_id, **_keep_all())
+    page = client.get(f"/ui/projects/{project_id}").text
+    assert "Edit the script myself" in page
+    original = html.unescape(page.split('aria-label="Editable script package">')[1]
+                             .split("</textarea>")[0])
+
+    hype = original.replace("AI Agent vs Chatbot for Students", "Boost Your Chatbot Skills")
+    edited = client.post(f"/ui/projects/{project_id}/edit",
+                         data={"text": hype, "reviewer": "Asha"}, follow_redirects=False)
+    assert edited.status_code == 303
+    run = status(client, project_id)
+    assert run["status"] == "failed" and "'Boost'" in run["jobs"][-1]["error_message"]
+    assert run["approvals"][-1]["notes"].startswith("Hand-edited script submitted by Asha")
+    page = html.unescape(client.get(f"/ui/projects/{project_id}").text)
+    assert "!! RULE: packaging claims 'Boost'" in page  # the failed edit comes back annotated
+
+    client.post(f"/ui/projects/{project_id}/edit", data={"text": original, "reviewer": "Asha"})
+    run = status(client, project_id)
+    assert run["status"] == "script_review"
+    trail = next(a for a in run["artifacts"] if a["type"] == "human_edit.json")
+    assert json.loads(storage.get().read(trail["storage_path"]))["edited_by"] == "Asha"
+    assert not storage.get().exists(human_edit.KEY.format(project_id))  # used once
+
+
+def test_finished_run_shows_player_downloads_and_cost(client) -> None:
+    project_id = _start(client)
+    _decide(client, project_id, **_keep_all())
+    _decide(client, project_id, decision="approve", reviewer="Dolender")
+    _decide(client, project_id, decision="approve", reviewer="Dolender", ai_synthetic="yes",
+            ai_reason="synthetic narration voice")
+    page = client.get(f"/ui/projects/{project_id}").text
+    assert "Your video" in page and "<video" in page
+    for label in ("Video (MP4)", "Captions (SRT)", "Thumbnail", "Claims",
+                  "Publish receipt (mock)", "Everything (ZIP)"):
+        assert label in page, label
+    assert "<h3>Cost</h3>" in page and "Edit the script myself" not in page

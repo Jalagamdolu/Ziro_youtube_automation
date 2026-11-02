@@ -1,0 +1,29 @@
+<section>
+  <h2>Your video</h2>
+  <div class="row">
+    <div>
+      {% if finish.video %}<video controls preload="metadata" style="width:100%;max-height:560px;background:#000"
+             src="/ui/projects/{{ run.id }}/files/{{ finish.video }}"></video>{% else %}<p class="muted">No video artifact.</p>{% endif %}
+    </div>
+    <div>
+      {% if finish.thumbnail %}<img alt="Thumbnail" style="width:100%;border:1px solid var(--line)"
+           src="/ui/projects/{{ run.id }}/files/{{ finish.thumbnail }}">{% endif %}
+      <h3>Downloads</h3>
+      <p>{% for label, key in finish.downloads %}
+        <a href="/ui/projects/{{ run.id }}/files/{{ key }}" download><button type="button">{{ label }}</button></a>
+      {% endfor %}
+        <a href="/ui/projects/{{ run.id }}/bundle.zip"><button class="primary" type="button">Everything (ZIP)</button></a></p>
+      <p class="small muted">Published only to the mock publisher (private, never a real channel).</p>
+    </div>
+  </div>
+  <h3>Cost</h3>
+  <table>
+    <tr><th>Provider</th><th>Calls</th><th>Units</th><th>Amount</th><th></th></tr>
+    {% for provider, kind, calls, units, amount in finish.costs %}
+    <tr><td>{{ provider }}</td><td>{{ calls }}</td><td>{{ "{:,.0f}".format(units) }}</td>
+        <td>${{ "%.4f" | format(amount) }}</td><td class="small muted">{{ kind }}</td></tr>
+    {% else %}<tr><td colspan="5" class="muted">No paid calls recorded.</td></tr>
+    {% endfor %}
+    <tr><th>Total</th><td></td><td></td><th>${{ "%.4f" | format(run.total_cost_usd) }}</th><td></td></tr>
+  </table>
+</section>

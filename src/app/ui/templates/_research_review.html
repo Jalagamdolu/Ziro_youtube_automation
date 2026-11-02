@@ -25,7 +25,12 @@
       <div><label for="rr-reviewer">Reviewer</label><input type="text" id="rr-reviewer" name="reviewer" value="Dolender" required></div>
       <div><label for="rr-notes">Notes (optional)</label><input type="text" id="rr-notes" name="notes"></div>
     </div>
-    <p><button class="primary" type="submit">Approve claims</button></p>
+    <p><button class="primary" type="submit">Approve claims (with my edits/removals)</button></p>
+  </form>
+  <form method="post" action="/ui/projects/{{ run.id }}/decide" class="row" style="align-items:end">
+    <input type="hidden" name="decision" value="approve">
+    <div><label for="ra-reviewer">Reviewer</label><input type="text" id="ra-reviewer" name="reviewer" value="Dolender" required></div>
+    <div><button type="submit">Approve all {{ gate.claims | length }} claims as-is</button></div>
   </form>
 </section>
 {% include "_reject.html" %}

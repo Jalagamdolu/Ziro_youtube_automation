@@ -10,6 +10,21 @@
 </section>
 
 <section>
+  <h2>Stages</h2>
+  <table>
+    <tr><th>Stage</th><th>State</th><th>Attempts</th><th>Time</th></tr>
+    {% for st in stages %}
+    <tr{% if st.state in ("running", "waiting for you") %} class="top"{% endif %}>
+      <td>{{ st.stage }}{% if st.gate %} <span class="muted small">gate</span>{% endif %}</td>
+      <td><span class="pill {{ 'ok' if st.state in ('succeeded', 'cached', 'approved') else 'bad' if st.state in ('failed', 'abandoned', 'rejected') else 'warn' if st.state in ('running', 'waiting for you') else '' }}">{{ st.state }}</span></td>
+      <td>{{ st.attempts or "" }}{% if st.failed %} <span class="small muted">({{ st.failed }} failed)</span>{% endif %}</td>
+      <td class="small">{{ "%.1f s" | format(st.seconds) if st.seconds is not none else "" }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</section>
+
+<section>
   <h2>State timeline</h2>
   <table>
     <tr><th>At (UTC)</th><th>From</th><th>To</th><th>Actor</th></tr>

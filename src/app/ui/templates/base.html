@@ -48,7 +48,9 @@
 <body>
   <header>
     <a href="/">Ziro YouTube automation</a>
-    <span class="tag">sandbox · prototype mode · publishing is mocked</span>
+    <a href="/" class="tag">Runs</a>
+    <a href="/new" class="tag">New video</a>
+    <span class="tag">sandbox · {{ mode() }} mode · publishing is mocked · no login (local only)</span>
   </header>
   <main>
     {% if error %}<section class="error"><strong>Not done:</strong> {{ error }}</section>{% endif %}

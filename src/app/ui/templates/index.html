@@ -1,12 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Runs{% endblock %}
+{% block title %}New video{% endblock %}
 {% block content %}
 <section>
-  <h2>New run</h2>
+  <h1>Make a video</h1>
+  <p class="muted small">Type a topic. The run researches it, writes a script and renders the video, pausing at three review gates on the run page.</p>
   <form method="post" action="/ui/projects">
     <label for="prompt">Topic</label>
-    <input type="text" id="prompt" name="prompt" required
-           value="What makes an AI agent different from a chatbot?">
+    <input type="text" id="prompt" name="prompt" required autofocus
+           placeholder="e.g. What is RAG (retrieval-augmented generation) in AI, explained for students?">
     <div class="row">
       <div>
         <label for="format">Format</label>
@@ -25,25 +26,12 @@
            value="Indian students, early-career developers and career switchers">
     <label for="cta">CTA</label>
     <input type="text" id="cta" name="cta" value="Explore AI learning at ziro.digital">
-    <p class="muted small">Prototype mode only has content for topics with a fixture; other topics stop at research with a clear error.</p>
+    {% if mode() == "prototype" %}
+    <p class="muted small">Prototype mode: only topics with a hand-written fixture have content; any other topic stops at research with a clear error. Switch <code>mode</code> to <code>production</code> in <code>src/config.yaml</code> for any topic (free-tier keys in <code>.env</code>).</p>
+    {% else %}
+    <p class="muted small">Production mode (free tiers, D-27): any topic. Rendering is Shorts only for now.</p>
+    {% endif %}
     <button class="primary" type="submit">Start run</button>
   </form>
-</section>
-
-<section>
-  <h2>Recent runs</h2>
-  {% if projects %}
-  <table>
-    <tr><th>Topic</th><th>Format</th><th>Status</th><th>Created (UTC)</th></tr>
-    {% for p in projects %}
-    <tr>
-      <td><a href="/ui/projects/{{ p.id }}">{{ p.topic }}</a></td>
-      <td>{{ p.format }}</td>
-      <td><span class="pill">{{ p.status }}</span></td>
-      <td class="small">{{ p.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
-    </tr>
-    {% endfor %}
-  </table>
-  {% else %}<p class="muted">No runs yet.</p>{% endif %}
 </section>
 {% endblock %}

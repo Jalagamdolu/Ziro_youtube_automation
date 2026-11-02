@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Runs{% endblock %}
+{% block content %}
+<section>
+  <h1 style="display:flex;justify-content:space-between;align-items:center">All runs
+    <a href="/new"><button class="primary" type="button">New video</button></a></h1>
+  <table>
+    <tr><th>Topic</th><th>Format</th><th>State</th><th>Created (UTC)</th><th>Spend</th></tr>
+    {% for p in projects %}
+    <tr>
+      <td><a href="/ui/projects/{{ p.id }}">{{ p.topic }}</a></td>
+      <td>{{ p.format }}</td>
+      <td><span class="pill {{ 'ok' if p.status == 'done' else 'bad' if p.status == 'failed' else 'warn' if p.status.endswith('_review') else '' }}">{{ p.status }}</span></td>
+      <td class="small">{{ p.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+      <td class="small">${{ "%.4f" | format(spent.get(p.id, 0) or 0) }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</section>
+{% endblock %}
