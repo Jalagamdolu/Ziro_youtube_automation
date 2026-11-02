@@ -1,14 +1,25 @@
 import React from "react";
 import { AbsoluteFill, Audio, Sequence, staticFile, useVideoConfig } from "remotion";
 import { Captions } from "./Captions";
+import { ChatBubble } from "./scenes/ChatBubble";
+import { Checklist } from "./scenes/Checklist";
+import { Comparison } from "./scenes/Comparison";
 import { DefinitionCard } from "./scenes/DefinitionCard";
+import { EndCard } from "./scenes/EndCard";
+import { Flow } from "./scenes/Flow";
 import { TitleCard } from "./scenes/TitleCard";
 import { theme } from "./theme";
 import type { Scene, ShortProps } from "./types";
 
-// visual_type -> template. Types without a template yet fall back to the title card.
+// visual_type (src/app/nodes/storyboarding.py) -> template; anything else gets the title card.
 const templates: Record<string, React.FC<{ scene: Scene; title: string }>> = {
   definition_card: DefinitionCard,
+  quote_card: DefinitionCard,
+  comparison: Comparison,
+  chat_bubble: ChatBubble,
+  flow: Flow,
+  checklist: Checklist,
+  end_card: EndCard,
 };
 
 export const Short: React.FC<ShortProps> = ({ title, audio, scenes, cues }) => {

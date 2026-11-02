@@ -5,7 +5,7 @@ export type Scene = {
   visual_type: string;
   start: number; // seconds
   end: number;
-  props: Record<string, string>;
+  props: Record<string, string | string[]>; // lists: flow steps, checklist items
 };
 
 export type Cue = {

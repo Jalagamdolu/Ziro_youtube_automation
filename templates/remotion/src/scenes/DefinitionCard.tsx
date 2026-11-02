@@ -1,25 +1,25 @@
 import React from "react";
-import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill } from "remotion";
+import { useEnter } from "../motion";
 import { safe, theme } from "../theme";
 import type { Scene } from "../types";
 
-// A sourced definition: headline from the [ON SCREEN] beat, body = the approved claim's wording,
-// attribution = the claim's source (never text the claim ledger does not contain).
+// A sourced definition or quote: headline from the [ON SCREEN] beat, body = the approved claim's
+// wording (quote cards: the source's verbatim quote), attribution = the claim's source
+// (never text the claim ledger does not contain).
 export const DefinitionCard: React.FC<{ scene: Scene; title: string }> = ({ scene }) => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const enter = spring({ frame, fps, config: { damping: 200 } });
-  const { headline, definition, source, source_title } = scene.props;
+  const enter = useEnter();
+  const { label, headline, definition, source, source_title } = scene.props as Record<string, string>;
   return (
     <AbsoluteFill style={{ paddingTop: safe.top + 40, paddingLeft: safe.left, paddingRight: safe.right }}>
       <div style={{
-        opacity: enter, transform: `translateY(${interpolate(enter, [0, 1], [40, 0])}px)`,
+        ...enter,
         backgroundColor: theme.surface, borderRadius: 32, padding: "56px 56px 48px",
         borderLeft: `14px solid ${theme.primary}`, boxShadow: "0 24px 60px rgba(0,0,0,0.35)",
       }}>
         <div style={{ color: theme.primary, fontFamily: theme.displayFont, fontSize: 34, fontWeight: 700,
           letterSpacing: 6 }}>
-          DEFINITION
+          {label || "DEFINITION"}
         </div>
         <div style={{ color: theme.ink, fontFamily: theme.displayFont, fontSize: 72, fontWeight: 700,
           lineHeight: 1.1, marginTop: 20 }}>
