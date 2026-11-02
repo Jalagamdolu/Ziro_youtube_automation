@@ -18,6 +18,12 @@ os.environ["DATABASE_URL"] = TEST_DB_URL
 REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/0")
 os.environ["REDIS_URL"] = REDIS_URL.rsplit("/", 1)[0] + "/1"
 
+# Tests never reach a real API, whatever .env holds; only the opt-in live smoke test keeps keys.
+if os.environ.get("ZIRO_LIVE") != "1":
+    for _key in ("GEMINI_API_KEY", "GROQ_API_KEY", "TAVILY_API_KEY", "ANTHROPIC_API_KEY",
+                 "SARVAM_API_KEY"):
+        os.environ.pop(_key, None)
+
 ROOT = Path(__file__).resolve().parents[1]
 TABLES = ("approvals", "artifacts", "costs", "events", "jobs", "publishing", "sources",
           "asset_licenses", "projects", "checkpoints", "checkpoint_writes", "checkpoint_blobs")
@@ -52,6 +58,7 @@ def pipeline(database: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setitem(nodes.FUNCS, "rendering", stubs.rendering)
     monkeypatch.setenv("RUNS_DIR", str(tmp_path))
     cfg = config.load()
+    cfg["mode"] = "prototype"  # tests opt into production explicitly (graph/test_production_*)
     cfg["backoff"] = {"initial_seconds": 0.01, "factor": 2.0, "max_seconds": 0.05}
     monkeypatch.setattr(config, "load", lambda: cfg)
     monkeypatch.setattr(queue, "queue", lambda: Queue(queue.QUEUE_NAME, connection=queue.redis(),
