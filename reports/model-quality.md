@@ -4,7 +4,7 @@ Draft for the final report. Sources: D-27, D-28, D-29 in `architecture/decisions
 
 **Run:** Short, any-topic production mode, prompt *"What is RAG (retrieval-augmented generation) in AI, explained for students?"*, 2026-11-02. Reviewer at all gates: Dolender (decisions relayed from chat by Claude, recorded as such in `approvals`).
 
-**Outcome:** research passed review on the first try; scripting never produced a draft that passed both the deterministic checks and the reviewer's notes, so the run stopped at `failed` in scripting and nothing was rendered or published. That stop is the guardrails working, not a crash.
+**Outcome:** research passed review on the first try. **No model-written script** passed both the deterministic checks and the reviewer's notes, so the fully automated run stopped at `failed` in scripting; that stop was the guardrails working, not a crash. The video exists only because of the human-edit bridge (D-30, below): Dolender edited a model draft by hand, the edit passed every check, and the run went on to render.
 
 ## Headline
 
@@ -59,10 +59,22 @@ Wall clock: draft 1.2 s · research 8.9 s · scripting 19 s across the 3 passing
 
 Most of the token volume came from failed drafts: a passing Flash-Lite scripting attempt used ~4k input / 1k output tokens per call.
 
+## How the run reached a video: the human-edit bridge (D-30)
+
+After the last automated cycle failed, Dolender took the closest model draft and edited it by hand. That draft was gpt-oss-120b, final cycle, draft 1, whose script passed every check and whose packaging failed only on hype titles.
+- **Starting point:** the gpt-oss script plus the v3 titles, thumbnail, description, tags and hooks Dolender had already approved. That combination passed every check before any edit, so the file had no failing lines, only three editorial notes for gaps the checks don't cover.
+- **Dolender's edits:** the Relevance line ("…RAG stops them guessing and gives you correct answers" → "…RAG stops them guessing: it fetches the facts before it answers"); one unused hook that still said "real-time"; and three chapters instead of five.
+- **Checks:** the edited package went through every scripting check, nothing skipped, with 0 automatic revisions. It passed with 0 problems. Claude then confirmed the two pre-approval conditions (Relevance speaks to the viewer and doesn't repeat C1; nothing on screen says "real-time") and relayed Dolender's chat pre-approval at script_review.
+- **Trail:** `scripting/v4` holds `human_draft.txt` and `human_edit.json` (`edited_by: Dolender`); the worker logged `script human-edited Dolender`; the approval note says the script was human-edited; and no model cost was recorded for that attempt.
+- **Formatting incident:** Windows 11 Notepad reformatted the first `.md` edit file on save (escaped `[`, dropped `##`, doubled line breaks). The bridge now uses `.txt`. The edit was converted back undoing only those artifacts, and Notepad's file is kept beside it as `human_draft.notepad-original.md`.
+- **Render:** storyboarding 0 s, rendering 148 s (Kokoro → WhisperX → Remotion → FFmpeg). The result is 53.4 s, 1080×1920, −14.3 LUFS, 121 words in 28 caption cues, and 8 scenes of 8 types, all rendered with their content.
+
+**What this shows:** a human editor plus deterministic checks produced a publishable-quality Short from free-tier model drafts at $0. The models contributed the research, all but one sentence of the narration (gpt-oss) and the packaging (Flash-Lite); the human contributed that one sentence, a hook and the chapters, plus the editorial judgement over three review rounds. This is not the same as the models doing it alone, and the report shouldn't present it as if it were.
+
 ## Paid comparison — not yet run
 
 The documented upgrade is Claude through the Anthropic SDK (D-02) for draft, research and scripting, with Sarvam for Indian-English narration. The comparison run on this same brief awaits a paid key. Dolender's estimate for it is about ₹50; to be confirmed against Anthropic's and Sarvam's price pages before the run, using the per-call token counts the `costs` table already records (above). The adapters are interfaces, so the switch is configuration plus the Claude adapter, with every check unchanged.
 
 ## Conclusion
 
-At ₹0 the pipeline is safe but not productive: the deterministic guardrails held — no invented outcome, salary, placement or unsourced figure got past them once the D-28/D-29 scans were in place — but the free models could not write a script that clears those guardrails and a reviewer's editorial notes within two revisions. The bottleneck is model quality, not the pipeline. The recommendation stands: keep the checks exactly as they are and run the Claude comparison on this brief before choosing the production model.
+At ₹0 the pipeline is safe but not productive: the deterministic guardrails held — no invented outcome, salary, placement or unsourced figure got past them once the D-28/D-29 scans were in place — but the free models could not write a script that clears those guardrails and a reviewer's editorial notes within two revisions. With a human editor in the loop (D-30) the same pipeline did reach a checked, rendered Short at $0. The bottleneck is model quality, not the pipeline. The recommendation stands: keep the checks exactly as they are and run the Claude comparison on this brief before choosing the production model.
