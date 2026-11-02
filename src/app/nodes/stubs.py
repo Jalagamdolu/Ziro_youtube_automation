@@ -32,10 +32,13 @@ def export_ready(ctx: StageContext) -> Outputs:
 
 def mock_published(ctx: StageContext) -> Outputs:
     package = ContentPackage.model_validate(ctx.read_json("scripting", "content_package.json"))
+    footage = f"{ctx.inputs['rendering']}/stock.json"  # D-33: credit the stock provider
+    credit = (json.loads(ctx.storage.read(footage)).get("credit")
+              if ctx.storage.exists(footage) else None)
     request = {
         "snippet": {
             "title": package.top_titles[0],
-            "description": package.description,
+            "description": f"{package.description}\n\n{credit}" if credit else package.description,
             "tags": package.tags,
             "categoryId": "27",
             "defaultLanguage": package.brief.language,

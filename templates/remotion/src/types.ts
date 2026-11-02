@@ -6,6 +6,8 @@ export type Scene = {
   start: number; // seconds
   end: number;
   props: Record<string, string | string[]>; // lists: flow steps, checklist items
+  background?: string; // stock clip in the public dir (D-33); absent = solid background
+  background_seconds?: number;
 };
 
 export type Cue = {

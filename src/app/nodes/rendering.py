@@ -9,13 +9,17 @@ import json
 import re
 import subprocess
 import tempfile
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from app.adapters import aligner, tts
+from sqlalchemy import func, select
+
+from app.adapters import aligner, stock, tts
 from app.core import config, costs, db
 from app.core.contracts import ContentPackage
 from app.core.errors import FatalError
+from app.core.models import AssetLicense
 from app.nodes import script_checks
 from app.nodes.context import Outputs, StageContext
 
@@ -73,9 +77,11 @@ def rendering(ctx: StageContext) -> Outputs:
         work = Path(folder)
         (work / "public").mkdir()
         sf.write(work / "public" / "narration.wav", narration, tts.RATE)
+        footage = backgrounds(ctx.project_id, package.brief.topic, scenes, work / "public")
         (work / "props.json").write_text(json.dumps({
             "title": package.brief.topic, "audio": "narration.wav", "duration": clock,
-            "scenes": [{k: scene[k] for k in ("id", "visual_type", "start", "end", "props")}
+            "scenes": [{k: scene[k] for k in ("id", "visual_type", "start", "end", "props",
+                                              "background", "background_seconds") if k in scene}
                        for scene in scenes],
             "cues": cues}), encoding="utf-8")
         _run(["npx", "remotion", "render", "src/index.ts", "Short", str(work / "raw.mp4"),
@@ -109,8 +115,50 @@ def rendering(ctx: StageContext) -> Outputs:
         "duration_s": round(duration, 1), "duration_ok": low <= duration <= high,
         "resolution": "1080x1920", "loudness_target_lufs": -14, "words": len(words),
         "cues": len(cues), "scene_types": sorted({s["visual_type"] for s in scenes}),
+        "stock": stock_checks(ctx.project_id, footage),
         "deferred": ["chapters", "dead-air"]}, indent=2)
+    outputs["stock.json"] = json.dumps(footage, indent=2, ensure_ascii=False)
     return outputs
+
+
+def backgrounds(project_id: str, topic: str, scenes: list[dict[str, Any]], public: Path
+                ) -> dict[str, Any]:
+    """Stock clips behind the scenes (D-33): fetched once, stored in the render's public dir,
+    one license row each. No provider or no usable clip leaves the solid brand background."""
+    providers = stock.get()
+    query, clips, searches = stock.find(providers, stock.background_query(topic),
+                                        config.load()["stock"]["clips_per_video"])
+    if searches:
+        costs.record_usage(project_id, "rendering", [(f"{providers[0].name}-search", searches)])
+    for i, clip in enumerate(clips):
+        (public / f"background_{i}.mp4").write_bytes(stock.download(clip))
+    behind = [s for s in scenes if s["visual_type"] != "end_card"]  # the end card stays clean
+    for i, scene in enumerate(behind if clips else []):
+        scene["background"] = f"background_{i % len(clips)}.mp4"
+        scene["background_seconds"] = clips[i % len(clips)].seconds
+    with db.session() as s, s.begin():
+        s.add_all(AssetLicense(asset=f"{c.provider} video {c.id}", type="stock_video",
+                               source=c.page_url, license=c.license, proof_url=c.license_url,
+                               project_id=project_id, query=query) for c in clips)
+    provider = clips[0].provider.capitalize() if clips else None
+    return {"query": query, "provider": provider, "clips": [asdict(c) for c in clips],
+            "credit": f"Stock footage: {provider}" if clips else None}
+
+
+def stock_checks(project_id: str, footage: dict[str, Any]) -> dict[str, Any]:
+    """QA: every clip used has a license row for this run and no people or brand tags; any
+    failure stops the stage rather than shipping unlicensed footage."""
+    with db.session() as s:
+        licensed = s.scalar(select(func.count()).where(AssetLicense.project_id == project_id,
+                                                       AssetLicense.type == "stock_video")) or 0
+    clips = footage["clips"]
+    report = {"clips": len(clips), "query": footage["query"], "provider": footage["provider"],
+              "all_licensed": licensed >= len(clips),
+              "no_people_or_brand_tags": not any(stock.EXCLUDED.search(c["tags"]) for c in clips),
+              "credit": footage["credit"]}
+    if not (report["all_licensed"] and report["no_people_or_brand_tags"]):
+        raise FatalError(f"stock footage failed QA: {report}")
+    return report
 
 
 def sentences(lines: list[str]) -> list[str]:

@@ -1,5 +1,6 @@
 import React from "react";
 import { AbsoluteFill, Audio, Sequence, staticFile, useVideoConfig } from "remotion";
+import { Background } from "./Background";
 import { Captions } from "./Captions";
 import { ChatBubble } from "./scenes/ChatBubble";
 import { Checklist } from "./scenes/Checklist";
@@ -33,6 +34,9 @@ export const Short: React.FC<ShortProps> = ({ title, audio, scenes, cues }) => {
         const frames = Math.max(1, Math.round(scene.end * fps) - from);
         return (
           <Sequence key={scene.id} from={from} durationInFrames={frames}>
+            {scene.background ? (
+              <Background file={scene.background} seconds={scene.background_seconds ?? scene.end - scene.start} />
+            ) : null}
             <Template scene={scene} title={title} />
           </Sequence>
         );
