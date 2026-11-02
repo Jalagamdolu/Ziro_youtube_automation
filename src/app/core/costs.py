@@ -44,6 +44,8 @@ def total(s: Session, project_id: str) -> float:
 def record_usage(project_id: str, stage: str, calls: list[tuple[str, float]]) -> None:
     """One row per (price key, units) an adapter used; free-tier calls cost $0 but keep their
     token counts for the paid estimate."""
+    if not calls:
+        return
     with db.session() as s, s.begin():
         for provider, units in calls:
             record_cost(s, project_id, stage, provider, units)

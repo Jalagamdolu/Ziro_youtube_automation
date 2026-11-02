@@ -52,6 +52,10 @@ class LLM(Protocol):
         revision (reviewer notes or failed checks)."""
         ...
 
+    def photo_queries(self, brief: Brief, scenes: list[dict[str, Any]]) -> list[str]:
+        """One stock-photo search phrase per scene, in order; [] = let code choose (D-34)."""
+        ...
+
 
 class FixtureLLM:
     calls: list[Usage] = []
@@ -66,6 +70,11 @@ class FixtureLLM:
         # The CTA comes from the brief, as a real model would write it (T01).
         filled = json.loads(json.dumps(package).replace("{cta}", brief.cta))
         return PackageDraft.model_validate(filled)
+
+    def photo_queries(self, brief: Brief, scenes: list[dict[str, Any]]) -> list[str]:
+        """Hand-written phrases from the fixture, like its script; none = code keywords."""
+        path = fixture_dir(brief.topic) / "photo_queries.json"
+        return json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
 
 
 class ModelLLM:
@@ -90,6 +99,14 @@ class ModelLLM:
             return PackageDraft.model_validate(reply)
         except ValueError as error:
             raise RetryableError(f"model returned an invalid package: {error}") from error
+
+
+    def photo_queries(self, brief: Brief, scenes: list[dict[str, Any]]) -> list[str]:
+        from app.adapters import prompts
+
+        reply = self.chat.json(*prompts.photo_queries(brief, scenes))
+        queries = reply.get("queries", []) if isinstance(reply, dict) else []
+        return [str(q) for q in queries]
 
 
 class GeminiChat:

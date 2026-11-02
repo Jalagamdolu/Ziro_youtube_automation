@@ -1,13 +1,17 @@
 """storyboarding: each `[ON SCREEN: ...]` beat + the narration under it becomes one scene (§4).
 
-Prototype mode parses the approved script deterministically (an LLM storyboard is a production
-option). Template text comes only from the script and the approved claim ledger.
+The script is parsed deterministically; template text comes only from the script and the approved
+claim ledger. Each scene also gets a photo search phrase (D-34): suggested by the LLM in
+production, built from the scene's own words in code in prototype mode or when the model's answer
+doesn't fit. The reviewer approves the photos themselves at qa_review.
 """
 
 import json
 import re
 from typing import Any
 
+from app.adapters import llm, stock
+from app.core import costs
 from app.core.contracts import Claim, ContentPackage
 from app.nodes import script_checks
 from app.nodes.context import Outputs, StageContext
@@ -30,8 +34,30 @@ REQUIRED = {"definition_card": "definition", "quote_card": "definition", "compar
 
 def storyboarding(ctx: StageContext) -> Outputs:
     package = ContentPackage.model_validate(ctx.read_json("scripting", "content_package.json"))
-    return {"scenes.json": json.dumps(parse(package.script, package.claims), indent=2,
-                                      ensure_ascii=False)}
+    scenes = parse(package.script, package.claims)
+    writer = llm.get("storyboarding")
+    try:
+        suggested = writer.photo_queries(package.brief, scenes)
+    finally:
+        costs.record_usage(ctx.project_id, "storyboarding", writer.calls)
+    if len(suggested) != len(scenes):
+        suggested = [""] * len(scenes)  # wrong count: phrases from the scenes' words instead
+    for scene, query in zip(scenes, suggested, strict=True):
+        scene["photo_query"] = photo_query(scene, query)
+    return {"scenes.json": json.dumps(scenes, indent=2, ensure_ascii=False)}
+
+
+def photo_query(scene: dict[str, Any], suggested: str) -> str | None:
+    """The scene's photo search: the model's phrase cleaned of anything the filters forbid, else
+    the scene's own words. The end card has no photo."""
+    if scene["visual_type"] == "end_card":
+        return None
+    words = [w for w in re.findall(r"[A-Za-z][A-Za-z-]+", suggested)
+             if not stock.EXCLUDED.search(w)][:6]
+    if words and " ".join(words).lower() != "none":
+        return " ".join(words).lower()
+    beat = QUOTED.findall(scene["on_screen"])
+    return stock.keywords(" ".join(beat) + " " + scene["text"]) or None
 
 
 def visual_problems(script: str, claims: list[Claim]) -> list[str]:

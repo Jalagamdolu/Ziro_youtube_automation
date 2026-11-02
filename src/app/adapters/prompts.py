@@ -7,6 +7,7 @@ app.nodes.script_checks enforces, so a draft can pass on the first try.
 import json
 import re
 from pathlib import Path
+from typing import Any
 
 from app.core.contracts import Brief, Claim
 from app.nodes import script_checks
@@ -36,6 +37,30 @@ def learning_outcome(brief: Brief) -> tuple[str, str]:
               f"{brief.target_seconds} s\n\nWrite one sentence, starting with a verb, saying what "
               "the viewer can do or explain after watching. Promise only what this one video can "
               "teach; no outcomes such as jobs, salaries or placements.")
+    return system, prompt
+
+
+def photo_queries(brief: Brief, scenes: list[dict[str, Any]]) -> tuple[str, str]:
+    system = ("You pick stock photographs for a short educational video. Reply with JSON only: "
+              '{"queries": ["...", ...]}, one search phrase per scene, in order.')
+    listed = "\n".join(f"{i + 1}. On screen: {s['on_screen']}\n   Narration: "
+                        f"{script_checks.MARKER.sub('', s['text']).strip()}"
+                        for i, s in enumerate(scenes))
+    prompt = f"""Video: {brief.topic}
+
+For each scene, write a 2-5 word search phrase for a REAL photograph (not an illustration) that
+shows what the narration explains, so the photos alone tell the story.
+- Concrete and photographable: objects, places, actions (e.g. "student notebook exam timetable",
+  "server room cables", "hands typing laptop code").
+- People only when not identifiable: hands, from behind, over the shoulder, or far away. Never
+  faces, portraits, selfies or children.
+- No brand names, logos, product screenshots or readable app interfaces.
+- For the last scene (the call to action) write "none".
+
+Scenes:
+{listed}
+
+Exactly {len(scenes)} phrases."""
     return system, prompt
 
 
