@@ -21,12 +21,12 @@ stage_deadline_seconds:
   researching: 900
   rendering: 1800
 
-# Narration (D-23, provisional). Overrule the voice here; rendering re-synthesises from scratch.
+# Narration (D-23, Dolender's pick by ear). Rendering re-synthesises from scratch on change.
 tts:
   engine: kokoro          # prototype: local + free. production: sarvam (not built, D-19)
-  voice: hf_alpha         # fallback: bf_emma (phonemes: en-gb)
+  voice: af_heart
   phonemes: en-us
-  speed: 1.0
+  speed: 0.95
 
 # Written form -> how the narrator says it (brief §07: written "Ziro", spoken "ZAIRO").
 pronunciation:

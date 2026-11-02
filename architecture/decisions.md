@@ -80,6 +80,7 @@ Evaluated before Phase 4P (D-21), on the Short fixture's narration; WAVs and num
 - Choice: `hf_alpha` with English (`en-us`) phonemes — the closest to the user's "female, Indian-English accent" brief while staying as intelligible as the native voices. Fallback: `bf_emma`.
 - Brand: every voice read the respelling "Zairo" as "zero" (espeak gives /zˈɛɹoʊ/). The pronunciation step therefore injects phonemes, not respellings: `Ziro` → `zˈaɪɹoʊ` (ZAI-ro), and `ziro.digital` is spoken "Ziro dot digital". Re-transcription now hears "Zyro", which matches the "Zai-ro" respelling.
 - Provisional until Dolender listens. Overruling is one line in `src/config.yaml` (`tts.voice` / `tts.phonemes`) and a re-run: rendering re-synthesises and re-aligns from scratch; nothing is built on hand-made timings.
+- **Decided (Dolender, 2026-11-02):** after side-by-side samples of the hook and the ziro.digital CTA in `hf_alpha`, `bf_emma` and `af_heart` at speed 1.0 and 0.95 (same ZAIRO override), Dolender picked **`af_heart` (American female) at speed 0.95**. Accent goal set aside for clarity; Sarvam (Indian voices) stays the production path.
 - License caveat for production integration: `kokoro-onnx` phonemises through espeak-ng, which is GPL-3.0 (loaded as a shared library via `espeakng-loader`, MIT wrapper). Fine for this sandbox; flag before shipping inside Content Studio.
 
 ## D-24 Media stack lives only in the worker image (Phase 4P)
