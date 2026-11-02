@@ -13,9 +13,11 @@ from app.adapters import llm
 from app.core import costs, db
 from app.core.contracts import Brief, Claim, ContentPackage, Hook, PackageDraft
 from app.core.errors import FatalError
-from app.core.models import Approval
+from app.core.log import log
+from app.core.models import Approval, Artifact
 from app.nodes import script_checks, skills
 from app.nodes.context import Outputs, StageContext
+from app.nodes.storyboarding import visual_problems
 
 MAX_REVISIONS = 2
 
@@ -23,9 +25,12 @@ MAX_REVISIONS = 2
 def scripting(ctx: StageContext) -> Outputs:
     brief = Brief.model_validate(ctx.read_json("draft", "brief.json"))
     claims = approved_claims(ctx.project_id, ctx.read_json("researching", "claims.json"))
-    writer = llm.get()
+    writer = llm.get("scripting")
+    notes = ctx.notes
+    if notes and (previous := _previous_script(ctx)):  # a reject edits the reviewed script
+        notes += f"\nThe reviewed script, to edit rather than rewrite:\n{previous}"
     try:
-        draft, hooks, titles = _write(writer, brief, claims, ctx.notes)
+        draft, hooks, titles = _write(writer, brief, claims, notes)
     finally:
         costs.record_usage(ctx.project_id, "scripting", writer.calls)
 
@@ -55,15 +60,33 @@ def scripting(ctx: StageContext) -> Outputs:
 
 def _write(writer: llm.LLM, brief: Brief, claims: list[Claim], notes: str | None
            ) -> tuple[PackageDraft, list[dict[str, Any]], list[dict[str, Any]]]:
-    for _ in range(1 + MAX_REVISIONS):
+    reviewer = f"Reviewer notes: {notes}\n" if notes else ""
+    for attempt in range(1 + MAX_REVISIONS):
         draft = writer.write_package(brief, claims, notes)
         hooks = skills.score_hooks([h.text for h in draft.hooks])
         titles = skills.lint_titles(draft.titles, draft.thumbnail_text)
         problems = _problems(draft, brief, claims, hooks, titles)
+        log.info("draft checked", draft=attempt + 1, problems=problems, script=draft.script)
         if not problems:
             return draft, hooks, titles
-        notes = "Fix: " + "; ".join(problems)
-    raise FatalError(f"script failed checks after {MAX_REVISIONS} revisions: {notes}")
+        # The model sees its own draft and exactly what to change, not just that it failed.
+        notes = (f"{reviewer}Fix: " + "; ".join(problems)
+                 + f"\nYour previous script, to revise rather than restart:\n{draft.script}")
+    raise FatalError(f"script failed checks after {MAX_REVISIONS} revisions: "
+                     + "; ".join(problems))
+
+
+def _previous_script(ctx: StageContext) -> str | None:
+    """The newest script.md this project's scripting stage wrote (stale or not)."""
+    with db.session() as s:
+        path = s.scalars(
+            select(Artifact.storage_path)
+            .where(Artifact.project_id == ctx.project_id, Artifact.stage == "scripting",
+                   Artifact.type == "script.md")
+            .order_by(Artifact.version.desc())
+            .limit(1)
+        ).first()
+    return ctx.storage.read(path).decode("utf-8") if path else None
 
 
 def approved_claims(project_id: str, researched: list[dict[str, Any]]) -> list[Claim]:
@@ -87,11 +110,16 @@ def _problems(draft: PackageDraft, brief: Brief, claims: list[Claim],
               hooks: list[dict[str, Any]], titles: list[dict[str, Any]]) -> list[str]:
     problems = script_checks.claim_problems(draft.script, claims)
     problems += script_checks.shape_problems(draft.script, brief)
+    problems += visual_problems(draft.script, claims)
+    problems += script_checks.on_screen_problems(draft.script, claims, brief.topic)
+    problems += script_checks.packaging_problems(
+        [*draft.titles, draft.thumbnail_text, draft.description, *draft.tags], claims)
     if len({h.text.strip().lower() for h in draft.hooks}) != 5:
         problems.append("the five hooks must be distinct")
     opening = script_checks.hook_line(draft.script)
     if not any(h["hook"] in opening for h in hooks[:2]):
-        problems.append("the script must open with one of the two top-scoring hooks")
+        top = " or ".join(repr(h["hook"]) for h in hooks[:2])
+        problems.append(f"the Hook section must be exactly one of the two top-scoring hooks: {top}")
     if any(issue == "duplicate" for issue, _ in titles[0]["issues"]):
         problems.append("thumbnail text repeats the top title")
     return problems

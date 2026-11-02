@@ -10,7 +10,6 @@ from pathlib import Path
 
 from app.core.contracts import Brief, Claim
 from app.nodes import script_checks
-from app.nodes.storyboarding import VISUAL_TYPES
 
 ROOT = Path(__file__).resolve().parents[2]
 SKILLS = ROOT / "vendor" / "youtube-agent-skill" / "skills"
@@ -46,13 +45,18 @@ def package(brief: Brief, claims: list[Claim], notes: str | None) -> tuple[str, 
     sections = script_checks.SECTIONS[brief.format]
     low, high = script_checks.RUNTIME[brief.format]
     words = [round(s * script_checks.WORDS_PER_SECOND) for s in (low, high)]
-    visuals = ", ".join(f'"{key}"' for key, _ in VISUAL_TYPES)
-    shape = ("Hook at most 7 spoken words (it must land within 3 s); Hook + Relevance at most 25 "
-             "words (relevance lands by 10 s); one worked example; one takeaway."
+    shape = ("Word budget per section: Hook 5-7 words (it must land within 3 s); Relevance "
+             "12-18 (relevance lands by 10 s); Example 70-95, one worked example told step by "
+             "step; Takeaway 20-30, one practical test or rule; CTA just the CTA line. Count "
+             "your words: drafts under 112 words are rejected."
              if brief.format == "short" else
              "Hook (including the learning outcome) at most 37 spoken words (15 s); Context with "
              "prerequisites; Build is the step-by-step demonstration; Recap names one limitation "
              "and the next action.")
+    # hookscore.py prefers longer hooks; for a Short the brief's 3-second rule wins (D-21), so
+    # every candidate is short and whichever two score best still fit.
+    hook_length = ("Every hook is 5-7 words." if brief.format == "short"
+                   else "Every hook is at most 25 words.")
     system = "\n\n".join([
         "You write YouTube scripts and packaging for Ziro (written \"Ziro\"). Reply with one JSON "
         "object only. Follow the voice profile and the hard rules exactly; a deterministic checker "
@@ -66,11 +70,20 @@ def package(brief: Brief, claims: list[Claim], notes: str | None) -> tuple[str, 
     rules = f"""# Hard rules
 1. Script format: Markdown. Exactly these sections, in order, as "## Name" headings:
    {", ".join(sections)}.
-2. Every section has at least one visual line "[ON SCREEN: ...]" before its narration. Start each
-   visual with one of {visuals} when it fits; put on-screen words in double quotes; a definition
-   or quote card names its source as "source: <publisher>". Visuals are illustrations and text
-   cards only: no real product screens, no people, no logos except "Ziro logo".
-3. Narration: {words[0]}-{words[1]} spoken words in total (150 words per minute, {low}-{high} s).
+2. Every section has at least one visual line before its narration, written in exactly one of
+   these forms (anything else renders as a plain title card):
+   [ON SCREEN: definition card - "Headline", source: Publisher]   narration under it cites a claim
+   [ON SCREEN: quote card - "Page title", source: Publisher]      narration under it cites a claim
+   [ON SCREEN: "Thing A" and "Thing B" side by side]
+   [ON SCREEN: chat bubble asking "the user's exact message"]
+   [ON SCREEN: flow - "Step one" to "Step two" to "Step three"]
+   [ON SCREEN: checklist - "First item" / "Second item"]
+   [ON SCREEN: Ziro logo and "ziro.digital"]                      CTA section only
+   [ON SCREEN: "Short headline"]                                   anything else
+   Visuals are illustrations and text cards only: no real product screens, no people. Words in
+   quotes on screen must be words the narration says; never show a word the voice doesn't.
+3. Narration: {words[0]}-{words[1]} spoken words in total (150 words per minute, {low}-{high} s);
+   aim for about {sum(words) // 2}.
    {shape}
 4. Every sentence that uses a fact from the claim ledger ends with its marker, e.g. "[C2]". Use
    only the ledger's facts, in its wording or a faithful paraphrase. Any sentence with a digit,
@@ -81,11 +94,15 @@ def package(brief: Brief, claims: list[Claim], notes: str | None) -> tuple[str, 
 6. The CTA section contains the CTA exactly once, verbatim: "{brief.cta}". It appears nowhere else.
 7. The Hook section's narration is exactly the text of one of your five hooks.
 8. hooks: five distinct hooks, each with a one-sentence explanation naming its formula.
-9. titles: ten distinct titles, at most 60 characters, no more than two ALL-CAPS words.
-10. thumbnail_text: at most 3 words, not repeating words from the best title.
-11. description: 2-4 plain sentences, then "Sources:" with one line per cited claim
+   {hook_length}
+9. Narration, on-screen text, titles, thumbnail text, description and tags use no outcome or
+   quality words (fixes, solves, better, faster, accurate, reliable, hallucinations, best, #1,
+   reduces, improves, boost) unless a claim in the ledger uses that exact word.
+10. titles: ten distinct titles, at most 60 characters, no more than two ALL-CAPS words.
+11. thumbnail_text: at most 3 words, not repeating words from the best title.
+12. description: 2-4 plain sentences, then "Sources:" with one line per cited claim
     ("- <publisher>, <page title>: <url>"), then the CTA line.
-12. tags: at most 15. target_queries: exactly 3 search phrases. chapters: start at 0 seconds,
+13. tags: at most 15. target_queries: exactly 3 search phrases. chapters: start at 0 seconds,
     one per section, using start_seconds from the 150 wpm estimate.
 
 # JSON shape

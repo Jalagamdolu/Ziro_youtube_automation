@@ -34,3 +34,23 @@ def test_script_reject_reruns_scripting_not_research(client, calls: Counter[str]
     assert calls["researching"] == 1 and calls["scripting"] == 2
     assert run["approvals"][-1]["target_stage"] == "scripting"
     assert run["approvals"][-1]["notes"] == "hook 1 overclaims"
+
+
+def test_script_reject_hands_the_reviewed_script_to_the_writer(client, monkeypatch) -> None:
+    from app.adapters import llm
+
+    seen: list[str | None] = []
+
+    class Spy(llm.FixtureLLM):
+        def write_package(self, brief, claims, notes):  # type: ignore[no-untyped-def]
+            seen.append(notes)
+            return super().write_package(brief, claims, notes)
+
+    monkeypatch.setattr(llm, "get", lambda stage="default": Spy())
+    project_id = create(client)
+    approve(client, project_id)
+    reject(client, project_id, "scripting", notes="tighten the hook")
+
+    assert seen[0] is None
+    assert seen[1].startswith("tighten the hook")
+    assert "The reviewed script, to edit rather than rewrite:\n## Hook" in seen[1]
