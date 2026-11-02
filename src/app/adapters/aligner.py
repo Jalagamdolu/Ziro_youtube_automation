@@ -27,11 +27,13 @@ class WhisperXAligner:
             [{"text": s["text"], "start": s["start"], "end": s["end"]} for s in segments],
             self.model, self.metadata, audio, "cpu", return_char_alignments=False)
         words: list[dict[str, Any]] = []
-        for segment, aligned in zip(segments, result["segments"], strict=True):
+        # WhisperX re-splits text into sentences itself (e.g. at a period inside quotes), so its
+        # segments need not match ours one to one; their words are still in spoken order.
+        for aligned in result["segments"]:
             found = aligned.get("words", [])
             # Tokens the model cannot place (e.g. digits) inherit their neighbours' times.
             for i, word in enumerate(found):
-                start = word.get("start", found[i - 1]["end"] if i else segment["start"])
+                start = word.get("start", found[i - 1]["end"] if i else aligned["start"])
                 end = word.get("end", start)
                 words.append({"text": word["word"], "start": float(start), "end": float(end)})
         return words
