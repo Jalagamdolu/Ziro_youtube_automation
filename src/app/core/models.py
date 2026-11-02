@@ -136,4 +136,6 @@ class AssetLicense(Base):
     source: Mapped[str] = mapped_column(Text)
     license: Mapped[str]
     proof_url: Mapped[str | None] = mapped_column(Text)
+    project_id: Mapped[str | None] = mapped_column(index=True)  # per-run media (stock footage)
+    query: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(default=now)

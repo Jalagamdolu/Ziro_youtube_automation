@@ -37,6 +37,11 @@ stage_deadline_seconds:
   researching: 900
   rendering: 1800
 
+# Stock footage behind scenes (D-33): first provider with a key is primary; none = solid colour.
+stock:
+  providers: [pixabay, pexels]
+  clips_per_video: 3
+
 # Narration (D-23, Dolender's pick by ear). Rendering re-synthesises from scratch on change.
 tts:
   engine: kokoro          # local + free in both modes for now (D-27); sarvam not built (D-19)
@@ -59,6 +64,8 @@ prices:
   groq-input: 0.0
   groq-output: 0.0
   tavily-search: 0.0      # searches; free plan credits
+  pixabay-search: 0.0     # stock searches (D-33), free API
+  pexels-search: 0.0
 
 # Hard cap on recorded spend per video (USD).
 spend_cap_usd: 5.0
