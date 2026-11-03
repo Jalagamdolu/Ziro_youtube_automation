@@ -21,6 +21,8 @@ Open http://localhost:8000. Type a topic, pick Short or Long, set any length (Sh
 
 **A real presenter (optional, D-36).** Tick "A person will present this video on camera" when creating a run. After the script is approved, the run page shows it as a teleprompter: record it on a phone (upright, about the target length) and upload it there. Your voice replaces the synthetic narration, and the cards and photos appear around you.
 
+**Style (D-37):** 2–3-word bold captions mid-frame, a cut about every 3.5 s, and cited facts open on a screenshot of the real source page.
+
 **No login.** The UI has no authentication and the reviewer name is a text field. It is meant for a single reviewer on a local machine. Add authentication, with reviewer identity taken from the login, before deploying it anywhere.
 
 ## Limitations
