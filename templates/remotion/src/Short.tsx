@@ -2,6 +2,7 @@ import React from "react";
 import { AbsoluteFill, Audio, Sequence, staticFile, useVideoConfig } from "remotion";
 import { Captions } from "./Captions";
 import { Photo } from "./Photo";
+import { Presenter } from "./Presenter";
 import { ChatBubble } from "./scenes/ChatBubble";
 import { Checklist } from "./scenes/Checklist";
 import { Comparison } from "./scenes/Comparison";
@@ -23,7 +24,7 @@ const templates: Record<string, React.FC<{ scene: Scene; title: string }>> = {
   end_card: EndCard,
 };
 
-export const Short: React.FC<ShortProps> = ({ title, audio, scenes, cues }) => {
+export const Short: React.FC<ShortProps> = ({ title, audio, presenter, scenes, cues }) => {
   const { fps } = useVideoConfig();
   return (
     <AbsoluteFill style={{ backgroundColor: theme.background, fontFamily: theme.bodyFont }}>
@@ -34,7 +35,9 @@ export const Short: React.FC<ShortProps> = ({ title, audio, scenes, cues }) => {
         const frames = Math.max(1, Math.round(scene.end * fps) - from);
         return (
           <Sequence key={scene.id} from={from} durationInFrames={frames}>
-            {scene.photo ? <Photo file={scene.photo} frames={frames} /> : null}
+            {presenter && (scene.layout === "presenter" || scene.layout === "split") ? (
+              <Presenter file={presenter} from={from} split={scene.layout === "split"} />
+            ) : scene.photo ? <Photo file={scene.photo} frames={frames} /> : null}
             <Template scene={scene} title={title} />
           </Sequence>
         );

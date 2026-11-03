@@ -13,7 +13,7 @@ export const EndCard: React.FC<{ scene: Scene; title: string }> = ({ scene }) =>
   const link = useEnter(0.4);
   return (
     <AbsoluteFill style={{ paddingTop: safe.top + 200, paddingLeft: safe.left, paddingRight: safe.right,
-      alignItems: "center" }}>
+      alignItems: "center", backgroundColor: theme.background }}>
       {logo ? (
         <div style={{ ...mark, backgroundColor: "#FFFFFF", borderRadius: 36, padding: "48px 44px",
           boxShadow: "0 24px 60px rgba(0,0,0,0.35)" }}>
