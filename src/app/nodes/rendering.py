@@ -28,6 +28,11 @@ SENTENCE_PAUSE, SECTION_PAUSE = 0.15, 0.35
 # The reviewer's photo swaps at qa_review (D-34): {scene id: candidate index}.
 PHOTO_CHOICES = "{}/rendering/photo_choices.json"
 END_CARD_SECONDS = 2.0  # voice.md: end card about 2 seconds
+# A real presenter's recording of the approved script (D-36), uploaded on the run page.
+RECORDING = "{}/recording/presenter.mp4"
+WAITING_FOR_RECORDING = ("waiting for the presenter's recording: read the script on the run page, "
+                         "record it on a phone and upload it there")
+CARD_TYPES = {"definition_card", "quote_card", "flow", "checklist"}  # split screen with presenter
 CUE_WORDS = 5  # short cues read well on a phone
 # A sentence ends at . ? or ! even when a closing quote or bracket follows ('startup."').
 SENTENCE_END = re.compile(r"[.!?][\"”’')]*$")
@@ -39,48 +44,29 @@ LOGO = TEMPLATES.parent / "brand" / "ziro-digital-logo-transparent.png"
 
 
 def rendering(ctx: StageContext) -> Outputs:
-    import numpy as np  # worker image only (D-24)
-    import soundfile as sf
-
     package = ContentPackage.model_validate(ctx.read_json("scripting", "content_package.json"))
     if package.brief.format != "short":
         raise FatalError("Remotion templates exist for Shorts only so far (D-26)")
+    recording = RECORDING.format(ctx.project_id)
+    if package.brief.presenter and not ctx.storage.exists(recording):
+        raise FatalError(WAITING_FOR_RECORDING)
+    import soundfile as sf  # worker image only (D-24)
+
     scenes: list[dict[str, Any]] = ctx.read_json("storyboarding", "scenes.json")
-    pronunciation = config.load()["pronunciation"]
-    voice = tts.get()
-
-    audio: list[Any] = []
-    segments: list[dict[str, Any]] = []
-    clock, section, characters = 0.0, None, 0
-    for scene in scenes:
-        if section is not None and scene["section"] != section:
-            audio.append(np.zeros(int(SECTION_PAUSE * tts.RATE), dtype=np.float32))
-            clock += SECTION_PAUSE
-        section, scene["start"] = scene["section"], clock
-        for sentence in sentences([scene["text"]]):
-            samples = voice.synthesize(sentence)
-            length = len(samples) / tts.RATE
-            segments.append({"text": tts.spoken_text(sentence, pronunciation), "written": sentence,
-                             "start": clock, "end": clock + length})
-            audio += [samples, np.zeros(int(SENTENCE_PAUSE * tts.RATE), dtype=np.float32)]
-            clock += length + SENTENCE_PAUSE
-            characters += len(sentence)
-        if scene["visual_type"] == "end_card" and clock - scene["start"] < END_CARD_SECONDS:
-            hold = scene["start"] + END_CARD_SECONDS - clock
-            audio.append(np.zeros(int(hold * tts.RATE), dtype=np.float32))
-            clock += hold
-        scene["end"] = clock
-    with db.session() as s, s.begin():
-        costs.record_cost(s, ctx.project_id, "rendering", "kokoro-local", characters)
-
-    narration = np.concatenate(audio)
-    spoken = aligner.get().align(_resample(narration, tts.RATE, aligner.RATE), segments)
-    words = written_words(spoken, segments)
-    cues = make_cues(words)
-
     with tempfile.TemporaryDirectory() as folder:
         work = Path(folder)
         (work / "public").mkdir()
+        if package.brief.presenter:
+            shutil.copyfile(config.runs_dir() / recording, work / "public" / "presenter.mp4")
+            narration, segments, clock = _recorded(work / "public" / "presenter.mp4", scenes)
+        else:
+            narration, segments, clock = _synthesised(ctx.project_id, scenes)
+        spoken = aligner.get().align(_resample(narration, tts.RATE, aligner.RATE), segments)
+        words = written_words(spoken, segments)
+        cues = make_cues(words)
+        if package.brief.presenter:  # the recording's own timing decides where scenes fall
+            scene_times(scenes, words, clock)
+            set_layouts(scenes)
         sf.write(work / "public" / "narration.wav", narration, tts.RATE)
         footage = photos(ctx.project_id, scenes, work / "public")
         shutil.copyfile(LOGO, work / "public" / LOGO.name)
@@ -89,8 +75,9 @@ def rendering(ctx: StageContext) -> Outputs:
                 scene["props"]["logo"] = LOGO.name
         (work / "props.json").write_text(json.dumps({
             "title": package.brief.topic, "audio": "narration.wav", "duration": clock,
+            "presenter": "presenter.mp4" if package.brief.presenter else None,
             "scenes": [{k: scene[k] for k in ("id", "visual_type", "start", "end", "props",
-                                              "photo") if k in scene}
+                                              "photo", "layout") if k in scene}
                        for scene in scenes],
             "cues": cues}), encoding="utf-8")
         _run(["npx", "remotion", "render", "src/index.ts", "Short", str(work / "raw.mp4"),
@@ -130,6 +117,90 @@ def rendering(ctx: StageContext) -> Outputs:
         "deferred": ["chapters", "dead-air"]}, indent=2)
     outputs["stock.json"] = json.dumps(footage, indent=2, ensure_ascii=False)
     return outputs
+
+
+def _synthesised(project_id: str, scenes: list[dict[str, Any]]
+                 ) -> tuple[Any, list[dict[str, Any]], float]:
+    """Kokoro narration, one sentence at a time; scene start/end are the exact audio times."""
+    import numpy as np  # worker image only (D-24)
+
+    pronunciation = config.load()["pronunciation"]
+    voice = tts.get()
+    audio: list[Any] = []
+    segments: list[dict[str, Any]] = []
+    clock, section, characters = 0.0, None, 0
+    for scene in scenes:
+        if section is not None and scene["section"] != section:
+            audio.append(np.zeros(int(SECTION_PAUSE * tts.RATE), dtype=np.float32))
+            clock += SECTION_PAUSE
+        section, scene["start"] = scene["section"], clock
+        for sentence in sentences([scene["text"]]):
+            samples = voice.synthesize(sentence)
+            length = len(samples) / tts.RATE
+            segments.append({"text": tts.spoken_text(sentence, pronunciation), "written": sentence,
+                             "start": clock, "end": clock + length})
+            audio += [samples, np.zeros(int(SENTENCE_PAUSE * tts.RATE), dtype=np.float32)]
+            clock += length + SENTENCE_PAUSE
+            characters += len(sentence)
+        if scene["visual_type"] == "end_card" and clock - scene["start"] < END_CARD_SECONDS:
+            hold = scene["start"] + END_CARD_SECONDS - clock
+            audio.append(np.zeros(int(hold * tts.RATE), dtype=np.float32))
+            clock += hold
+        scene["end"] = clock
+    with db.session() as s, s.begin():
+        costs.record_cost(s, project_id, "rendering", "kokoro-local", characters)
+    return np.concatenate(audio), segments, clock
+
+
+def _recorded(video: Path, scenes: list[dict[str, Any]]
+              ) -> tuple[Any, list[dict[str, Any]], float]:
+    """The presenter's own voice from their recording (D-36): one segment covering the whole
+    script, so WhisperX places every written word in the real audio."""
+    import soundfile as sf
+
+    wav = video.with_name("recorded.wav")
+    _run(["ffmpeg", "-y", "-i", str(video), "-vn", "-ac", "1", "-ar", str(tts.RATE), str(wav)],
+         video.parent)
+    narration, _ = sf.read(wav, dtype="float32")
+    wav.unlink()
+    clock = len(narration) / tts.RATE
+    written = " ".join(sentence for scene in scenes for sentence in sentences([scene["text"]]))
+    pronunciation = config.load()["pronunciation"]
+    return narration, [{"text": tts.spoken_text(written, pronunciation), "written": written,
+                        "start": 0.0, "end": clock}], clock
+
+
+def scene_times(scenes: list[dict[str, Any]], words: list[dict[str, Any]], clock: float
+                ) -> None:
+    """Each scene starts at its first spoken word in the recording and runs to the next scene;
+    if alignment lost words, scenes fall back to their share of the written words."""
+    counts = [len(" ".join(sentences([s["text"]])).split()) for s in scenes]
+    total, seen = sum(counts), 0
+    for scene, count in zip(scenes, counts, strict=True):
+        if len(words) >= total:
+            scene["start"] = 0.0 if seen == 0 else words[seen]["start"]
+        else:
+            scene["start"] = clock * seen / max(1, total)
+        seen += count
+    for scene, following in zip(scenes, [*scenes[1:], None], strict=True):
+        scene["end"] = following["start"] if following else clock
+
+
+def set_layouts(scenes: list[dict[str, Any]]) -> None:
+    """Presenter videos (D-36): the presenter fills the frame for the opening line; scenes with a
+    card split the screen (card on top, presenter below); other scenes cut away to their photo
+    while the presenter keeps talking. Only cut-aways search for a photo."""
+    for i, scene in enumerate(scenes):
+        if scene["visual_type"] == "end_card":
+            continue
+        if i == 0:
+            scene["layout"] = "presenter"
+        elif scene["visual_type"] in CARD_TYPES:
+            scene["layout"] = "split"
+        else:
+            scene["layout"] = "photo" if scene.get("photo_query") else "presenter"
+        if scene["layout"] != "photo":
+            scene["photo_query"] = None
 
 
 def photos(project_id: str, scenes: list[dict[str, Any]], public: Path) -> dict[str, Any]:
