@@ -13,7 +13,13 @@ SECTIONS = {
     "short": ["Hook", "Relevance", "Example", "Takeaway", "CTA"],
     "long": ["Hook", "Context", "Build", "Recap", "CTA"],
 }
-RUNTIME = {"short": (45, 75), "long": (180, 300)}
+TOLERANCE = 0.15  # the script's estimated runtime must land within ±15% of the target (D-35)
+
+
+def runtime(brief: Brief) -> tuple[int, int]:
+    """(low, high) seconds the script may run for this brief's target."""
+    return (round(brief.target_seconds * (1 - TOLERANCE)),
+            round(brief.target_seconds * (1 + TOLERANCE)))
 
 MARKER = re.compile(r"\[C(\d+)\]")
 # Needs a source: any figure, percentage, year or calendar date. A month name states a date only
@@ -124,9 +130,10 @@ def shape_problems(script: str, brief: Brief) -> list[str]:
                 for name in _sections_without_visuals(script)]
     seconds = {name: spoken_words(lines) / WORDS_PER_SECOND for name, lines in found.items()}
     total = sum(seconds.values())
-    low, high = RUNTIME[brief.format]
+    low, high = runtime(brief)
     if not low <= total <= high:
-        words, middle = round(total * WORDS_PER_SECOND), round((low + high) / 2 * WORDS_PER_SECOND)
+        words, middle = round(total * WORDS_PER_SECOND), round(brief.target_seconds
+                                                               * WORDS_PER_SECOND)
         problems.append(f"runtime {total:.0f}s ({words} spoken words) at 150 wpm is outside "
                         f"{low}-{high}s: {'add' if words < middle else 'cut'} about "
                         f"{abs(middle - words)} spoken words in the {expected[2]} section")

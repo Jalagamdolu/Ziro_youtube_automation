@@ -71,12 +71,20 @@ def package(brief: Brief, claims: list[Claim], notes: str | None) -> tuple[str, 
     hooks = json.loads((SKILLS / "yt-script" / "hooks.json").read_text(encoding="utf-8"))
     formulas = [f"{h['name']}: {h['shape']}" for h in hooks["hooks"]]
     sections = script_checks.SECTIONS[brief.format]
-    low, high = script_checks.RUNTIME[brief.format]
+    low, high = script_checks.runtime(brief)
     words = [round(s * script_checks.WORDS_PER_SECOND) for s in (low, high)]
-    shape = ("Word budget per section: Hook 5-7 words (it must land within 3 s); Relevance "
-             "12-18 (relevance lands by 10 s); Example 70-95, one worked example told step by "
-             "step; Takeaway 20-30, one practical test or rule; CTA just the CTA line. Count "
-             "your words: drafts under 112 words are rejected."
+    # Budgets scale with the requested length (D-35); Hook, Relevance and CTA stay short.
+    target_words = round(brief.target_seconds * script_checks.WORDS_PER_SECOND)
+    relevance_words = min(18, max(8, target_words // 6))
+    takeaway_words = max(8, round(target_words * 0.18))
+    example_words = max(10, target_words - 6 - relevance_words - takeaway_words
+                        - len(brief.cta.split()))
+    shape = (f"Word budget per section: Hook 5-7 words (it must land within 3 s); Relevance "
+             f"about {relevance_words} (relevance lands by 10 s); Example about {example_words}, "
+             f"one worked example told step by step; Takeaway about {takeaway_words}, one "
+             f"practical test or rule; "
+             f"CTA just the CTA line. Count your words: drafts under {words[0]} or over "
+             f"{words[1]} words are rejected."
              if brief.format == "short" else
              "Hook (including the learning outcome) at most 37 spoken words (15 s); Context with "
              "prerequisites; Build is the step-by-step demonstration; Recap names one limitation "

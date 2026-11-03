@@ -18,7 +18,7 @@ FIXES = [
     ("claims '", "say what it does, not how much better it makes things, e.g. "
                  "\"How RAG Connects Models To Data\""),
     ("on-screen", "show only words the narration says, or say them in the narration"),
-    ("runtime", "add or cut spoken words in the Example section (112-188 in total)"),
+    ("runtime", "add or cut spoken words in the Example section (the rule names how many)"),
     ("Hook section", "make the Hook line exactly one of the two top-scoring hooks"),
     ("relevance must land", "keep Hook + Relevance to 25 spoken words or fewer"),
     ("unsourced figure", "cite the claim it comes from, e.g. [C2], or drop the figure"),

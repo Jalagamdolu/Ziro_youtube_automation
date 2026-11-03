@@ -5,8 +5,9 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, Field, model_validator
 
-# Brief §07 script shapes: SHORT 45–75 s, LONG 3–5 min.
-DURATION_LIMITS = {"short": (45, 75), "long": (180, 300)}
+# Allowed targets (D-35 overrides brief §07's SHORT 45-75 s / LONG 3-5 min at Dolender's request):
+# any length the reviewer asks for in these ranges; the script must land within ±15% of it.
+DURATION_LIMITS = {"short": (15, 180), "long": (60, 600)}
 
 
 class Brief(BaseModel):

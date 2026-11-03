@@ -40,7 +40,7 @@ def test_package_rejects_out_of_contract(overrides: dict[str, object]) -> None:
         _package(**overrides)
 
 
-@pytest.mark.parametrize("fmt,seconds", [("short", 90), ("long", 120)])
+@pytest.mark.parametrize("fmt,seconds", [("short", 200), ("long", 30)])  # D-35 ranges
 def test_brief_duration_must_fit_format(fmt: str, seconds: int) -> None:
     with pytest.raises(ValidationError):
         Brief(**(BRIEF.model_dump() | {"format": fmt, "target_seconds": seconds}))
