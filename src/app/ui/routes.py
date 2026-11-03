@@ -16,6 +16,7 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Resp
 from fastapi.templating import Jinja2Templates
 from pydantic import ValidationError
 from sqlalchemy import func, select
+from starlette.datastructures import UploadFile  # what request.form() returns for files
 
 from app.adapters import storage
 from app.api import actions
@@ -24,12 +25,13 @@ from app.core import config, db
 from app.core.contracts import ContentPackage, HookDraft, PackageDraft
 from app.core.models import Artifact, Cost, Project
 from app.graph.stages import GATES, ORDER, REJECT_TARGETS
-from app.nodes import human_edit
-from app.nodes.rendering import PHOTO_CHOICES
+from app.nodes import human_edit, script_checks
+from app.nodes.rendering import PHOTO_CHOICES, RECORDING
 
 router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 templates.env.globals["mode"] = lambda: config.load()["mode"]
+MAX_RECORDING_BYTES = 600_000_000  # a few minutes of phone video
 # Finished-run downloads: file name -> button label (the export bundle, one file at a time).
 DOWNLOADS = {"video.mp4": "Video (MP4)", "captions.srt": "Captions (SRT)",
              "captions.vtt": "Captions (VTT)", "thumbnail.png": "Thumbnail",
@@ -77,8 +79,10 @@ def run_page(request: Request, project_id: str, error: str | None = None,
     with db.session() as s:
         gate = {} if waiting else _gate_context(s, project_id, run["status"])
         finish = _finish(s, project_id) if run["status"] == "done" else {}
+        recording = _recording_context(s, run)
     return templates.TemplateResponse(request, "run.html", {
         "run": run, "gate": gate, "error": error, "waiting": waiting, "finish": finish,
+        "recording": recording,
         "stages": stages(run), "edit": None if waiting else _edit_text(run),
         "reject_targets": REJECT_TARGETS.get(run["status"], []),
     })
@@ -146,6 +150,38 @@ async def edit(request: Request, project_id: str) -> RedirectResponse:
                 notes=f"Hand-edited script submitted by {reviewer}; it runs through every check."))
             return RedirectResponse(f"{page}?submitted=script_review", status_code=303)
         actions.retry(project_id)
+    except HTTPException as error:
+        return _back(page, error)
+    return RedirectResponse(page, status_code=303)
+
+
+@router.post("/ui/projects/{project_id}/recording")
+async def upload_recording(request: Request, project_id: str) -> RedirectResponse:
+    """The presenter's phone recording of the approved script (D-36). Stored for the run; after
+    rendering stopped for it the run retries, and at qa_review it counts as a re-take."""
+    form = await request.form()
+    video, reviewer = form.get("video"), str(form.get("reviewer", "")).strip() or "Dolender"
+    page = f"/ui/projects/{project_id}"
+    if not isinstance(video, UploadFile) or not video.filename:
+        return _back(page, HTTPException(422, "choose the video file to upload"))
+    data = await video.read(MAX_RECORDING_BYTES + 1)
+    if len(data) > MAX_RECORDING_BYTES or not data:
+        return _back(page, HTTPException(413, "the recording must be a video under 600 MB"))
+    run = actions.run_status(project_id)
+    status, failed = run["status"], _failed_stage(run)
+    if status not in ("script_review", "qa_review") and not (
+            status == "failed" and failed == "rendering"):
+        return _back(page, HTTPException(409, "upload the recording at script_review, at "
+                                              "qa_review, or when rendering waits for it"))
+    storage.get().write(RECORDING.format(project_id), data)
+    try:
+        if status == "failed":
+            actions.retry(project_id)
+        elif status == "qa_review":
+            actions.decide(project_id, "reject", DecisionRequest(
+                reviewer=reviewer, target="rendering",
+                notes=f"New presenter recording uploaded by {reviewer}."))
+            return RedirectResponse(f"{page}?submitted=qa_review", status_code=303)
     except HTTPException as error:
         return _back(page, error)
     return RedirectResponse(page, status_code=303)
@@ -254,6 +290,22 @@ def stages(run: dict[str, Any]) -> list[dict[str, Any]]:
                      "attempts": len(jobs), "seconds": seconds if jobs else None, "gate": False,
                      "failed": sum(j["status"] == "failed" for j in jobs)})
     return rows
+
+
+def _recording_context(s: Any, run: dict[str, Any]) -> dict[str, Any] | None:
+    """Presenter runs (D-36): the narration to read on camera and whether a take is uploaded."""
+    brief = json.loads(actions.read_latest(s, run["id"], "brief.json") or "{}")
+    status = run["status"]
+    if not brief.get("presenter") or not (
+            status in ("script_review", "qa_review")
+            or (status == "failed" and _failed_stage(run) == "rendering")):
+        return None
+    package = json.loads(actions.read_latest(s, run["id"], "content_package.json") or "{}")
+    lines = [(name, " ".join(script_checks.MARKER.sub("", line).strip() for line in narration))
+             for name, narration in script_checks.sections(package.get("script", "")).items()]
+    key = RECORDING.format(run["id"])
+    return {"lines": lines, "uploaded": storage.get().exists(key),
+            "seconds": package.get("brief", {}).get("target_seconds")}
 
 
 def _failed_stage(run: dict[str, Any]) -> str | None:
