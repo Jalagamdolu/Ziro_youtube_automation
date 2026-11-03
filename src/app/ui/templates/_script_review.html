@@ -45,6 +45,8 @@
     <tr><th>Draft chapters</th><td>{% for c in p.chapters %}{{ "%d:%02d" | format(c.start_seconds // 60, c.start_seconds % 60) }} {{ c.title }}{% if not loop.last %} · {% endif %}{% endfor %}</td></tr>
   </table>
 
+  {% if edit %}{% include "_edit.html" %}{% endif %}
+
   <form method="post" action="/ui/projects/{{ run.id }}/decide">
     <input type="hidden" name="decision" value="approve">
     <div class="row">

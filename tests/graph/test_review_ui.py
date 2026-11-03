@@ -135,7 +135,10 @@ def test_hand_edit_from_the_browser_goes_through_every_check(client) -> None:
     project_id = _start(client)
     _decide(client, project_id, **_keep_all())
     page = client.get(f"/ui/projects/{project_id}").text
-    assert "Edit the script myself" in page
+    assert "Edit before approving" in page
+    # the edit option sits above the Approve button, so it's seen before approving
+    assert page.index("Submit my edit through all checks") < page.index(
+        "Approve script and package")
     original = html.unescape(page.split('aria-label="Editable script package">')[1]
                              .split("</textarea>")[0])
 
@@ -169,7 +172,7 @@ def test_finished_run_shows_player_downloads_and_cost(client) -> None:
     for label in ("Video (MP4)", "Captions (SRT)", "Thumbnail", "Claims",
                   "Publish receipt (mock)", "Everything (ZIP)"):
         assert label in page, label
-    assert "<h3>Cost</h3>" in page and "Edit the script myself" not in page
+    assert "<h3>Cost</h3>" in page and "Edit before approving" not in page
 
 
 def test_failed_scripting_offers_the_last_draft_flagged_and_a_fix_reaches_review(
