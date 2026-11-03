@@ -13,6 +13,7 @@ The brief (§04) names Hemu as team lead and reviewer. Operationally this projec
 - Remotion company license: free while evaluating; the founder must check it before commercial use (D-26).
 - Sprint B (2026-11-02): all scene templates built; the demo Short is re-rendered through the real path (Kokoro af_heart at 0.95 → WhisperX → Remotion → FFmpeg; 55.5 s, −14.2 LUFS measured) and exported to `outputs/demo-short`. Awaiting Dolender's review of the video. Still open: chapters.py, deadair.py, thumbnail is plain text (no template yet), Long format templates.
 - Sprint A (2026-11-02, D-27): production mode on free tiers is built and mock-tested (Gemini → Groq fallback, Tavily search + own page fetch with quote verification). The first live any-topic run waits for GEMINI_API_KEY / GROQ_API_KEY / TAVILY_API_KEY in `.env`.
+- **Long format templates unbuilt; the brief's long-video deliverable is open.** Rendering supports Shorts only (D-26), so a Long run fails at rendering. Preset 3's Long run (ec09fd16, "Three practical GenAI portfolio projects") was cancelled at research_review on 2026-11-03 for this reason.
 
 ## Next UX items (logged 2026-11-03; building freeze until the two live runs finish and the review queue clears)
 
