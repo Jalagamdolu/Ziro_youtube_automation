@@ -223,3 +223,24 @@ Dolender tried presenter mode and removed it: "The product is: machine creates t
 - **Kept from D-37:** 3-word captions, ~3.5 s cuts (source page → photo ↔ second camera move, or card), source-page captures with the quote highlighted.
 - **Guarantee (`tests/unit/test_synthetic_only.py`):** runs created through the UI or API, even ones asking for a presenter, go script_review → storyboarding → rendering → qa_review with no recording step; no upload route or presenter code remains in `rendering`.
 - **In-flight runs:** 616e1fa6 ("What is Rag", 30 s) and c578374e had `presenter: true` in their briefs; both were switched to `false` (artifact checksums updated) before storyboarding. 46e8cc9c (D-37 style sample) was rendered with a presenter and stays as it is at qa_review; re-rendering it would now produce the synthetic version.
+
+## D-40 Explainers are built on how-it-works claims; visual honesty: photos for the literal, diagrams for the abstract (Dolender, 2026-11-03)
+Run 395cd279 ("What is Rag", 30 s) explained nothing and showed desks and server rooms. The research had approved four IBM overview claims (what RAG is, that it helps), and none said how it works, so the claim check let the script be no more concrete than they were. The relevance line was forced into "your portfolio". The photo prompt asked for a photo per scene, and an abstract software idea has nothing literal to photograph. Dolender approved three fixes:
+- **Mechanism claims (research).** Every claim now has a `kind`: `definition` (what it is), `mechanism` (how it works: a concrete step, component or flow) or `other`. Benefits are never mechanism. The research agent sets it, and the reviewer sees it at research_review: a "mechanism" pill per claim and a count line ("1 definition · 2 mechanism · 0 other"). For **explainer topics**, research needs `MIN_MECHANISM = 2` verified mechanism claims:
+  - Explainer topics match `script_checks.EXPLAINER`: "What is/are …", "How does/do … work", "Explain …".
+  - The agent is told to search technical documentation for the steps, and its "done" is refused until it has them.
+  - If the turns run out first, researching fails with a reason that lists what it did find, instead of passing vague claims to the gate. Retry, or reword the topic.
+  - Scope: the requirement applies to explainer topics only, because list topics such as "Three practical GenAI portfolio projects" have no single mechanism. Widen `EXPLAINER` if more topics should need it.
+- **On-topic script.** For explainers the package prompt adds rule 14:
+  - Relevance is the problem the thing solves; no career, portfolio, job or project lines.
+  - The Example explains the mechanism step by step, one step per sentence, citing the mechanism claims, and a flow visual's steps are those sentences' steps.
+  - The hook is about what it is or how it works, not a side benefit.
+  - The claim ledger in the prompt shows each claim's kind.
+  - Enforced in code: `script_checks.mechanism_problems` fails a draft whose Example cites fewer than 2 mechanism claims (or all of them, if fewer were approved). It is part of the checks the hand edit also passes through.
+- **Visual honesty: photos for the literal, diagrams for the abstract.**
+  - A scene gets a stock photo only when the storyboarding model names a physical, photographable thing the scene is actually about. Stand-ins (a desk for "software", a library for "knowledge") are not allowed. Everything else answers "none".
+  - Definition, quote, flow and checklist cards and the end card never get a photo (`storyboarding.DIAGRAMS`); the card is the visual.
+  - Abstract scenes show their card or diagram on the brand background, opening on the cited source-page capture where there is one (D-37).
+  - Code no longer guesses a photo query from a scene's words (`stock.keywords` removed). No phrase means no photo.
+  - voice.md records the policy.
+- Tests: `tests/unit/test_mechanism.py`, plus new research-agent and photo-policy tests.
