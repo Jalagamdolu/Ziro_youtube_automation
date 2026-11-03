@@ -6,7 +6,8 @@ import { spawn } from "node:child_process";
 import { writeFileSync } from "node:fs";
 
 const [chrome, url, out, quote = ""] = process.argv.slice(2);
-const WIDTH = 1080, HEIGHT = 3000;
+// A narrow 640 px window at 1.6875x: the page becomes a 1080 px image whose text reads on a phone.
+const WIDTH = 640, HEIGHT = 1800, SCALE = 1.6875;
 const proc = spawn(chrome, ["--no-sandbox", "--disable-gpu", "--hide-scrollbars",
   "--disable-dev-shm-usage", "--remote-debugging-port=0", `--window-size=${WIDTH},${HEIGHT}`,
   "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
@@ -37,8 +38,8 @@ const send = (method, params = {}) => new Promise((resolve) => {
   ws.send(JSON.stringify({ id: next, method, params }));
 });
 
-await send("Emulation.setDeviceMetricsOverride", { width: WIDTH, height: HEIGHT, deviceScaleFactor: 1,
-  mobile: false });
+await send("Emulation.setDeviceMetricsOverride", { width: WIDTH, height: HEIGHT,
+  deviceScaleFactor: SCALE, mobile: false });  // narrow + zoomed; "mobile" makes some sites hide articles
 await send("Page.navigate", { url });
 await new Promise((resolve) => setTimeout(resolve, 8000)); // let the page render
 
@@ -50,18 +51,20 @@ const script = `(() => {
   }
   const needle = ${JSON.stringify(quote.slice(0, 60).replace(/\s+/g, " ").trim())};
   if (!needle) return false;
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-  const start = needle.slice(0, 24);
-  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-    const host = node.parentElement;  // the element whose own text starts the quote
-    if (host && node.textContent.replace(/\\s+/g, " ").includes(start)
-        && host.innerText.replace(/\\s+/g, " ").includes(needle)) {
-      host.style.setProperty("background", "#FFE066", "important");
-      host.style.setProperty("outline", "8px solid #FF7700", "important");
-      host.scrollIntoView({ block: "start" });
-      window.scrollBy(0, -320);
-      return true;
-    }
+  // The smallest element whose text contains the quote (links inside the sentence are fine).
+  const norm = (text) => text.replace(/\\s+/g, " ");  // doubled backslash: inside a template string
+  let best = null;
+  for (const el of document.querySelectorAll("body *")) {
+    const text = el.textContent || "";
+    if (text.length >= needle.length && (!best || text.length < best.textContent.length)
+        && norm(text).includes(needle)) best = el;
+  }
+  if (best) {
+    best.style.setProperty("background", "#FFE066", "important");
+    best.style.setProperty("outline", "8px solid #FF7700", "important");
+    best.scrollIntoView({ block: "start" });
+    window.scrollBy(0, -180);
+    return true;
   }
   return false;
 })()`;
