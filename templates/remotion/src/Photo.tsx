@@ -4,10 +4,12 @@ import { theme } from "./theme";
 
 // A real photo that carries the scene (D-34): full frame, slow zoom and drift (Ken Burns), darkened
 // only where text sits (cards at the top, captions lower down) so the photo stays the story.
-export const Photo: React.FC<{ file: string; frames: number }> = ({ file, frames }) => {
-  const t = Math.min(1, useCurrentFrame() / Math.max(1, frames)); // frame is scene-relative
-  const scale = interpolate(t, [0, 1], [1.04, 1.14]);
-  const drift = interpolate(t, [0, 1], [0, -40]);
+export const Photo: React.FC<{ file: string; frames: number; alt?: boolean }> = (
+  { file, frames, alt }) => {
+  const t = Math.min(1, useCurrentFrame() / Math.max(1, frames)); // frame is shot-relative
+  // `alt` is a second camera move on the same photo (zoom out, drift down), so a cut reads as one.
+  const scale = interpolate(t, [0, 1], alt ? [1.18, 1.06] : [1.04, 1.14]);
+  const drift = interpolate(t, [0, 1], alt ? [-30, 20] : [0, -40]);
   return (
     <AbsoluteFill>
       <Img src={staticFile(file)}

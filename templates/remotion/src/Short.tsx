@@ -11,7 +11,8 @@ import { EndCard } from "./scenes/EndCard";
 import { Flow } from "./scenes/Flow";
 import { TitleCard } from "./scenes/TitleCard";
 import { theme } from "./theme";
-import type { Scene, ShortProps } from "./types";
+import { Capture } from "./Capture";
+import type { Scene, Shot, ShortProps } from "./types";
 
 // visual_type (src/app/nodes/storyboarding.py) -> template; anything else gets the title card.
 const templates: Record<string, React.FC<{ scene: Scene; title: string }>> = {
@@ -33,16 +34,51 @@ export const Short: React.FC<ShortProps> = ({ title, audio, presenter, scenes, c
         const Template = templates[scene.visual_type] ?? TitleCard;
         const from = Math.round(scene.start * fps);
         const frames = Math.max(1, Math.round(scene.end * fps) - from);
+        const shots: Shot[] = scene.shots ?? [{ start: scene.start, end: scene.end, card: true,
+          kind: presenter && scene.layout ? scene.layout : scene.photo ? "photo" : "card" }];
         return (
           <Sequence key={scene.id} from={from} durationInFrames={frames}>
-            {presenter && (scene.layout === "presenter" || scene.layout === "split") ? (
-              <Presenter file={presenter} from={from} split={scene.layout === "split"} />
-            ) : scene.photo ? <Photo file={scene.photo} frames={frames} /> : null}
-            <Template scene={scene} title={title} />
+            {shots.map((shot, n) => {
+              const shotFrom = Math.round(shot.start * fps);
+              const shotFrames = Math.max(1, Math.round(shot.end * fps) - shotFrom);
+              return (
+                <Sequence key={n} from={shotFrom - from} durationInFrames={shotFrames}>
+                  <ShotLayer shot={shot} scene={scene} presenter={presenter} from={shotFrom}
+                    frames={shotFrames} />
+                  {shot.card ? <Template scene={scene} title={title} /> : null}
+                </Sequence>
+              );
+            })}
           </Sequence>
         );
       })}
       <Captions cues={cues} />
     </AbsoluteFill>
   );
+};
+
+// One shot's background (D-37): the presenter (full, punched in, or under the card), the scene's
+// photo (two camera moves), or the cited source page. Cards and captions draw on top.
+const ShotLayer: React.FC<{ shot: Shot; scene: Scene; presenter?: string | null; from: number;
+  frames: number }> = ({ shot, scene, presenter, from, frames }) => {
+  const source = String(scene.props.source ?? "");
+  switch (shot.kind) {
+    case "presenter":
+    case "presenter_zoom":
+    case "split":
+      return presenter ? <Presenter file={presenter} from={from} split={shot.kind === "split"}
+        zoom={shot.kind === "presenter_zoom"} /> : null;
+    case "capture":
+      return scene.capture ? (
+        <>
+          {presenter ? <Presenter file={presenter} from={from} split /> : null}
+          <Capture file={scene.capture} frames={frames} source={source} split={!!presenter} />
+        </>
+      ) : null;
+    case "photo":
+    case "photo_alt":
+      return scene.photo ? <Photo file={scene.photo} frames={frames} alt={shot.kind === "photo_alt"} /> : null;
+    default:
+      return null;
+  }
 };

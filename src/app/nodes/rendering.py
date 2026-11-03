@@ -5,6 +5,7 @@ Scenes come from storyboarding's scenes.json; their start/end are the exact time
 synthesised for them. Shorts only for now (D-26); chapters and dead-air QA follow.
 """
 
+import hashlib
 import json
 import re
 import shutil
@@ -33,7 +34,9 @@ RECORDING = "{}/recording/presenter.mp4"
 WAITING_FOR_RECORDING = ("waiting for the presenter's recording: read the script on the run page, "
                          "record it on a phone and upload it there")
 CARD_TYPES = {"definition_card", "quote_card", "flow", "checklist"}  # split screen with presenter
-CUE_WORDS = 5  # short cues read well on a phone
+SHOT_SECONDS = 3.5  # cut roughly this often, at a word boundary (D-37)
+CAPTURED = {"definition_card", "quote_card"}  # scenes whose cited source page is shown (D-37)
+CUE_WORDS = 3  # 2-3 big words at a time, the Shorts caption style (D-37)
 # A sentence ends at . ? or ! even when a closing quote or bracket follows ('startup."').
 SENTENCE_END = re.compile(r"[.!?][\"”’')]*$")
 SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s+|(?<=[.!?][\"”’')])\s+")
@@ -41,6 +44,9 @@ FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 TEMPLATES = Path(__file__).resolve().parents[3] / "templates" / "remotion"
 # The official logo, used unaltered on the end card; its "#1" tagline is an approved fact (D-35).
 LOGO = TEMPLATES.parent / "brand" / "ziro-digital-logo-transparent.png"
+# Remotion's own headless Chrome (worker image), reused for source-page captures (D-37).
+CHROME = TEMPLATES / ("node_modules/.remotion/chrome-headless-shell/linux64/"
+                      "chrome-headless-shell-linux64/chrome-headless-shell")
 
 
 def rendering(ctx: StageContext) -> Outputs:
@@ -69,6 +75,8 @@ def rendering(ctx: StageContext) -> Outputs:
             set_layouts(scenes)
         sf.write(work / "public" / "narration.wav", narration, tts.RATE)
         footage = photos(ctx.project_id, scenes, work / "public")
+        sources = captures(ctx.project_id, scenes, work / "public")
+        plan_shots(scenes, words, package.brief.presenter)
         shutil.copyfile(LOGO, work / "public" / LOGO.name)
         for scene in scenes:
             if scene["visual_type"] == "end_card":
@@ -77,7 +85,8 @@ def rendering(ctx: StageContext) -> Outputs:
             "title": package.brief.topic, "audio": "narration.wav", "duration": clock,
             "presenter": "presenter.mp4" if package.brief.presenter else None,
             "scenes": [{k: scene[k] for k in ("id", "visual_type", "start", "end", "props",
-                                              "photo", "layout") if k in scene}
+                                              "photo", "layout", "capture", "shots")
+                        if k in scene}
                        for scene in scenes],
             "cues": cues}), encoding="utf-8")
         _run(["npx", "remotion", "render", "src/index.ts", "Short", str(work / "raw.mp4"),
@@ -114,6 +123,7 @@ def rendering(ctx: StageContext) -> Outputs:
         "resolution": "1080x1920", "loudness_target_lufs": -14, "words": len(words),
         "cues": len(cues), "scene_types": sorted({s["visual_type"] for s in scenes}),
         "stock": stock_checks(ctx.project_id, footage),
+        "source_captures": sources,
         "deferred": ["chapters", "dead-air"]}, indent=2)
     outputs["stock.json"] = json.dumps(footage, indent=2, ensure_ascii=False)
     return outputs
@@ -201,6 +211,85 @@ def set_layouts(scenes: list[dict[str, Any]]) -> None:
             scene["layout"] = "photo" if scene.get("photo_query") else "presenter"
         if scene["layout"] != "photo":
             scene["photo_query"] = None
+
+
+def captures(project_id: str, scenes: list[dict[str, Any]], public: Path) -> list[str]:
+    """The real page each cited claim comes from (D-37): a tall screenshot taken with the headless
+    Chrome Remotion already ships, panned slowly on screen with the source credited. Genuine
+    capture, never a mock-up; cached per URL; a page that blocks or fails just isn't shown."""
+    store, shown = storage.get(), list[str]()
+    if not CHROME.exists():  # only the worker image ships Remotion's headless Chrome
+        return shown
+    for scene in scenes:
+        url = scene.get("props", {}).get("source_url")
+        if scene["visual_type"] not in CAPTURED or not url:
+            continue
+        key = f"_captures/{hashlib.sha256(url.encode()).hexdigest()[:16]}.png"
+        if not store.exists(key):
+            shot = public / "capture.tmp.png"
+            try:
+                subprocess.run([str(CHROME), "--headless", "--no-sandbox", "--hide-scrollbars",
+                                "--disable-gpu", "--window-size=1080,3000",
+                                "--virtual-time-budget=10000", f"--screenshot={shot}", url],
+                               capture_output=True, timeout=60, check=False)
+            except subprocess.TimeoutExpired:
+                continue
+            if not shot.exists() or shot.stat().st_size < 40_000:  # blank or blocked page
+                shot.unlink(missing_ok=True)
+                continue
+            store.write(key, shot.read_bytes())
+            shot.unlink()
+        scene["capture"] = f"capture_{scene['id']}.png"
+        (public / scene["capture"]).write_bytes(store.read(key))
+        if url not in shown:
+            shown.append(url)
+    with db.session() as s, s.begin():
+        s.add_all(AssetLicense(asset=f"screen capture of {url}", type="source_capture",
+                               source=url, license="Screen capture of the cited source page, "
+                               "shown briefly with attribution (D-37)", proof_url=url,
+                               project_id=project_id) for url in shown)
+    return shown
+
+
+def plan_shots(scenes: list[dict[str, Any]], words: list[dict[str, Any]], presenter: bool
+               ) -> None:
+    """Cut each scene into shots of about SHOT_SECONDS, at word boundaries, alternating looks
+    (D-37): a cited scene opens on its source page; then the card or photo alternates with the
+    presenter (presenter videos) or with a second camera move on the photo (narrated videos)."""
+    for i, scene in enumerate(scenes):
+        start, end = scene["start"], scene["end"]
+        if scene["visual_type"] == "end_card":
+            scene["shots"] = [{"start": start, "end": end, "kind": "end", "card": True}]
+            continue
+        count = max(1, round((end - start) / SHOT_SECONDS))
+        ends = [w["end"] for w in words if start < w["end"] < end]
+        cuts = [start]
+        for k in range(1, count):
+            target = start + (end - start) * k / count
+            cut = min(ends, key=lambda t: abs(t - target)) if ends else target
+            if cut - cuts[-1] > 1.0:
+                cuts.append(cut)
+        cuts.append(end)
+        kinds = _looks(scene, presenter, first=i == 0)
+        scene["shots"] = [{"start": a, "end": b, "kind": kinds[n % len(kinds)],
+                           "card": kinds[n % len(kinds)] in ("split", "photo", "photo_alt",
+                                                              "card")}
+                          for n, (a, b) in enumerate(zip(cuts, cuts[1:], strict=False))]
+
+
+def _looks(scene: dict[str, Any], presenter: bool, first: bool) -> list[str]:
+    capture = ["capture"] if scene.get("capture") else []
+    if presenter:
+        layout = scene.get("layout", "presenter")
+        if layout == "photo" and scene.get("photo"):
+            return ["photo", "presenter"]
+        if first:  # a presenter video opens on the presenter's face
+            return ["presenter", "split"]
+        if layout == "split":
+            return [*capture, "split", "presenter_zoom"]
+        return ["presenter", "presenter_zoom"]
+    base = ["photo", "photo_alt"] if scene.get("photo") else ["card"]
+    return [*capture, *base]
 
 
 def photos(project_id: str, scenes: list[dict[str, Any]], public: Path) -> dict[str, Any]:

@@ -103,3 +103,29 @@ def test_presenter_run_shows_the_teleprompter_and_upload_continues_rendering(
                 data={"reviewer": "Dolender"})
     assert storage.get().read(RECORDING.format(project_id)) == b"MP4DATA"
     assert status(client, project_id)["status"] == "qa_review"
+
+
+def test_shots_cut_about_every_three_seconds_at_word_boundaries() -> None:
+    from app.nodes.rendering import plan_shots
+
+    words = [{"text": f"w{i}", "start": i * 0.5, "end": i * 0.5 + 0.45} for i in range(24)]
+    scenes = [{"visual_type": "comparison", "start": 0.0, "end": 4.0, "layout": "presenter"},
+              {"visual_type": "definition_card", "start": 4.0, "end": 11.0, "layout": "split",
+               "capture": "capture_S2.png"},
+              {"visual_type": "end_card", "start": 11.0, "end": 13.0}]
+    plan_shots(scenes, words, presenter=True)
+    first, card, end = (s["shots"] for s in scenes)
+    assert [s["kind"] for s in first] == ["presenter"]  # opens on the presenter's face
+    assert [s["kind"] for s in card] == ["capture", "split"]  # source page, then the card
+    assert [s["card"] for s in card] == [False, True]
+    assert all(round(s["end"] % 0.5, 2) == 0.45 for s in card[:-1])  # cut where a word ends
+    assert end == [{"start": 11.0, "end": 13.0, "kind": "end", "card": True}]
+
+
+def test_narrated_videos_alternate_two_camera_moves_on_the_photo() -> None:
+    from app.nodes.rendering import plan_shots
+
+    scenes = [{"visual_type": "title", "start": 0.0, "end": 9.0, "photo": "photo_S1.jpg"}]
+    plan_shots(scenes, [], presenter=False)
+    assert [s["kind"] for s in scenes[0]["shots"]] == ["photo", "photo_alt", "photo"]
+    assert all(s["card"] for s in scenes[0]["shots"])

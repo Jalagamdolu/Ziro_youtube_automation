@@ -8,6 +8,15 @@ export type Scene = {
   props: Record<string, string | string[]>; // lists: flow steps, checklist items
   photo?: string; // stock photo in the public dir (D-34); absent = solid background
   layout?: "presenter" | "split" | "photo"; // presenter videos only (D-36)
+  capture?: string; // screenshot of the cited source page (D-37)
+  shots?: Shot[]; // cuts within the scene (D-37); absent = one shot
+};
+
+export type Shot = {
+  start: number; // seconds, absolute
+  end: number;
+  kind: "presenter" | "presenter_zoom" | "split" | "photo" | "photo_alt" | "capture" | "card" | "end";
+  card: boolean; // show the scene's card/template during this shot
 };
 
 export type Cue = {
