@@ -7,6 +7,7 @@ synthesised for them. Shorts only for now (D-26); chapters and dead-air QA follo
 
 import json
 import re
+import shutil
 import subprocess
 import tempfile
 from dataclasses import asdict
@@ -33,6 +34,8 @@ SENTENCE_END = re.compile(r"[.!?][\"”’')]*$")
 SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s+|(?<=[.!?][\"”’')])\s+")
 FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 TEMPLATES = Path(__file__).resolve().parents[3] / "templates" / "remotion"
+# The official logo, used unaltered on the end card; its "#1" tagline is an approved fact (D-35).
+LOGO = TEMPLATES.parent / "brand" / "ziro-digital-logo-transparent.png"
 
 
 def rendering(ctx: StageContext) -> Outputs:
@@ -80,6 +83,10 @@ def rendering(ctx: StageContext) -> Outputs:
         (work / "public").mkdir()
         sf.write(work / "public" / "narration.wav", narration, tts.RATE)
         footage = photos(ctx.project_id, scenes, work / "public")
+        shutil.copyfile(LOGO, work / "public" / LOGO.name)
+        for scene in scenes:
+            if scene["visual_type"] == "end_card":
+                scene["props"]["logo"] = LOGO.name
         (work / "props.json").write_text(json.dumps({
             "title": package.brief.topic, "audio": "narration.wav", "duration": clock,
             "scenes": [{k: scene[k] for k in ("id", "visual_type", "start", "end", "props",
@@ -112,7 +119,9 @@ def rendering(ctx: StageContext) -> Outputs:
                   name], work)
             outputs[name] = (work / name).read_bytes()
         duration = _probe_seconds(work / "video.mp4")
-    low, high = script_checks.RUNTIME[package.brief.format]
+    # The finished video adds sentence and section pauses to the script's 150 wpm estimate.
+    low, high = (round(package.brief.target_seconds * 0.75),
+                 round(package.brief.target_seconds * 1.25))
     outputs["qa_report.json"] = json.dumps({
         "duration_s": round(duration, 1), "duration_ok": low <= duration <= high,
         "resolution": "1080x1920", "loudness_target_lufs": -14, "words": len(words),
