@@ -30,6 +30,17 @@ TABLES = ("approvals", "artifacts", "costs", "events", "jobs", "publishing", "so
           "asset_licenses", "projects", "checkpoints", "checkpoint_writes", "checkpoint_blobs")
 
 
+@pytest.fixture(autouse=True)
+def _prototype_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every test starts in prototype mode, whatever the local config.yaml says; tests opt into
+    production themselves (graph/test_production_*)."""
+    from app.core import config
+
+    cfg = config.load()
+    cfg["mode"] = "prototype"
+    monkeypatch.setattr(config, "load", lambda: cfg)
+
+
 @pytest.fixture(scope="session")
 def database() -> None:
     with psycopg.connect(BASE_URL, autocommit=True) as conn:
