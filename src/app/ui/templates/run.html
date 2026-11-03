@@ -26,7 +26,6 @@
 {% elif run.status == "qa_review" %}{% include "_qa_review.html" %}
 {% elif run.status == "done" %}{% include "_finish.html" %}
 {% endif %}
-{% if recording %}{% include "_recording.html" %}{% endif %}
 {% if edit and run.status != "script_review" %}{% include "_edit.html" %}{% endif %}
 
 <div hx-get="/ui/projects/{{ run.id }}/live?seen={{ run.events | length }}" hx-trigger="every 2s"

@@ -26,8 +26,6 @@
            value="Indian students, early-career developers and career switchers">
     <label for="cta">CTA</label>
     <input type="text" id="cta" name="cta" value="Explore AI learning at ziro.digital">
-    <label style="font-weight:normal;margin-top:12px"><input type="checkbox" name="presenter" value="true" checked>
-      A person will present this video on camera <span class="muted small">(after the script is approved you record it on a phone and upload it; your voice replaces the synthetic one)</span></label>
     {% if mode() == "prototype" %}
     <p class="muted small">Prototype mode: only topics with a hand-written fixture have content; any other topic stops at research with a clear error. Switch <code>mode</code> to <code>production</code> in <code>src/config.yaml</code> for any topic (free-tier keys in <code>.env</code>).</p>
     {% else %}

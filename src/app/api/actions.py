@@ -31,7 +31,6 @@ class CreateRequest(BaseModel):
     cta: str = "Explore AI learning at ziro.digital"
     target_seconds: int | None = None
     learning_outcome: str | None = None
-    presenter: bool = False
 
 
 class DecisionRequest(BaseModel):
@@ -53,7 +52,6 @@ def create_project(request: CreateRequest) -> str:
             format=request.format,
             target_seconds=request.target_seconds or DEFAULT_SECONDS[request.format],
             cta=request.cta,
-            presenter=request.presenter,
         )
     except ValidationError as error:
         raise HTTPException(422, errors(error)) from error

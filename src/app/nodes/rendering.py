@@ -29,11 +29,6 @@ SENTENCE_PAUSE, SECTION_PAUSE = 0.15, 0.35
 # The reviewer's photo swaps at qa_review (D-34): {scene id: candidate index}.
 PHOTO_CHOICES = "{}/rendering/photo_choices.json"
 END_CARD_SECONDS = 2.0  # voice.md: end card about 2 seconds
-# A real presenter's recording of the approved script (D-36), uploaded on the run page.
-RECORDING = "{}/recording/presenter.mp4"
-WAITING_FOR_RECORDING = ("waiting for the presenter's recording: read the script on the run page, "
-                         "record it on a phone and upload it there")
-CARD_TYPES = {"definition_card", "quote_card", "flow", "checklist"}  # split screen with presenter
 SHOT_SECONDS = 3.5  # cut roughly this often, at a word boundary (D-37)
 CAPTURED = {"definition_card", "quote_card"}  # scenes whose cited source page is shown (D-37)
 CUE_WORDS = 3  # 2-3 big words at a time, the Shorts caption style (D-37)
@@ -53,39 +48,28 @@ def rendering(ctx: StageContext) -> Outputs:
     package = ContentPackage.model_validate(ctx.read_json("scripting", "content_package.json"))
     if package.brief.format != "short":
         raise FatalError("Remotion templates exist for Shorts only so far (D-26)")
-    recording = RECORDING.format(ctx.project_id)
-    if package.brief.presenter and not ctx.storage.exists(recording):
-        raise FatalError(WAITING_FOR_RECORDING)
     import soundfile as sf  # worker image only (D-24)
 
     scenes: list[dict[str, Any]] = ctx.read_json("storyboarding", "scenes.json")
     with tempfile.TemporaryDirectory() as folder:
         work = Path(folder)
         (work / "public").mkdir()
-        if package.brief.presenter:
-            shutil.copyfile(config.runs_dir() / recording, work / "public" / "presenter.mp4")
-            narration, segments, clock = _recorded(work / "public" / "presenter.mp4", scenes)
-        else:
-            narration, segments, clock = _synthesised(ctx.project_id, scenes)
+        narration, segments, clock = _synthesised(ctx.project_id, scenes)
         spoken = aligner.get().align(_resample(narration, tts.RATE, aligner.RATE), segments)
         words = written_words(spoken, segments)
         cues = make_cues(words)
-        if package.brief.presenter:  # the recording's own timing decides where scenes fall
-            scene_times(scenes, words, clock)
-            set_layouts(scenes)
         sf.write(work / "public" / "narration.wav", narration, tts.RATE)
         footage = photos(ctx.project_id, scenes, work / "public")
         sources = captures(ctx.project_id, scenes, work / "public")
-        plan_shots(scenes, words, package.brief.presenter)
+        plan_shots(scenes, words)
         shutil.copyfile(LOGO, work / "public" / LOGO.name)
         for scene in scenes:
             if scene["visual_type"] == "end_card":
                 scene["props"]["logo"] = LOGO.name
         (work / "props.json").write_text(json.dumps({
             "title": package.brief.topic, "audio": "narration.wav", "duration": clock,
-            "presenter": "presenter.mp4" if package.brief.presenter else None,
             "scenes": [{k: scene[k] for k in ("id", "visual_type", "start", "end", "props",
-                                              "photo", "layout", "capture", "shots")
+                                              "photo", "capture", "shots")
                         if k in scene}
                        for scene in scenes],
             "cues": cues}), encoding="utf-8")
@@ -162,57 +146,6 @@ def _synthesised(project_id: str, scenes: list[dict[str, Any]]
     return np.concatenate(audio), segments, clock
 
 
-def _recorded(video: Path, scenes: list[dict[str, Any]]
-              ) -> tuple[Any, list[dict[str, Any]], float]:
-    """The presenter's own voice from their recording (D-36): one segment covering the whole
-    script, so WhisperX places every written word in the real audio."""
-    import soundfile as sf
-
-    wav = video.with_name("recorded.wav")
-    _run(["ffmpeg", "-y", "-i", str(video), "-vn", "-ac", "1", "-ar", str(tts.RATE), str(wav)],
-         video.parent)
-    narration, _ = sf.read(wav, dtype="float32")
-    wav.unlink()
-    clock = len(narration) / tts.RATE
-    written = " ".join(sentence for scene in scenes for sentence in sentences([scene["text"]]))
-    pronunciation = config.load()["pronunciation"]
-    return narration, [{"text": tts.spoken_text(written, pronunciation), "written": written,
-                        "start": 0.0, "end": clock}], clock
-
-
-def scene_times(scenes: list[dict[str, Any]], words: list[dict[str, Any]], clock: float
-                ) -> None:
-    """Each scene starts at its first spoken word in the recording and runs to the next scene;
-    if alignment lost words, scenes fall back to their share of the written words."""
-    counts = [len(" ".join(sentences([s["text"]])).split()) for s in scenes]
-    total, seen = sum(counts), 0
-    for scene, count in zip(scenes, counts, strict=True):
-        if len(words) >= total:
-            scene["start"] = 0.0 if seen == 0 else words[seen]["start"]
-        else:
-            scene["start"] = clock * seen / max(1, total)
-        seen += count
-    for scene, following in zip(scenes, [*scenes[1:], None], strict=True):
-        scene["end"] = following["start"] if following else clock
-
-
-def set_layouts(scenes: list[dict[str, Any]]) -> None:
-    """Presenter videos (D-36): the presenter fills the frame for the opening line; scenes with a
-    card split the screen (card on top, presenter below); other scenes cut away to their photo
-    while the presenter keeps talking. Only cut-aways search for a photo."""
-    for i, scene in enumerate(scenes):
-        if scene["visual_type"] == "end_card":
-            continue
-        if i == 0:
-            scene["layout"] = "presenter"
-        elif scene["visual_type"] in CARD_TYPES:
-            scene["layout"] = "split"
-        else:
-            scene["layout"] = "photo" if scene.get("photo_query") else "presenter"
-        if scene["layout"] != "photo":
-            scene["photo_query"] = None
-
-
 def captures(project_id: str, scenes: list[dict[str, Any]], public: Path) -> list[str]:
     """The real page each cited claim comes from (D-37): a tall screenshot taken with the headless
     Chrome Remotion already ships, scrolled to the quoted passage and highlighting it, then panned
@@ -252,12 +185,11 @@ def captures(project_id: str, scenes: list[dict[str, Any]], public: Path) -> lis
     return shown
 
 
-def plan_shots(scenes: list[dict[str, Any]], words: list[dict[str, Any]], presenter: bool
-               ) -> None:
+def plan_shots(scenes: list[dict[str, Any]], words: list[dict[str, Any]]) -> None:
     """Cut each scene into shots of about SHOT_SECONDS, at word boundaries, alternating looks
-    (D-37): a cited scene opens on its source page; then the card or photo alternates with the
-    presenter (presenter videos) or with a second camera move on the photo (narrated videos)."""
-    for i, scene in enumerate(scenes):
+    (D-37): a cited scene opens on its source page; then two camera moves on the scene's photo
+    alternate (or the card on the solid background)."""
+    for scene in scenes:
         start, end = scene["start"], scene["end"]
         if scene["visual_type"] == "end_card":
             scene["shots"] = [{"start": start, "end": end, "kind": "end", "card": True}]
@@ -271,24 +203,14 @@ def plan_shots(scenes: list[dict[str, Any]], words: list[dict[str, Any]], presen
             if cut - cuts[-1] > 1.0:
                 cuts.append(cut)
         cuts.append(end)
-        kinds = _looks(scene, presenter, first=i == 0)
+        kinds = _looks(scene)
         scene["shots"] = [{"start": a, "end": b, "kind": kinds[n % len(kinds)],
-                           "card": kinds[n % len(kinds)] in ("split", "photo", "photo_alt",
-                                                              "card")}
+                           "card": kinds[n % len(kinds)] != "capture"}
                           for n, (a, b) in enumerate(zip(cuts, cuts[1:], strict=False))]
 
 
-def _looks(scene: dict[str, Any], presenter: bool, first: bool) -> list[str]:
+def _looks(scene: dict[str, Any]) -> list[str]:
     capture = ["capture"] if scene.get("capture") else []
-    if presenter:
-        layout = scene.get("layout", "presenter")
-        if layout == "photo" and scene.get("photo"):
-            return ["photo", "presenter"]
-        if first:  # a presenter video opens on the presenter's face
-            return ["presenter", "split"]
-        if layout == "split":
-            return [*capture, "split", "presenter_zoom"]
-        return ["presenter", "presenter_zoom"]
     base = ["photo", "photo_alt"] if scene.get("photo") else ["card"]
     return [*capture, *base]
 

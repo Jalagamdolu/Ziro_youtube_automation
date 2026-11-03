@@ -19,7 +19,7 @@ docker compose up -d --build
 
 Open http://localhost:8000. Type a topic, pick Short or Long, set any length (Shorts 15–180 s, Long 60–600 s; the script lands within ±15%, D-35), and start the run. The run page updates by itself: approve or edit the claims at research_review; approve, reject with notes, or edit the script yourself at script_review; watch the video and set the AI disclosure at qa_review. When the run finishes, the same page plays the video and offers every export file for download. All runs are listed on the home page.
 
-**A real presenter (optional, D-36).** Tick "A person will present this video on camera" when creating a run. After the script is approved, the run page shows it as a teleprompter: record it on a phone (upright, about the target length) and upload it there. Your voice replaces the synthetic narration, and the cards and photos appear around you.
+**Fully synthetic (D-39).** Every video is made by the machine end to end: Kokoro narration (af_heart), stock photos, cards, cited source-page captures and word-timed captions. There is no presenter or recording step.
 
 **Style (D-37):** 2–3-word bold captions mid-frame, a cut about every 3.5 s, and cited facts open on a screenshot of the real source page.
 

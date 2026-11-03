@@ -19,7 +19,6 @@ class Brief(BaseModel):
     target_seconds: int
     cta: str = Field(min_length=1)
     brand_profile: str = "Ziro"
-    presenter: bool = False  # a real person records the narration on camera (D-36)
 
     @model_validator(mode="after")
     def _duration_fits_format(self) -> Self:
