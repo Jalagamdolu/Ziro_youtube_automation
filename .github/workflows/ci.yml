@@ -7,5 +7,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - run: make secret-scan  # D-41
       - run: make lint
       - run: make test

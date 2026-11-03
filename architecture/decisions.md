@@ -244,3 +244,9 @@ Run 395cd279 ("What is Rag", 30 s) explained nothing and showed desks and server
   - Code no longer guesses a photo query from a scene's words (`stock.keywords` removed). No phrase means no photo.
   - voice.md records the policy.
 - Tests: `tests/unit/test_mechanism.py`, plus new research-agent and photo-policy tests.
+
+## D-41 Secret leaked in .env.example Oct 30, revoked Nov 3, scanner added (Dolender, 2026-11-03)
+- **Incident.** Two commits made in the GitHub web editor on `main` (`2f90288` "Add Gemini API Key to .env.example", `c727b84`) put a real Google AI Studio key (`AQ.…`) into `.env.example`. The repository is public. It was found on 2026-11-03 when branch merges into `main` conflicted on that file. The key was not the one in the local `.env` (compared without printing). Dolender revoked the old Gemini keys in AI Studio the same day.
+- **Clean-up.** `main` was merged into `phase-2/yt-03-yt-04-content-engine` keeping the branch's names-only `.env.example`, which drops the key line, and that merge was carried up through `phase-3/yt-07-product-ui` and `phase-5b/yt-06-stock-footage`, so merging them removes the line from `main`. The key stays in `main`'s history. Revoking it makes that copy useless, so history was not rewritten; a rewrite needs a force-push to `main`.
+- **Guard.** `make secret-scan` runs `git grep` over every tracked file for Google (`AIza…`, `AQ.…`), Groq (`gsk_…`), Tavily (`tvly-…`) and Anthropic (`sk-ant-…`) key shapes and fails on any match. CI runs it first, before lint and tests (`.github/workflows/ci.yml`). The only exclusion is `tests/manual_qa/source-snapshots/`: saved third-party pages kept as manual QA evidence, which carry Google's own public page keys. Verified: passes on the current tree and fails on a planted `gsk_` key.
+- Rule unchanged (CLAUDE.md): secrets only in `.env` (git-ignored); `.env.example` lists names only.

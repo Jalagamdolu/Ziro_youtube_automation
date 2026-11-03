@@ -8,7 +8,7 @@ UNTIL    ?= end
 AUDIENCE ?= Indian students, early-career developers and career switchers
 CTA      ?= Explore AI learning at ziro.digital
 
-.PHONY: up down test test-live lint video export install-voice demo-short demo-long second-topic
+.PHONY: up down test test-live lint secret-scan video export install-voice demo-short demo-long second-topic
 
 up:
 	$(COMPOSE) up -d --build
@@ -28,6 +28,12 @@ test-live:
 lint:
 	$(COMPOSE) build api
 	$(APP) sh -c "ruff check src tests && mypy"
+
+# D-41: fail if any tracked file holds an API key (Google AIza/AQ., Groq, Tavily, Anthropic).
+# Saved third-party pages (manual QA evidence) carry Google's own public page keys; skipped.
+SECRET_PATTERN = AIza[0-9A-Za-z_-]{20,}|AQ\.[0-9A-Za-z_-]{20,}|gsk_[0-9A-Za-z]{20,}|tvly-[0-9A-Za-z_-]{16,}|sk-ant-[0-9A-Za-z_-]{20,}
+secret-scan:
+	@! git grep -nIE '$(SECRET_PATTERN)' -- . ':!tests/manual_qa/source-snapshots' || { echo "secret-scan: API key found in a tracked file (above); remove it and revoke the key"; exit 1; }
 
 video:
 	$(CLI) video --prompt "$(PROMPT)" --format $(FORMAT) --until $(UNTIL) --audience "$(AUDIENCE)" --cta "$(CTA)"
