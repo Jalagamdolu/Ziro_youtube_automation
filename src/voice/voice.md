@@ -67,8 +67,9 @@ Any of these can appear only if supplied as an approved fact.
   step-by-step build to 3:30, then recap, one limitation and the next action; close with the CTA,
   sources and the next learning path.
 - Default CTA: "Explore AI learning at ziro.digital".
-- Synthetic narration by default, no presenter on camera. Optionally a real Ziro presenter records
-  the approved script on camera and their own voice replaces the synthetic one (D-36).
+- Synthetic narration always, no presenter on camera (D-39).
+- Visual honesty: photos only for literal, photographable subjects; abstract ideas get cards and
+  diagrams on the brand background (D-40).
 
 - CTA wording confirmed: "Explore AI learning at ziro.digital".
 - Narrator: female, Indian-English accent; the final voice is chosen by testing in Phase 4P.

@@ -10,6 +10,7 @@ from app.core.contracts import Brief
 from app.core.errors import FatalError
 from app.core.log import log
 from app.core.models import Source
+from app.nodes import script_checks
 from app.nodes.context import Outputs, StageContext
 
 
@@ -25,6 +26,13 @@ def researching(ctx: StageContext) -> Outputs:
         log.warning("dropped unverified claims", dropped=len(found) - len(claims))
     if not claims:
         raise FatalError("research found no verified claims")
+    mechanism = research.mechanism_count(claims)
+    if script_checks.is_explainer(brief.topic) and mechanism < script_checks.MIN_MECHANISM:
+        raise FatalError(  # say so rather than pass vague claims to research_review (D-40)
+            f"research found {mechanism} 'how it works' (mechanism) claims; an explainer needs "
+            f"{script_checks.MIN_MECHANISM}. Verified claims were: "
+            + "; ".join(f"{c.id} {c.kind}: {c.claim}" for c in claims)
+            + ". Retry, or reword the topic.")
 
     with db.session() as s, s.begin():
         s.execute(delete(Source).where(Source.project_id == ctx.project_id))  # ledger = latest run

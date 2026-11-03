@@ -72,7 +72,7 @@ class FixtureLLM:
         return PackageDraft.model_validate(filled)
 
     def photo_queries(self, brief: Brief, scenes: list[dict[str, Any]]) -> list[str]:
-        """Hand-written phrases from the fixture, like its script; none = code keywords."""
+        """Hand-written phrases from the fixture, like its script; none = no photos (D-40)."""
         path = fixture_dir(brief.topic) / "photo_queries.json"
         return json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
 

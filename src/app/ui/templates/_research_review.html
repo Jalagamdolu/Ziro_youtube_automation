@@ -1,13 +1,15 @@
 <section>
   <h2>Research review — check every claim against its source</h2>
   <p class="muted small">Keep, edit or remove each claim. Scripts may only use the claims you approve here; removed claims are blocked by the claim check.</p>
+  {% set mech = gate.claims | selectattr("kind", "equalto", "mechanism") | list %}
+  <p class="small"><strong>{{ gate.claims | selectattr("kind", "equalto", "definition") | list | length }} definition</strong> (what it is) · <strong>{{ mech | length }} mechanism</strong> (how it works) · {{ gate.claims | length - mech | length - (gate.claims | selectattr("kind", "equalto", "definition") | list | length) }} other. The script's Example must explain the mechanism claims (D-40).</p>
   <form method="post" action="/ui/projects/{{ run.id }}/decide">
     <input type="hidden" name="decision" value="approve">
     <table>
       <tr><th style="width:4em">Claim</th><th style="width:40%">Wording used in the script</th><th>Source and quote</th><th style="width:7em">Keep?</th></tr>
       {% for c in gate.claims %}
       <tr>
-        <td><strong>{{ c.id }}</strong></td>
+        <td><strong>{{ c.id }}</strong><br><span class="pill {{ 'ok' if c.kind == 'mechanism' else '' }}">{{ c.kind or "other" }}</span></td>
         <td><textarea rows="3" name="text_{{ c.id }}" aria-label="Wording for {{ c.id }}">{{ c.claim }}</textarea></td>
         <td class="small">
           <a href="{{ c.url }}" target="_blank" rel="noopener noreferrer">{{ c.title }}</a><br>

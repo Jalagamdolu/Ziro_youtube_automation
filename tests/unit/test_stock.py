@@ -79,15 +79,18 @@ def test_candidates_are_cached_by_query_hash(runs) -> None:
     assert route.call_count == 1
 
 
-def test_storyboard_phrases_come_from_the_model_or_the_scene_words() -> None:
+def test_photos_only_for_literal_subjects_never_guessed() -> None:
+    """Visual honesty (D-40): the model's literal phrase, cleaned; "none", no phrase, a diagram
+    card or the end card get no photo; code never guesses one from the scene's words."""
     from app.nodes.storyboarding import photo_query
 
-    flow = {"visual_type": "flow", "on_screen": 'flow - "Search" to "Read"',
-            "text": "It searches, reads and writes the calendar entries."}
-    assert photo_query(flow, "Hands typing on Apple MacBook keyboard") == \
-        "hands typing on keyboard"  # brands stripped from the model's phrase
-    assert photo_query(flow, "") == "search read searches"  # code fallback
-    assert photo_query({"visual_type": "end_card", "on_screen": "", "text": ""}, "x") is None
+    title = {"visual_type": "title", "on_screen": '"Exam week"', "text": "Exams start Monday."}
+    assert photo_query(title, "Hands holding Apple iPhone exam timetable") == \
+        "hands holding exam timetable"  # brands stripped from the model's phrase
+    assert photo_query(title, "") is None
+    assert photo_query(title, "none") is None
+    flow = {"visual_type": "flow", "on_screen": 'flow - "Search" to "Read"', "text": "It reads."}
+    assert photo_query(flow, "server room cables") is None  # the diagram is the visual
 
 
 def test_photos_take_the_reviewers_swap_and_record_licenses(client, monkeypatch, tmp_path

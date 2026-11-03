@@ -48,17 +48,22 @@ def photo_queries(brief: Brief, scenes: list[dict[str, Any]]) -> tuple[str, str]
                         for i, s in enumerate(scenes))
     prompt = f"""Video: {brief.topic}
 
-For each scene, write a search phrase for a REAL photograph (not an illustration) that shows what
-the narration explains, so the photos alone tell the story.
-- 2-4 plain nouns naming the literal object, document or place the narration talks about. Stock
-  search matches words, not ideas: "exam schedule paper", "paper calendar deadlines", "checklist
-  paper pen", "server room cables", "hand holding phone".
+Visual honesty (D-40): photos for the literal, diagrams for the abstract. A scene gets a photo
+ONLY if its on-screen beat or narration names a physical thing you could photograph and that IS
+what the scene is about: a printed document, a phone, a classroom, a server room when the
+narration is about servers. Everything else - software, models, data, ideas, steps, processes,
+definitions - answers "none": that scene shows its card or diagram on the brand background. When
+unsure, "none". Most scenes of a software explainer are "none".
+- A photo phrase is 2-4 plain nouns naming that literal thing: "exam schedule paper", "hand
+  holding phone", "server room cables". Never a stand-in (a desk, a notebook, a library, a
+  keyboard) for something that isn't on a desk, in a notebook, in a library or typed.
 - Never abstract words ("concept", "AI", "agent", "intelligence", "future", "innovation") and no
-  metaphors: they return illustrations and robots, not photos of the thing.
+  metaphors.
 - People only when not identifiable: hands, from behind, over the shoulder, or far away. Never
   faces, portraits, selfies or children.
 - No brand names, logos, product screenshots or readable app interfaces.
 - For the last scene (the call to action) write "none".
+- For any scene whose card is a definition, quote, flow or checklist, write "none".
 
 Scenes:
 {listed}
@@ -146,13 +151,25 @@ def package(brief: Brief, claims: list[Claim], notes: str | None) -> tuple[str, 
 12. description: 2-4 plain sentences, then "Sources:" with one line per cited claim
     ("- <publisher>, <page title>: <url>"), then the CTA line.
 13. tags: at most 15. target_queries: exactly 3 search phrases. chapters: start at 0 seconds,
-    one per section, using start_seconds from the 150 wpm estimate.
+    one per section, using start_seconds from the 150 wpm estimate.{{explainer}}
 
 # JSON shape
 {{"script": "...", "hooks": [{{"text": "...", "explanation": "..."}}], "titles": ["..."],
  "thumbnail_text": "...", "description": "...", "tags": ["..."], "target_queries": ["..."],
  "chapters": [{{"start_seconds": 0, "title": "..."}}]}}"""
-    ledger = "\n".join(f"[{c.id}] {c.claim} (source: {c.title}, {c.url}"
+    if script_checks.is_explainer(brief.topic):
+        mechanism = ", ".join(c.id for c in claims if c.kind == "mechanism")
+        rules = rules.replace("{explainer}", f"""
+14. This is an explainer ("{brief.topic}"): the viewer must leave knowing HOW it works.
+    - Relevance stays on the topic: the problem this thing solves, in one plain line. No career,
+      portfolio, job or project lines.
+    - Example explains the mechanism step by step, one step per sentence, citing the mechanism
+      claims ({mechanism}); at least {script_checks.MIN_MECHANISM} of them. A flow visual's steps
+      are the steps those sentences say.
+    - Hook asks or states what it is or how it works; not a side benefit.""")
+    else:
+        rules = rules.replace("{explainer}", "")
+    ledger = "\n".join(f"[{c.id}] ({c.kind}) {c.claim} (source: {c.title}, {c.url}"
                        + (f", published {c.published_at.date()}" if c.published_at else "") + ")"
                        for c in claims)
     example = (EXAMPLE / "script.md").read_text(encoding="utf-8").replace("{cta}", brief.cta)

@@ -35,12 +35,6 @@ EXCLUDED = re.compile(
     r"kawasaki|kuka|fanuc|abb|yaskawa|siemens|bosch|tesla|dell|lenovo|hp|asus|acer|intel|amd|"
     r"nvidia|sony|lg|huawei|xiaomi|oneplus|cisco|ibm|oracle|adidas|coca-?cola|pepsi|starbucks|"
     r"mcdonalds|toyota|bmw|mercedes|audi|ford|honda|lego|mindstorms?)\b", re.IGNORECASE)
-STOPWORDS = {"and", "are", "can", "does", "for", "from", "how", "into", "its", "that", "the",
-             "their", "this", "was", "what", "when", "where", "which", "who", "why", "will",
-             "with", "you", "your", "versus", "actually", "really", "make", "makes", "made",
-             "different", "difference", "explained", "explain", "about", "all", "any", "learn",
-             "first", "should", "would", "could", "one", "two", "new", "best", "way", "ways",
-             "card", "source", "side", "screen", "between", "them", "then", "only", "single"}
 
 
 @dataclass
@@ -93,12 +87,6 @@ class PexelsStock:
         return [Photo("pexels", str(p["id"]), p["url"], p["src"]["portrait"], p["src"]["medium"],
                       p.get("alt", ""), "Pexels License", "https://www.pexels.com/license/")
                 for p in data.get("photos", []) if not EXCLUDED.search(p.get("alt", ""))]
-
-
-def keywords(text: str, limit: int = 3) -> str:
-    """A photo query from words in code (prototype mode, or when the model gives none)."""
-    words = [w for w in re.findall(r"[a-z]{3,}", text.lower()) if w not in STOPWORDS]
-    return " ".join(list(dict.fromkeys(words))[:limit])
 
 
 def candidates(stock: list[Stock], query: str) -> tuple[list[Photo], int]:

@@ -147,6 +147,7 @@ def _problems(draft: PackageDraft, brief: Brief, claims: list[Claim],
     problems += script_checks.shape_problems(draft.script, brief)
     problems += visual_problems(draft.script, claims)
     problems += script_checks.on_screen_problems(draft.script, claims, brief.topic)
+    problems += script_checks.mechanism_problems(draft.script, claims, brief.topic)
     problems += script_checks.packaging_problems(
         [*draft.titles, draft.thumbnail_text, draft.description, *draft.tags], claims)
     if len({h.text.strip().lower() for h in draft.hooks}) != 5:

@@ -52,7 +52,8 @@ def test_agent_keeps_only_quotes_found_on_the_fetched_page() -> None:
             {"action": "done"}]},
     ])
     web = FakeWeb()
-    claims = research.AgentResearch(chat, web, max_turns=5, target=3).find_claims(BRIEF)
+    topic = BRIEF.model_copy(update={"topic": "RAG for students"})  # not an explainer (D-40)
+    claims = research.AgentResearch(chat, web, max_turns=5, target=3).find_claims(topic)
 
     assert web.fetched == [URL]  # the URL search never returned is refused
     assert "refused, not in your search results" in chat.prompts[2]
@@ -76,3 +77,28 @@ def test_short_quotes_are_not_evidence() -> None:
     claim = research.verify({"url": URL, "quote": "RAG is useful.", "claim": "RAG is useful."},
                             {URL: page}, "C1", {})
     assert claim.verification_status == "unverified"
+
+
+def test_explainer_research_refuses_done_until_two_mechanism_claims() -> None:
+    """D-40: "What is X?" needs how-it-works claims; "done" without them is refused."""
+    claim = {"action": "claim", "url": URL, "quote": QUOTE, "claim": "RAG looks up documents."}
+    chat = ScriptedChat([
+        {"actions": [{"action": "search", "query": "how does RAG work"}]},
+        {"actions": [{"action": "fetch", "url": URL}]},
+        {"actions": [claim | {"kind": "definition"}, {"action": "done"}]},
+        {"actions": [claim | {"kind": "mechanism"}, claim | {"kind": "mechanism"},
+                     {"action": "done"}]},
+    ])
+    agent = research.AgentResearch(chat, FakeWeb(), max_turns=6, target=3)
+    claims = agent.find_claims(BRIEF)
+    assert "done refused: 0 of 2 mechanism claims" in chat.prompts[3]
+    assert "how it works" in chat.prompts[0] or len(chat.prompts) == 4
+    assert [c.kind for c in claims] == ["definition", "mechanism", "mechanism"]
+    assert research.mechanism_count(claims) == 2
+
+
+def test_an_unknown_kind_is_other() -> None:
+    page = Page(URL, "t", QUOTE, None)
+    claim = research.verify({"url": URL, "quote": QUOTE, "claim": "c", "kind": "benefit"},
+                            {URL: page}, "C1", {})
+    assert claim.kind == "other"

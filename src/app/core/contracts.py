@@ -37,6 +37,8 @@ class Claim(BaseModel):
     accessed_at: datetime
     published_at: datetime | None = None
     verification_status: Literal["verified", "unverified"]
+    # definition = what it is; mechanism = how it works, a step or component (D-40)
+    kind: Literal["definition", "mechanism", "other"] = "other"
 
 
 class HookDraft(BaseModel):

@@ -168,3 +168,27 @@ def _sections_without_visuals(script: str) -> list[str]:
 
 def hook_line(script: str) -> str:
     return " ".join(sections(script).get("Hook", [])).strip()
+
+
+# "What is X?" / "How does X work?" / "Explain X": the video must explain how X works (D-40).
+EXPLAINER = re.compile(r"^\s*(what\s+(is|are)\b|how\s+(does|do|is|are)\b.*\bwork|explain\b)",
+                       re.IGNORECASE)
+MIN_MECHANISM = 2  # "how it works" claims an explainer needs, in research and in the Example
+
+
+def is_explainer(topic: str) -> bool:
+    return bool(EXPLAINER.search(topic))
+
+
+def mechanism_problems(script: str, claims: list[Claim], topic: str) -> list[str]:
+    """Explainers: the Example section cites at least MIN_MECHANISM mechanism claims (D-40)."""
+    if not is_explainer(topic):
+        return []
+    mechanism = {c.id for c in claims if c.kind == "mechanism"}
+    example = " ".join(sections(script).get("Example", []))
+    cited = {m for m in re.findall(r"\[(C\d+)\]", example) if m in mechanism}
+    need = min(MIN_MECHANISM, len(mechanism))
+    if len(cited) >= need:
+        return []
+    return [f"the Example must explain how it works using at least {need} mechanism claims "
+            f"({', '.join(sorted(mechanism))}); it cites {len(cited)}"]
