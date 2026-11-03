@@ -108,7 +108,8 @@ def props(scene: dict[str, Any], claims: dict[str, Claim]) -> dict[str, str | li
         quote = kind == "quote_card"
         fields |= {"label": "QUOTE" if quote else "DEFINITION",
                    "definition": f"“{cited[0].quote}”" if quote else cited[0].claim,
-                   "source_title": cited[0].title, "source_url": cited[0].url}
+                   "source_title": cited[0].title, "source_url": cited[0].url,
+                   "quote": cited[0].quote}  # highlighted on the source-page capture (D-37)
     elif kind == "comparison":
         fields |= {"left": quoted[0] if quoted else "",
                    "right": quoted[1] if len(quoted) > 1 else "",

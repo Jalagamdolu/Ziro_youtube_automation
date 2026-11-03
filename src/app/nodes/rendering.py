@@ -215,23 +215,24 @@ def set_layouts(scenes: list[dict[str, Any]]) -> None:
 
 def captures(project_id: str, scenes: list[dict[str, Any]], public: Path) -> list[str]:
     """The real page each cited claim comes from (D-37): a tall screenshot taken with the headless
-    Chrome Remotion already ships, panned slowly on screen with the source credited. Genuine
-    capture, never a mock-up; cached per URL; a page that blocks or fails just isn't shown."""
+    Chrome Remotion already ships, scrolled to the quoted passage and highlighting it, then panned
+    slowly on screen with the source credited. Genuine capture, never a mock-up; cached per URL and
+    quote; a page that blocks, times out or renders blank just isn't shown."""
     store, shown = storage.get(), list[str]()
     if not CHROME.exists():  # only the worker image ships Remotion's headless Chrome
         return shown
     for scene in scenes:
-        url = scene.get("props", {}).get("source_url")
+        props = scene.get("props", {})
+        url = props.get("source_url")
         if scene["visual_type"] not in CAPTURED or not url:
             continue
-        key = f"_captures/{hashlib.sha256(url.encode()).hexdigest()[:16]}.png"
+        quote = props.get("quote") or props.get("definition", "").strip("“”\"")
+        key = f"_captures/{hashlib.sha256(f'{url} {quote}'.encode()).hexdigest()[:16]}.png"
         if not store.exists(key):
             shot = public / "capture.tmp.png"
-            try:
-                subprocess.run([str(CHROME), "--headless", "--no-sandbox", "--hide-scrollbars",
-                                "--disable-gpu", "--window-size=1080,3000",
-                                "--virtual-time-budget=10000", f"--screenshot={shot}", url],
-                               capture_output=True, timeout=60, check=False)
+            try:  # capture.mjs: DevTools-driven screenshot with the quote highlighted
+                subprocess.run(["node", "capture.mjs", str(CHROME), url, str(shot), quote],
+                               cwd=TEMPLATES, capture_output=True, timeout=70, check=False)
             except subprocess.TimeoutExpired:
                 continue
             if not shot.exists() or shot.stat().st_size < 40_000:  # blank or blocked page
