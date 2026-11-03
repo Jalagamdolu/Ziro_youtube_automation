@@ -17,7 +17,7 @@ Narration is local Kokoro TTS in both modes. Each scene is carried by a real sto
 docker compose up -d --build
 ```
 
-Open http://localhost:8000. Type a topic, pick Short or Long, and start the run. The run page updates by itself: approve or edit the claims at research_review; approve, reject with notes, or edit the script yourself at script_review; watch the video and set the AI disclosure at qa_review. When the run finishes, the same page plays the video and offers every export file for download. All runs are listed on the home page.
+Open http://localhost:8000. Type a topic, pick Short or Long, set any length (Shorts 15–180 s, Long 60–600 s; the script lands within ±15%, D-35), and start the run. The run page updates by itself: approve or edit the claims at research_review; approve, reject with notes, or edit the script yourself at script_review; watch the video and set the AI disclosure at qa_review. When the run finishes, the same page plays the video and offers every export file for download. All runs are listed on the home page.
 
 **No login.** The UI has no authentication and the reviewer name is a text field. It is meant for a single reviewer on a local machine. Add authentication, with reviewer identity taken from the login, before deploying it anywhere.
 
@@ -27,5 +27,4 @@ Open http://localhost:8000. Type a topic, pick Short or Long, and start the run.
 - **Paid upgrade path:** Claude (Anthropic SDK, D-02) for the LLM steps and Sarvam for Indian-English TTS stay the documented production choice. The adapters are interfaces, so switching doesn't touch the pipeline, and cost rows already record the token counts for the estimate.
 - **Shorts only** for rendering so far (D-26). Long-format scripts reach `script_review` but don't render.
 - **Remotion license:** free while evaluating; check the company license before commercial use (D-26).
-- **End card** uses a text wordmark until a logo without the "#1" tagline is supplied (D-26).
 - Chapters (`chapters.py`) and dead-air QA (`deadair.py`) aren't wired in yet.
