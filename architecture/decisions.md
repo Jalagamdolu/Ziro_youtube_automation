@@ -392,3 +392,24 @@ Replaces D-37's full-frame shot style (D-39's synthetic-only narration stands).
 - Unchanged: the source-proof capture scrolls slowly to the highlighted quote; photos keep their Ken Burns move; solid scenes and the presenter placeholder stay still.
 - QA on the re-rendered HTTPS Short: longest hold 3.54 s (pacing rule met), loudness -14.1 LUFS.
 - Seen in review, not fixed: the MDN source capture includes the page's own sidebar advert (Hetzner). The capture is genuine, but a third-party ad in our video is unwanted; hiding ad slots in `capture.mjs` is a follow-up.
+
+## D-59 Source captures hide adverts, never the content (Dolender, 2026-11-05)
+- **The honesty line.** Hiding adverts, cookie banners and popups is allowed: the same category as the fixed and sticky overlays already hidden (D-37). The article text, the quoted passage and its highlight are never altered. A capture with ads stripped is still genuine; a capture with edited content is not.
+- **What `capture.mjs` hides.** It sets `display: none`, and does nothing else, on:
+  - iframes and `<ins>` ad slots;
+  - custom elements named like ads (`*-placement-*`, `*-ad-*`, `*-advert*`, `*-sponsor*`, `*-promo*`, `*-survey*`), for example MDN's `mdn-placement-sidebar`, which carried the Hetzner advert;
+  - elements whose class or id is an ad, cookie, consent, newsletter, popup or modal name (including Google's `adsbygoogle`);
+  - elements labelled as adverts or alert dialogs.
+- **What it never touches.** The quoted passage, anything that contains it and anything inside it are skipped before any hiding. Nothing on the page is edited, removed or added; a test checks the script holds no text-editing calls.
+- `rendering.CAPTURE_VERSION = 2` is part of the capture cache key, so every page is captured afresh once under the new rule. The MDN page for the HTTPS Short was re-captured: advert gone, quote highlighted as published.
+
+## D-60 A Short is at most 60 seconds, pauses included (Dolender, 2026-11-05)
+- **Product rule**: YouTube Shorts up to 60 s. The 60 s default with ±15% let scripts land at 69 s; the HTTPS Short ran 67.9 s and then 70.4 s.
+  - The default target is now 52 s (±15% = 44–60 s): `DEFAULT_SECONDS`, the planner and the New-video form.
+  - A Short's target may be 15–60 s (`DURATION_LIMITS`, was 15–180).
+  - The script's runtime band is capped at 60 s for Shorts.
+- **Pauses count.** Rendering adds 0.15 s after every sentence and 0.35 s between sections (now defined once in `script_checks` and used by both). `script_checks.video_seconds` estimates the finished length as speech at 150 wpm plus those pauses. A Short estimated over 60 s fails scripting with "cut about N spoken words". The HTTPS render calibrates this: Sarvam ran at ~146 wpm, with ~3.5 s of pauses.
+- **The writer** aims for 130 words (52 s × 150 wpm) and is told never to pass `SHORT_WORD_CAP` = 140 words, which leaves ~4 s for pauses.
+- **Backstop.** Rendering fails a Short whose real video runs over 60.5 s (0.5 s for encoder padding), with "Reject to scripting to cut words".
+- **Fixture.** The hand-written chatbot/agent fixture estimated 62 s. It lost 9 words and no facts: "that match my résumé", "and writes the entries" (the on-screen flow's words stay spoken) and "are … actually". It is now 140 words, about 59 s.
+- **The HTTPS Short (be7d0678)** stays at 70 s as a test artifact, per Dolender. Its review re-renders lift the cap in that one-off process only; pipeline runs keep it.

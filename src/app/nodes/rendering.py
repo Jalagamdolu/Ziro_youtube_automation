@@ -28,7 +28,7 @@ from app.core.models import AssetLicense
 from app.nodes import script_checks
 from app.nodes.context import Outputs, StageContext
 
-SENTENCE_PAUSE, SECTION_PAUSE = 0.15, 0.35
+SENTENCE_PAUSE, SECTION_PAUSE = script_checks.SENTENCE_PAUSE, script_checks.SECTION_PAUSE
 # The reviewer's photo swaps at qa_review (D-34): {scene id: candidate index}.
 PHOTO_CHOICES = "{}/rendering/photo_choices.json"
 END_CARD_SECONDS = 2.0  # voice.md: end card about 2 seconds
@@ -36,6 +36,7 @@ END_CARD_SECONDS = 2.0  # voice.md: end card about 2 seconds
 # at most SNAP away, so none passes PACE's ceiling; QA measures the result.
 SHOT_MAX, SNAP, PACE = 3.6, 0.3, (2.0, 4.0)
 CAPTURED = {"definition_card", "quote_card"}  # scenes whose cited source page can be shown (D-37)
+CAPTURE_VERSION = 2  # 2: adverts and popups hidden (D-59); a new version re-captures every page
 CUE_WORDS = 7  # the small transcription box: two short lines at a time (D-48)
 LOUDNESS = (-15.5, -12.5)  # integrated LUFS the finished video must land in (target -14)
 # A sentence ends at . ? or ! even when a closing quote or bracket follows ('startup."').
@@ -114,6 +115,12 @@ def rendering(ctx: StageContext) -> Outputs:
     # The finished video adds sentence and section pauses to the script's 150 wpm estimate.
     low, high = (round(package.brief.target_seconds * 0.75),
                  round(package.brief.target_seconds * 1.25))
+    # A Short is at most 60 s (D-60): scripting checks it with the pauses counted; this is the
+    # backstop on the real video (0.5 s for encoder padding).
+    high = min(high, script_checks.SHORT_MAX)
+    if duration > script_checks.SHORT_MAX + 0.5:
+        raise FatalError(f"the Short runs {duration:.1f}s; a Short is at most "
+                         f"{script_checks.SHORT_MAX}s. Reject to scripting to cut words.")
     outputs["qa_report.json"] = json.dumps({
         "duration_s": round(duration, 1), "duration_ok": low <= duration <= high,
         "resolution": "1080x1920", "layout": "split (D-48)", "voice": engines.voice(),
@@ -222,7 +229,8 @@ def captures(project_id: str, scenes: list[dict[str, Any]], public: Path) -> lis
         if scene["visual_type"] not in CAPTURED or not url or shown:
             continue
         quote = props.get("quote") or props.get("definition", "").strip("“”\"")
-        key = f"_captures/{hashlib.sha256(f'{url} {quote}'.encode()).hexdigest()[:16]}.png"
+        digest = hashlib.sha256(f"{CAPTURE_VERSION} {url} {quote}".encode()).hexdigest()[:16]
+        key = f"_captures/{digest}.png"
         if not store.exists(key):
             shot = public / "capture.tmp.png"
             try:  # capture.mjs: DevTools-driven screenshot with the quote highlighted

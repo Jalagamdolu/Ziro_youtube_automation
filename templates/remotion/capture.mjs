@@ -43,21 +43,34 @@ await send("Emulation.setDeviceMetricsOverride", { width: WIDTH, height: HEIGHT,
 await send("Page.navigate", { url });
 await new Promise((resolve) => setTimeout(resolve, 8000)); // let the page render
 
-// Hide fixed/sticky overlays (cookie banners, headers), then find and highlight the quote.
+// Hide fixed/sticky overlays (cookie banners, headers) and adverts, then find and highlight the
+// quote. The honesty line (D-59): ads, cookie banners and popups may be hidden, like overlays;
+// the article text, the quoted passage and its highlight are never altered. Nothing is ever
+// edited or added, only hidden, and never the quote, anything containing it or anything in it.
 const script = `(() => {
   for (const el of document.querySelectorAll("body *")) {
     const pos = getComputedStyle(el).position;
     if (pos === "fixed" || pos === "sticky") el.style.setProperty("display", "none", "important");
   }
   const needle = ${JSON.stringify(quote.slice(0, 60).replace(/\s+/g, " ").trim())};
-  if (!needle) return false;
   // The smallest element whose text contains the quote (links inside the sentence are fine).
   const norm = (text) => text.replace(/\\s+/g, " ");  // doubled backslash: inside a template string
   let best = null;
-  for (const el of document.querySelectorAll("body *")) {
+  for (const el of needle ? document.querySelectorAll("body *") : []) {
     const text = el.textContent || "";
     if (text.length >= needle.length && (!best || text.length < best.textContent.length)
         && norm(text).includes(needle)) best = el;
+  }
+  const AD_TAG = /(^|-)(ad|ads|advert|advertisement|placement|sponsor|sponsored|promo|survey)(-|$)/i;
+  const AD_NAME = /^(ad|ads|adsbygoogle|advert|advertisement|ad-slot|sponsor|sponsored|promo|promoted|cookie|cookies|consent|gdpr|newsletter|popup|modal|survey)([-_].*)?$/i;
+  for (const el of document.querySelectorAll("body *")) {
+    if (best && (el.contains(best) || best.contains(el))) continue;  // the quote stays as published
+    const names = [...el.classList, el.id].filter(Boolean);
+    const label = (el.getAttribute("aria-label") || "") + " " + (el.getAttribute("role") || "");
+    if (el.tagName === "IFRAME" || el.tagName === "INS" || AD_TAG.test(el.tagName)
+        || names.some((n) => AD_NAME.test(n)) || /advert|sponsor|alertdialog/i.test(label)) {
+      el.style.setProperty("display", "none", "important");
+    }
   }
   if (best) {
     best.style.setProperty("background", "#FFE066", "important");
