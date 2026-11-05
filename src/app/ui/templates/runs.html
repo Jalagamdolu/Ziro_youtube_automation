@@ -1,20 +1,18 @@
 {% extends "base.html" %}
 {% block title %}Runs{% endblock %}
 {% block content %}
-<section>
-  <h1 style="display:flex;justify-content:space-between;align-items:center">All runs
-    <a href="/new"><button class="primary" type="button">New video</button></a></h1>
-  <table>
-    <tr><th>Topic</th><th>Format</th><th>State</th><th>Created (UTC)</th><th>Spend</th></tr>
-    {% for p in projects %}
-    <tr>
-      <td><a href="/ui/projects/{{ p.id }}">{{ p.topic }}</a></td>
-      <td>{{ p.format }}</td>
-      <td><span class="pill {{ 'ok' if p.status == 'done' else 'bad' if p.status == 'failed' else 'warn' if p.status.endswith('_review') else '' }}">{{ p.status }}</span></td>
-      <td class="small">{{ p.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
-      <td class="small">${{ "%.4f" | format(spent.get(p.id, 0) or 0) }}</td>
-    </tr>
-    {% endfor %}
-  </table>
-</section>
+<div class="page-head">
+  <h1>All runs</h1>
+  <a href="/new"><button class="primary big" type="button">New video</button></a>
+</div>
+<div class="cards">
+  {% for p in projects %}
+  <a class="card" href="/ui/projects/{{ p.id }}">
+    <span class="pill {{ plain.tone(p.status) }}">{{ plain.status(p.status) }}</span>
+    <h3>{{ p.topic }}</h3>
+    <p class="small muted">{{ p.format | capitalize }} · up to {{ p.target_seconds }} s · {{ p.created_at.strftime("%d %b %Y, %H:%M") }} UTC</p>
+    <p class="small">{{ plain.rupees(spent.get(p.id, 0) or 0) }}</p>
+  </a>
+  {% endfor %}
+</div>
 {% endblock %}

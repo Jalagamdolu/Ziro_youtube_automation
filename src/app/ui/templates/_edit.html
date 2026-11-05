@@ -1,15 +1,12 @@
-<section>
-  <h2>{% if run.status == "failed" %}Edit the last draft myself{% else %}Edit before approving (optional){% endif %}</h2>
+<details class="panel" id="edit"{% if run.status == "failed" %} open{% endif %}>
+  <summary>{% if run.status == "failed" %}Edit the last draft myself{% else %}Edit before approving (optional){% endif %}</summary>
   <p class="muted small">
-    {% if run.status == "failed" %}This is the last draft scripting wrote. Each <code>!! RULE</code> line sits under the line that broke it, with an example fix. Fix those and submit; on a pass the run goes to script_review as your hand-edited script.
+    {% if run.status == "failed" %}This is the last draft the writer made. Each <code>!! RULE</code> line sits under the line that broke it, with an example fix. Fix those and submit; when every check passes, the run goes to your script review with your version.
     {% else %}Change anything (script, hooks, titles, description, tags, chapters). Lines starting with <code>!!</code> are notes and are ignored; keep the <code>=== headers ===</code> and the <code>[C#]</code> markers on cited sentences.{% endif %}
-    Your version replaces the model for one scripting run and goes through <strong>every</strong> check (claims, banned and outcome words, shape and timing, visuals, hooks, titles), then comes back here for review. The trail records you as the editor.
+    Your version replaces the writer's for one round and goes through <strong>every</strong> check (claims, banned and outcome words, length, visuals, hooks, titles), then comes back here for review. The record shows you as the editor.
   </p>
   <form method="post" action="/ui/projects/{{ run.id }}/edit">
     <textarea name="text" rows="28" style="font-family:ui-monospace,Consolas,monospace;font-size:13px" aria-label="Editable script package">{{ edit }}</textarea>
-    <div class="row" style="align-items:end">
-      <div><label for="ed-reviewer">Editor</label><input type="text" id="ed-reviewer" name="reviewer" value="{{ request.state.user.name }}" readonly></div>
-      <div><button class="primary" type="submit">Submit my edit through all checks</button></div>
-    </div>
+    <p><button class="primary big" type="submit">Submit my edit through all checks</button></p>
   </form>
-</section>
+</details>

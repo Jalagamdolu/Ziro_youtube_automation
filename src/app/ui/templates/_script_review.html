@@ -1,7 +1,7 @@
 {% set p = gate.package %}
-<section>
+<section class="gate">
   <h2>Script review — claims and script together</h2>
-  <p class="muted small">Check each claim against its source, then the script that uses them. Approve sends the script to rendering; to change the claims, reject to researching with notes; to change the script, edit it below or reject to scripting.</p>
+  <p class="muted">Your turn. Check each claim against its source, then the script that uses them. <strong>Approve</strong> sends it to be rendered; <strong>Edit</strong> lets you change the words yourself (every check runs again); <strong>Send back</strong> asks for new research or a rewrite.</p>
 
   <h3>Claims ({{ p.claims | length }})</h3>
   {% set defs = p.claims | selectattr("kind", "equalto", "definition") | list %}
@@ -59,15 +59,13 @@
     <tr><th>Draft chapters</th><td>{% for c in p.chapters %}{{ "%d:%02d" | format(c.start_seconds // 60, c.start_seconds % 60) }} {{ c.title }}{% if not loop.last %} · {% endif %}{% endfor %}</td></tr>
   </table>
 
-  {% if edit %}{% include "_edit.html" %}{% endif %}
-
-  <form method="post" action="/ui/projects/{{ run.id }}/decide">
+  <form class="actionbar" method="post" action="/ui/projects/{{ run.id }}/decide">
     <input type="hidden" name="decision" value="approve">
-    <div class="row">
-      <div><label for="sr-reviewer">Reviewer</label><input type="text" id="sr-reviewer" name="reviewer" value="{{ request.state.user.name }}" readonly></div>
-      <div><label for="sr-notes">Notes (optional)</label><input type="text" id="sr-notes" name="notes"></div>
-    </div>
-    <p><button class="primary" type="submit">Approve script and package</button></p>
+    <input type="text" name="notes" placeholder="Notes (optional)" aria-label="Notes (optional)">
+    <button class="primary big" type="submit">✓ Approve script and package</button>
+    <button class="big" type="button" onclick="openPanel('edit')">Edit</button>
+    <button class="big danger" type="button" onclick="openPanel('reject')">Send back</button>
   </form>
 </section>
+{% if edit %}{% include "_edit.html" %}{% endif %}
 {% include "_reject.html" %}

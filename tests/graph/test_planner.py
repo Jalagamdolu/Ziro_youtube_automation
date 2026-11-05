@@ -1,5 +1,5 @@
-"""Topic planner, scheduler and login (D-47): planned runs start 3 h early, publish at their time
-and never before both reviews; two users from env, decisions record who was logged in."""
+"""Topic planner and scheduler (D-47): planned runs start 3 h early, publish at their time and
+never before both reviews. No login (D-61): every decision records Dolender."""
 
 from datetime import UTC, datetime, timedelta
 
@@ -31,37 +31,22 @@ def topic(topic_id: int) -> Topic:
         return s.get_one(Topic, topic_id)
 
 
-def test_pages_and_api_need_a_login(client) -> None:
+def test_no_login_pages_open_and_decisions_record_dolender(client) -> None:
     from app.api.main import app
 
-    anonymous = TestClient(app)
-    page = anonymous.get("/planner", follow_redirects=False)
-    assert page.status_code == 303 and page.headers["location"].startswith("/login")
-    assert anonymous.post("/projects", json={"prompt": TOPIC, "format": "short"}).status_code == 401
-    wrong = anonymous.post("/login", data={"username": "Dolender", "password": "nope"},
-                           follow_redirects=False)
-    assert "error" in wrong.headers["location"] and "ziro_session" not in wrong.cookies
-    assert "Log in" in anonymous.get("/login").text
-
-
-def test_the_reviewer_reviews_but_only_the_admin_plans(client) -> None:
-    from app.api.main import app
-
-    topic_id = plan(client, 24)
-    reviewer = TestClient(app)
-    reviewer.post("/login", data={"username": "reviewer", "password": "pw2"})
-    assert reviewer.post(f"/planner/{topic_id}/run").status_code == 403
-    assert "Run now" not in reviewer.get("/planner").text
-    project_id = client.post(f"/planner/{topic_id}/run", follow_redirects=False
-                             ).headers["location"].rsplit("/", 1)[1]
-    assert approve(reviewer, project_id).status_code == 202
-    assert status(client, project_id)["approvals"][0]["approver"] == "reviewer"
+    anyone = TestClient(app)
+    assert anyone.get("/planner", follow_redirects=False).status_code == 200
+    assert anyone.get("/login").status_code == 404
+    project_id = anyone.post("/projects", json={"prompt": TOPIC, "format": "short"}).json()["id"]
+    assert approve(anyone, project_id, reviewer="someone else").status_code == 202
+    assert status(anyone, project_id)["approvals"][0]["approver"] == "Dolender"
 
 
 def test_planned_topic_lists_its_start_time_and_runs_now_with_its_guidance(client) -> None:
     topic_id = plan(client, 24)
     page = client.get("/planner").text
-    assert TOPIC in page and "run starts" in page and "IST" in page and "agents, chatbots" in page
+    assert TOPIC in page and "Planned · starts" in page and "IST" in page
+    assert "agents, chatbots" in page
     response = client.post(f"/planner/{topic_id}/run", follow_redirects=False)
     project_id = response.headers["location"].rsplit("/", 1)[1]
     assert topic(topic_id).status == "started" and topic(topic_id).project_id == project_id
@@ -90,7 +75,7 @@ def test_approved_run_waits_for_its_publish_time_then_publishes(client) -> None:
     assert run["status"] == "export_ready"  # approved, parked until publish_at
     assert not any(a["type"] == "publish_receipt.json" for a in run["artifacts"])
     assert project_id not in reaper.reap(datetime.now(UTC) + timedelta(minutes=90))
-    assert "approved · publishes" in client.get("/planner").text
+    assert "Approved · publishes" in client.get("/planner").text
     assert "Publishes (mock) at" in client.get(f"/ui/projects/{project_id}").text
 
     assert scheduler.publish_due() == []  # not yet
@@ -99,7 +84,7 @@ def test_approved_run_waits_for_its_publish_time_then_publishes(client) -> None:
     run = status(client, project_id)
     assert run["status"] == "done"
     assert any(a["type"] == "publish_receipt.json" for a in run["artifacts"])
-    assert "published (mock)" in client.get("/planner").text
+    assert "Published (mock)" in client.get("/planner").text
 
 
 def test_missed_publish_time_is_said_and_nothing_publishes_before_review(client) -> None:

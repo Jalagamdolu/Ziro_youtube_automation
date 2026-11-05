@@ -56,7 +56,7 @@ def status(project_id: str) -> dict[str, Any]:
 
 @app.post("/projects/{project_id}/approve", status_code=202)
 def approve(project_id: str, body: DecisionRequest, request: Request) -> dict[str, str]:
-    body.reviewer = request.state.user["name"]  # decisions record who is logged in (D-47)
+    body.reviewer = request.state.user["name"]  # decisions record the reviewer (D-61)
     return {"decision_id": actions.decide(project_id, "approve", body)}
 
 

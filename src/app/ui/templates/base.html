@@ -7,23 +7,22 @@
   <link rel="icon" type="image/png" href="/static/favicon.png">
   <link rel="stylesheet" href="/static/theme.css">
   <script src="/static/htmx.min.js"></script>
+  <script>
+    // Approve / Edit / Send back (D-63): Edit and Send back open their panel and scroll to it.
+    function openPanel(id) { const d = document.getElementById(id); if (d) { d.open = true; d.scrollIntoView({behavior: "smooth"}); } }
+  </script>
 </head>
-<body class="{% block body_class %}{% endblock %}">
-  {% block header %}
+<body>
   <header class="topbar">
     <a class="logo" href="/"><img src="/static/brand/ziro-digital-logo-transparent.png" alt="Ziro"></a>
     <span class="mode" title="sandbox · publishing is mocked">{{ mode() }} · sandbox</span>
-    {% if request.state.user is defined %}
     <nav>
       <a href="/planner">Planner</a>
       <a href="/">Runs</a>
       <a href="/new">New video</a>
-      <span class="who">{{ request.state.user.name }} ({{ request.state.user.role }})</span>
-      <form method="post" action="/logout"><button type="submit">Log out</button></form>
+      <span class="who">{{ request.state.user.name }}</span>
     </nav>
-    {% endif %}
   </header>
-  {% endblock %}
   {% if banners() %}<div class="banners">{% for line in banners() %}<div class="banner">{{ line }}</div>{% endfor %}</div>{% endif %}
   <main>
     {% if error %}<section class="error"><strong>Not done:</strong> {{ error }}</section>{% endif %}

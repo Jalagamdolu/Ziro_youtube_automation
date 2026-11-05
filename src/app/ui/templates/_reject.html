@@ -1,18 +1,13 @@
-<section>
-  <h2>Reject</h2>
+<details class="panel" id="reject">
+  <summary>Send it back</summary>
   <form method="post" action="/ui/projects/{{ run.id }}/decide">
     <input type="hidden" name="decision" value="reject">
-    <div class="row">
-      <div>
-        <label for="rj-target">Send back to</label>
-        <select id="rj-target" name="target" required>
-          {% for t in reject_targets %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
-        </select>
-      </div>
-      <div><label for="rj-reviewer">Reviewer</label><input type="text" id="rj-reviewer" name="reviewer" value="{{ request.state.user.name }}" readonly></div>
-    </div>
-    <label for="rj-notes">What must change (required; passed to that stage)</label>
+    <label for="rj-target">Send back to</label>
+    <select id="rj-target" name="target" required>
+      {% for t in reject_targets %}<option value="{{ t }}">{{ plain.TARGETS.get(t, t) }}</option>{% endfor %}
+    </select>
+    <label for="rj-notes">What must change (required; the next step reads it)</label>
     <textarea id="rj-notes" name="notes" required></textarea>
-    <p><button class="danger" type="submit">Reject and send back</button></p>
+    <p><button class="danger big" type="submit">Reject and send back</button></p>
   </form>
-</section>
+</details>

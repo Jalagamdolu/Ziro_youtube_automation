@@ -1,0 +1,5 @@
+{# The automated QA as one line of ticks (D-63); the raw report is in Technical details. #}
+{% set report = gate.qa_report or finish.qa_report %}
+{% if report %}
+<p class="ticks">{% for ok, label in plain.qa_ticks(report) %}<span class="tick {{ 'ok' if ok else 'bad' }}">{{ "✓" if ok else "✗" }} {{ label }}</span>{% endfor %}</p>
+{% endif %}

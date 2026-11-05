@@ -1,6 +1,6 @@
 # Ziro_youtube_automation
 
-Prompt-to-video pipeline for Ziro: brief → research → script → visuals → narrated MP4, with two human approval gates (the script with its claims, and the final video) and mocked publishing. v2 (Ziro AI Content Studio, `architecture/v2-architecture.md`) adds the Claude writer, Sarvam voice, a topic planner with a scheduler, a login and a split-layout Short. Sandbox only. Design: `architecture/ARCHITECTURE.md`; decisions: `architecture/decisions.md`.
+Prompt-to-video pipeline for Ziro: brief → research → script → visuals → narrated MP4, with two human approval gates (the script with its claims, and the final video) and mocked publishing. v2 (Ziro AI Content Studio, `architecture/v2-architecture.md`) adds the Claude writer, Sarvam voice, a topic planner with a scheduler and a split-layout Short. Sandbox only. Design: `architecture/ARCHITECTURE.md`; decisions: `architecture/decisions.md`.
 
 ## Modes
 
@@ -19,9 +19,9 @@ Narration without a Sarvam key is local Kokoro TTS. Each scene is carried by a r
 docker compose up -d --build
 ```
 
-Open http://localhost:8000 and log in. The two users come from `.env` (`ZIRO_ADMIN_USER` / `ZIRO_ADMIN_PASSWORD`, `ZIRO_REVIEWER_USER` / `ZIRO_REVIEWER_PASSWORD`, D-47). Every gate decision records who was logged in.
+Open http://localhost:8000. There is no login (D-61): it runs on one machine for its one reviewer, and every gate decision records Dolender.
 
-**Planner** (`/planner`, admin): add a topic with keywords, guidelines, format and a publish time (IST). Its run starts 3 hours before that time, or now with "Run now". The finished video publishes (mock) at the publish time, and only after both reviews; a review still open at that time is shown as a missed publish time, and nothing publishes.
+**Planner** (`/planner`): add a topic with keywords, guidelines, format and a publish time (IST). Its run starts 3 hours before that time, or now with "Run now". The finished video publishes (mock) at the publish time, and only after both reviews; a review still open at that time is shown as a missed publish time, and nothing publishes.
 
 **New video**: type a topic, pick Short or Long, set any length (Shorts 15–180 s, Long 60–600 s; the script lands within ±15%, D-35), and start the run. The run page updates by itself: at script_review check the claims (with their sources and quotes) and the script together, then approve, reject with notes, or edit the script yourself; watch the video and set the AI disclosure at qa_review. When the run finishes, the same page plays the video and offers every export file for download. All runs are listed on the home page.
 

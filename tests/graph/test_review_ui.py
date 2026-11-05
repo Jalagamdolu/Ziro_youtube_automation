@@ -105,7 +105,7 @@ def test_first_visit_is_the_prompt_then_the_runs_list(client) -> None:
     assert 'name="prompt"' in home and "All runs" not in home
     project_id = _start(client)
     runs = client.get("/").text
-    assert "All runs" in runs and f"/ui/projects/{project_id}" in runs and "$0.0000" in runs
+    assert "All runs" in runs and f"/ui/projects/{project_id}" in runs and "₹0.00" in runs
     assert 'name="prompt"' in client.get("/new").text
 
 
@@ -126,9 +126,9 @@ def test_hand_edit_from_the_browser_goes_through_every_check(client) -> None:
     project_id = _start(client)
     page = client.get(f"/ui/projects/{project_id}").text
     assert "Edit before approving" in page
-    # the edit option sits above the Approve button, so it's seen before approving
-    assert page.index("Submit my edit through all checks") < page.index(
-        "Approve script and package")
+    # one decision bar: Approve, Edit (opens the edit panel) and Send back (D-63)
+    assert "Approve script and package" in page and "openPanel('edit')" in page
+    assert "openPanel('reject')" in page and "Submit my edit through all checks" in page
     original = html.unescape(page.split('aria-label="Editable script package">')[1]
                              .split("</textarea>")[0])
 

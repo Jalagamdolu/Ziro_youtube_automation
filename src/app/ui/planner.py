@@ -1,5 +1,5 @@
-"""Topic planner and login pages (D-47). The planner lists planned videos with what each one is
-waiting for; the admin adds topics and can start one now through the scheduler's own path."""
+"""Topic planner (D-47). It lists planned videos with what each one is waiting for; topics are
+added here and can start now through the scheduler's own path."""
 
 from datetime import UTC, datetime, timedelta, timezone
 from typing import Any
@@ -10,9 +10,8 @@ from sqlalchemy import select
 
 from app.core import config, db
 from app.core.models import Project, Topic
-from app.graph.stages import GATES
 from app.jobs import scheduler
-from app.ui import auth
+from app.ui import plain
 from app.ui.routes import templates
 
 router = APIRouter()
@@ -33,18 +32,17 @@ def state(topic: Topic, status: str | None, now: datetime) -> tuple[str, str]:
     lead = timedelta(hours=config.load()["planner"]["start_hours_before"])
     late = now >= topic.publish_at
     if topic.status == "cancelled":
-        return "cancelled", ""
+        return "Cancelled", ""
     if topic.status in ("planned", "starting"):
-        return f"planned · run starts {shown(topic.publish_at - lead)}", ""
+        return f"Planned · starts {shown(topic.publish_at - lead)}", ""
     if status == "done":
-        return "published (mock)", "ok"
+        return "Published (mock)", "ok"
     if status == scheduler.WAITING:
-        return ("approved · publishes " + shown(topic.publish_at), "ok") if not late \
-            else ("publishing now", "ok")
+        return ("Approved · publishes " + shown(topic.publish_at), "ok") if not late \
+            else ("Publishing now", "ok")
     if status in ("failed", "cancelled"):
-        return f"run {status} · nothing published", "bad"
-    doing = f"waiting for your {status.replace('_', ' ')}" if status in GATES \
-        else f"running: {status}"
+        return "Stopped · nothing published", "bad"
+    doing = plain.status(status or "draft")  # plain words, no stage names (D-63)
     if late:
         return f"MISSED publish time · nothing published · {doing}", "bad"
     return doing, "warn"
@@ -61,13 +59,11 @@ def planner(request: Request, error: str | None = None) -> HTMLResponse:
     default = (now + timedelta(days=1)).astimezone(zone()).strftime("%Y-%m-%dT18:00")
     return templates.TemplateResponse(request, "planner.html", {
         "rows": rows, "error": error, "default_time": default,
-        "admin": request.state.user["role"] == "admin",
         "lead": config.load()["planner"]["start_hours_before"]})
 
 
 @router.post("/planner")
 async def add_topic(request: Request) -> RedirectResponse:
-    _admin(request)
     form = {k: str(v).strip() for k, v in (await request.form()).items()}
     try:
         when = datetime.fromisoformat(form["publish_at"]).replace(tzinfo=zone()).astimezone(UTC)
@@ -89,7 +85,6 @@ async def add_topic(request: Request) -> RedirectResponse:
 
 @router.post("/planner/{topic_id}/run")
 def run_now(request: Request, topic_id: int) -> RedirectResponse:
-    _admin(request)
     try:
         project_id = scheduler.start_topic(topic_id, request.state.user["name"])
     except HTTPException as error:
@@ -101,45 +96,12 @@ def run_now(request: Request, topic_id: int) -> RedirectResponse:
 
 @router.post("/planner/{topic_id}/cancel")
 def cancel_topic(request: Request, topic_id: int) -> RedirectResponse:
-    _admin(request)
     with db.session() as s, s.begin():
         topic = s.get(Topic, topic_id)
         if topic and topic.status == "planned":
             topic.status = "cancelled"
     return RedirectResponse("/planner", status_code=303)
 
-
-def _admin(request: Request) -> None:
-    if request.state.user["role"] != "admin":
-        raise HTTPException(403, "only the admin plans topics")
-
-
-@router.get("/login", response_class=HTMLResponse)
-def login_page(request: Request, next: str = "/", error: str | None = None) -> HTMLResponse:
-    return templates.TemplateResponse(request, "login.html", {
-        "next": next if next.startswith("/") else "/", "error": error,
-        "configured": bool(auth.users())})
-
-
-@router.post("/login")
-async def login(request: Request) -> RedirectResponse:
-    form = {k: str(v) for k, v in (await request.form()).items()}
-    role = auth.check(form.get("username", "").strip(), form.get("password", ""))
-    target = form.get("next", "/") if form.get("next", "/").startswith("/") else "/"
-    if role is None:
-        return RedirectResponse(f"/login?error=wrong name or password&next={target}",
-                                status_code=303)
-    response = RedirectResponse(target, status_code=303)
-    response.set_cookie(auth.COOKIE, auth.cookie(form["username"].strip(), role),
-                        httponly=True, samesite="lax", max_age=auth.HOURS * 3600)
-    return response
-
-
-@router.post("/logout")
-def logout() -> RedirectResponse:
-    response = RedirectResponse("/login", status_code=303)
-    response.delete_cookie(auth.COOKIE)
-    return response
 
 
 def schedule(project_id: str, status: str) -> dict[str, Any] | None:

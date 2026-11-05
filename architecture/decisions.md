@@ -413,3 +413,31 @@ Replaces D-37's full-frame shot style (D-39's synthetic-only narration stands).
 - **Backstop.** Rendering fails a Short whose real video runs over 60.5 s (0.5 s for encoder padding), with "Reject to scripting to cut words".
 - **Fixture.** The hand-written chatbot/agent fixture estimated 62 s. It lost 9 words and no facts: "that match my résumé", "and writes the entries" (the on-screen flow's words stay spoken) and "are … actually". It is now 140 words, about 59 s.
 - **The HTTPS Short (be7d0678)** stays at 70 s as a test artifact, per Dolender. Its review re-renders lift the cap in that one-off process only; pipeline runs keep it.
+
+## D-61 No login (Dolender, 2026-11-05)
+- Dolender: "we don't need any login". The studio runs on one machine for its one reviewer. D-47's login is removed: the `/login` and `/logout` routes, the login page and its styles, the signed session cookie, the two env users (`ZIRO_ADMIN_*`, `ZIRO_REVIEWER_*`, `ZIRO_SESSION_SECRET`, dropped from compose and `.env.example`) and the admin/reviewer roles.
+- Every request acts as Dolender (`app/ui/auth.py`), so gate decisions still record Dolender in the approvals table, whatever a form or API body says. The planner is open to whoever opens the app.
+- Before this is used anywhere but the local machine, a login must come back (the API binds to 127.0.0.1 only).
+
+## D-62 A Short's requested length is a ceiling (Dolender, 2026-11-05)
+- **Rule.** For `format=short` the requested seconds are the most the video may run. Up to 15% under is fine; over fails. A requested 40 s is delivered at 34–40 s (aiming for 36–40), never 44. Supersedes the ±15% band for Shorts (D-35) and D-60's 52 s default; a Short is still at most 60 s.
+- **Script.**
+  - The word budget aims at 90% of the requested length (40 s → 90 words) and stops at the length minus ~8% left for pauses (40 s → 92 words): `script_checks.word_budget`, stated in the prompt.
+  - The speech band is 85–100% of the request (`runtime`).
+  - The pause-aware estimate (`video_seconds`, D-60) must fit inside the request, or the draft goes back with "cut about N spoken words".
+- **Render.** The voiced beats are assembled with the normal pauses (0.15 s between sentences, 0.35 s between sections). If the track still runs over the request, the pauses tighten to 0.05 / 0.12 s, cut from the same cached audio with nothing re-synthesised. QA then fails any Short longer than requested (0.1 s for the container's frame rounding), telling the reviewer to reject to scripting.
+- **Default.** With a ceiling, the natural default is the product maximum: new Shorts default to 60 s (delivered 51–60 s, aiming for 135 words). The forms say "at most".
+- Long videos are unchanged (±15%).
+
+## D-63 Product view first, engineering in Technical details (Dolender, 2026-11-05)
+- **Design test:** would we proudly demo this page to a paying client? No behaviour changed; only what a person sees first.
+- **Run page:**
+  - the topic, a six-step progress bar (Research → Script → Your review → Render → Your review → Published) with a spinner on the active step, and amber on "your review";
+  - one plain status line ("Writing the script…", "Waiting for your final review", "Stopped — needs your attention" with the reason);
+  - a ₹-per-video chip (`inr_per_usd` in config.yaml, approximate);
+  - the video when there is one, and the review panel when it is your turn;
+  - a decision bar pinned to the bottom of the screen: Approve, Edit (opens the edit panel), Send back (opens the reject panel, whose targets are named in words: "Script — rewrite it").
+- **QA** reads as ticks ("✓ 39.2s · ✓ loudness · ✓ pacing · ✓ captions") on the final review and the finished video.
+- **Technical details**, one collapsed section at the bottom (closed by default), holds everything else, unchanged: stages, state timeline, run log, decisions, the cost breakdown, the raw QA JSON, the artifact ZIP and Cancel. Nothing was removed: the audit trail is a brief requirement.
+- **Planner and runs list** are cards with plain statuses; there are no stage names ("qa_review") anywhere in the product view. Words live in `app/ui/plain.py`.
+- Screenshots of every page: `tests/manual_qa/ui-v3/`.

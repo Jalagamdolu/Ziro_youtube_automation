@@ -1,61 +1,56 @@
 {% set p = gate.package %}
-<section>
-  <h2>QA review — watch the preview before approving</h2>
+<section class="gate">
+  <h2>Final review — watch it, then decide</h2>
   <div class="row">
-    <div>
-      <h3>Video</h3>
-      {% if gate.video %}<video controls preload="metadata" style="width:100%;max-height:480px;background:#000"
-             src="/ui/projects/{{ run.id }}/files/{{ gate.video }}"></video>{% else %}<p class="muted">No video artifact.</p>{% endif %}
+    <div class="player">
+      {% if gate.video %}<video controls preload="metadata" src="/ui/projects/{{ run.id }}/files/{{ gate.video }}"></video>{% else %}<p class="muted">No video yet.</p>{% endif %}
     </div>
     <div>
-      <h3>Thumbnail</h3>
-      {% if gate.thumbnail %}<img class="thumb" alt="Thumbnail preview" style="width:100%"
-           src="/ui/projects/{{ run.id }}/files/{{ gate.thumbnail }}">{% else %}<p class="muted">No thumbnail artifact.</p>{% endif %}
-      <h3>Metadata</h3>
-      <table>
-        <tr><th>Title</th><td>{{ p.top_titles[0] }}</td></tr>
-        <tr><th>Tags</th><td class="small">{{ p.tags | join(", ") }}</td></tr>
-      </table>
+      {% include "_qa_ticks.html" %}
+      <h3>Title</h3><p>{{ p.top_titles[0] }}</p>
+      {% if gate.thumbnail %}<h3>Thumbnail</h3><img class="thumb" alt="Thumbnail preview" style="width:100%"
+           src="/ui/projects/{{ run.id }}/files/{{ gate.thumbnail }}">{% endif %}
+      <h3>Tags</h3><p class="small muted">{{ p.tags | join(", ") }}</p>
+      <details class="panel inline"><summary>Description</summary><pre>{{ p.description }}</pre></details>
     </div>
   </div>
   {% if gate.photos %}
-  <h3>Photos <span class="muted small">(one real photo per scene; Pixabay previews; using another one re-renders the video)</span></h3>
-  <table>
-    <tr><th style="width:12em">Scene · search</th><th>In the video</th><th>Alternatives</th></tr>
-    {% for ph in gate.photos %}{% set chosen = ph.candidates[ph.chosen] %}
-    <tr>
-      <td class="small"><strong>{{ ph.scene }}</strong><br>{{ ph.query }}</td>
-      <td><a href="{{ chosen.page_url }}" target="_blank" rel="noopener noreferrer"><img alt="Photo used in {{ ph.scene }}" src="{{ chosen.preview_url }}" style="height:150px;border:2px solid var(--primary);border-radius:4px"></a></td>
-      <td>{% for c in ph.candidates %}{% if loop.index0 != ph.chosen %}
-        <form method="post" action="/ui/projects/{{ run.id }}/photo" style="display:inline-block;margin:0 8px 8px 0;vertical-align:top;text-align:center">
-          <input type="hidden" name="scene" value="{{ ph.scene }}"><input type="hidden" name="index" value="{{ loop.index0 }}">
-          <input type="hidden" name="reviewer" value="{{ request.state.user.name }}">
-          <a href="{{ c.page_url }}" target="_blank" rel="noopener noreferrer"><img alt="Alternative photo for {{ ph.scene }}" src="{{ c.preview_url }}" style="height:110px;border-radius:4px"></a><br>
-          <button type="submit" class="small">Use this photo</button>
-        </form>{% endif %}{% endfor %}</td>
-    </tr>
-    {% endfor %}
-  </table>
-  <p class="small muted">Approve only if no photo shows an identifiable face, a child, a logo or a readable product screen. Credit in the description: “{{ gate.qa_report.stock.credit }}”.</p>
+  <details class="panel inline">
+    <summary>Photos in this video ({{ gate.photos | length }}) — swap one</summary>
+    <table>
+      <tr><th style="width:12em">Scene · search</th><th>In the video</th><th>Alternatives</th></tr>
+      {% for ph in gate.photos %}{% set chosen = ph.candidates[ph.chosen] %}
+      <tr>
+        <td class="small"><strong>{{ ph.scene }}</strong><br>{{ ph.query }}</td>
+        <td><a href="{{ chosen.page_url }}" target="_blank" rel="noopener noreferrer"><img alt="Photo used in {{ ph.scene }}" src="{{ chosen.preview_url }}" style="height:150px;border:2px solid var(--primary);border-radius:8px"></a></td>
+        <td>{% for c in ph.candidates %}{% if loop.index0 != ph.chosen %}
+          <form method="post" action="/ui/projects/{{ run.id }}/photo" style="display:inline-block;margin:0 8px 8px 0;vertical-align:top;text-align:center">
+            <input type="hidden" name="scene" value="{{ ph.scene }}"><input type="hidden" name="index" value="{{ loop.index0 }}">
+            <a href="{{ c.page_url }}" target="_blank" rel="noopener noreferrer"><img alt="Alternative photo for {{ ph.scene }}" src="{{ c.preview_url }}" style="height:110px;border-radius:8px"></a><br>
+            <button type="submit" class="small">Use this photo</button>
+          </form>{% endif %}{% endfor %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    <p class="small muted">Approve only if no photo shows an identifiable face, a child, a logo or a readable product screen. Credit in the description: “{{ gate.qa_report.stock.credit }}”.</p>
+  </details>
   {% endif %}
-  <h3>Description</h3><pre>{{ p.description }}</pre>
-  <h3>Automated QA report</h3><pre>{{ gate.qa_report | tojson(indent=2) }}</pre>
 
-  <form method="post" action="/ui/projects/{{ run.id }}/decide">
+  <form class="decision" method="post" action="/ui/projects/{{ run.id }}/decide">
     <input type="hidden" name="decision" value="approve">
-    <fieldset style="border:1px solid var(--line);border-radius:12px;margin:12px 0;padding:12px 16px">
+    <fieldset>
       <legend><strong>AI disclosure (required)</strong></legend>
-      <p class="small muted">Per YouTube's altered or synthetic content policy: does this video contain realistic synthetic media that viewers could mistake for real?</p>
-      <label style="font-weight:normal"><input type="radio" name="ai_synthetic" value="yes" required> Yes — label as altered/synthetic</label>
-      <label style="font-weight:normal"><input type="radio" name="ai_synthetic" value="no"> No</label>
+      <p class="small muted">YouTube's altered or synthetic content policy: does this video contain realistic synthetic media that viewers could mistake for real?</p>
+      <label class="choice"><input type="radio" name="ai_synthetic" value="yes" required> Yes — label as altered/synthetic</label>
+      <label class="choice"><input type="radio" name="ai_synthetic" value="no"> No</label>
       <label for="qa-reason">Reason</label>
-      <input type="text" id="qa-reason" name="ai_reason" required placeholder="e.g. synthetic narration voice">
+      <input type="text" id="qa-reason" name="ai_reason" required placeholder="e.g. AI narration voice and generated visuals">
     </fieldset>
-    <div class="row">
-      <div><label for="qa-reviewer">Reviewer</label><input type="text" id="qa-reviewer" name="reviewer" value="{{ request.state.user.name }}" readonly></div>
-      <div><label for="qa-notes">Notes (optional)</label><input type="text" id="qa-notes" name="notes"></div>
+    <div class="actionbar static">
+      <input type="text" name="notes" placeholder="Notes (optional)" aria-label="Notes (optional)">
+      <button class="primary big" type="submit">✓ Approve and publish (mock)</button>
+      <button class="big danger" type="button" onclick="openPanel('reject')">Send back</button>
     </div>
-    <p><button class="primary" type="submit">Approve for export (mock publish only)</button></p>
   </form>
 </section>
 {% include "_reject.html" %}

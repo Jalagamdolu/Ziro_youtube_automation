@@ -1,0 +1,69 @@
+{# The audit trail (brief §08), kept whole but out of the way (D-63): stage by stage, every
+transition, every attempt, every decision, the costs and the raw QA report. #}
+<p class="small muted">Run {{ run.id }} · status <code>{{ run.status }}</code> ·
+  <a href="/ui/projects/{{ run.id }}/bundle.zip">download every artifact (ZIP)</a></p>
+
+<h2>Stages</h2>
+<table>
+  <tr><th>Stage</th><th>State</th><th>Attempts</th><th>Time</th></tr>
+  {% for st in stages %}
+  <tr{% if st.state in ("running", "waiting for you") %} class="top"{% endif %}>
+    <td>{{ st.stage }}{% if st.gate %} <span class="muted small">gate</span>{% endif %}</td>
+    <td><span class="pill {{ 'ok' if st.state in ('succeeded', 'cached', 'approved') else 'bad' if st.state in ('failed', 'abandoned', 'rejected') else 'warn' if st.state in ('running', 'waiting for you') else '' }}">{{ st.state }}</span></td>
+    <td>{{ st.attempts or "" }}{% if st.failed %} <span class="small muted">({{ st.failed }} failed)</span>{% endif %}</td>
+    <td class="small">{{ "%.1f s" | format(st.seconds) if st.seconds is not none else "" }}</td>
+  </tr>
+  {% endfor %}
+</table>
+
+<h2>State timeline</h2>
+<table>
+  <tr><th>At (UTC)</th><th>From</th><th>To</th><th>Actor</th></tr>
+  {% for e in run.events %}
+  <tr><td class="small">{{ e.at.strftime("%H:%M:%S") }}</td><td>{{ e.from_state or "—" }}</td>
+      <td>{{ e.to_state }}</td><td>{{ e.actor }}</td></tr>
+  {% endfor %}
+</table>
+
+<h2>Run log (every attempt)</h2>
+<table>
+  <tr><th>Stage</th><th>Attempt</th><th>Result</th><th>Started</th><th>Finished</th><th>Error</th></tr>
+  {% for j in run.jobs %}
+  <tr><td>{{ j.stage }}</td><td>{{ j.retry_count + 1 }}</td>
+      <td><span class="pill {{ 'ok' if j.status in ('succeeded', 'cached') else 'bad' if j.status in ('failed', 'abandoned') else '' }}">{{ j.status }}</span></td>
+      <td class="small">{{ j.started_at.strftime("%H:%M:%S") }}</td>
+      <td class="small">{{ j.finished_at.strftime("%H:%M:%S") if j.finished_at else "—" }}</td>
+      <td class="small">{{ (j.error_code ~ ": " ~ j.error_message) if j.error_code else "" }}</td></tr>
+  {% endfor %}
+</table>
+
+{% if run.approvals %}
+<h2>Decisions</h2>
+<table>
+  <tr><th>Gate</th><th>Decision</th><th>Reviewer</th><th>Target</th><th>Notes</th><th>Review time</th></tr>
+  {% for a in run.approvals %}
+  <tr><td>{{ a.stage }}</td><td><span class="pill {{ 'ok' if a.decision == 'approve' else 'bad' }}">{{ a.decision }}</span></td>
+      <td>{{ a.approver }}</td><td>{{ a.target_stage or "" }}</td>
+      <td class="small">{{ a.notes }}
+        {% if a.claim_edits and (a.claim_edits.removed or a.claim_edits.edited) %}<br>claims removed: {{ a.claim_edits.removed | join(", ") or "none" }}; edited: {{ a.claim_edits.edited.keys() | join(", ") or "none" }}{% endif %}
+        {% if a.ai_disclosure %}<br>AI disclosure: {{ "yes" if a.ai_disclosure.synthetic else "no" }} — {{ a.ai_disclosure.reason }}{% endif %}</td>
+      <td class="small">{{ "%.1f" | format((a.timestamp - a.opened_at).total_seconds() / 60) }} min</td></tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+<h3>Cost</h3>
+<table>
+  <tr><th>Provider</th><th>Calls</th><th>Units</th><th>Amount</th><th></th></tr>
+  {% for provider, kind, calls, units, amount in tech.costs %}
+  <tr><td>{{ provider }}</td><td>{{ calls }}</td><td>{{ "{:,.0f}".format(units) }}</td>
+      <td>${{ "%.4f" | format(amount) }}</td><td class="small muted">{{ kind }}</td></tr>
+  {% else %}<tr><td colspan="5" class="muted">No paid calls recorded.</td></tr>
+  {% endfor %}
+  <tr><th>Total</th><td></td><td></td><th>${{ "%.4f" | format(run.total_cost_usd) }} ({{ plain.rupees(run.total_cost_usd) }})</th><td></td></tr>
+</table>
+
+{% if tech.qa_report %}
+<h3>Automated QA report</h3>
+<pre>{{ tech.qa_report | tojson(indent=2) }}</pre>
+{% endif %}

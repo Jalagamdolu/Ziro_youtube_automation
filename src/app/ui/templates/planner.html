@@ -1,30 +1,30 @@
 {% extends "base.html" %}
 {% block title %}Planner{% endblock %}
 {% block content %}
-<section>
-  <h1>Topic planner</h1>
-  <p class="muted small">Each run starts {{ lead }} h before its publish time so both reviews fit. Nothing publishes until you approve the script and the final video; if a review is still open at the publish time, the video waits and the row says so.</p>
-  <table>
-    <tr><th>Publish</th><th>Topic</th><th>Keywords</th><th>Format</th><th>Status</th><th></th></tr>
-    {% for r in rows %}{% set t = r.topic %}
-    <tr>
-      <td class="small">{{ r.when }}</td>
-      <td>{{ t.topic }}{% if t.guidelines %}<br><span class="muted small">{{ t.guidelines }}</span>{% endif %}</td>
-      <td class="small">{{ t.keywords | join(", ") }}</td>
-      <td class="small">{{ t.format }}{% if t.target_seconds %} · {{ t.target_seconds }} s{% endif %}</td>
-      <td><span class="pill {{ r.state[1] }}">{{ r.state[0] }}</span>
-        {% if t.project_id %}<br><a class="small" href="/ui/projects/{{ t.project_id }}">open run</a>{% endif %}</td>
-      <td>{% if admin and t.status == "planned" %}
-        <form method="post" action="/planner/{{ t.id }}/run" style="display:inline"><button class="primary" type="submit">Run now</button></form>
-        <form method="post" action="/planner/{{ t.id }}/cancel" style="display:inline"><button class="danger" type="submit">Cancel</button></form>
-      {% endif %}</td>
-    </tr>
-    {% else %}
-    <tr><td colspan="6" class="muted">No topics planned yet.</td></tr>
-    {% endfor %}
-  </table>
-</section>
-{% if admin %}
+<div class="page-head">
+  <div>
+    <h1>Planner</h1>
+    <p class="muted">Each video starts {{ lead }} h before its publish time so both reviews fit. Nothing publishes until you approve the script and the final video; if a review is still open at publish time, the video waits and the card says so.</p>
+  </div>
+</div>
+<div class="cards">
+  {% for r in rows %}{% set t = r.topic %}
+  <div class="card">
+    <span class="pill {{ r.state[1] }}">{{ r.state[0] }}</span>
+    <h3>{{ t.topic }}</h3>
+    <p class="small muted">Publishes {{ r.when }} · {{ t.format | capitalize }}{% if t.target_seconds %} · up to {{ t.target_seconds }} s{% endif %}</p>
+    {% if t.keywords %}<p class="small">{{ t.keywords | join(", ") }}</p>{% endif %}
+    {% if t.guidelines %}<p class="small muted">{{ t.guidelines }}</p>{% endif %}
+    <p>{% if t.project_id %}<a href="/ui/projects/{{ t.project_id }}"><button type="button">Open video</button></a>{% endif %}
+      {% if t.status == "planned" %}
+      <form method="post" action="/planner/{{ t.id }}/run" style="display:inline"><button class="primary" type="submit">Run now</button></form>
+      <form method="post" action="/planner/{{ t.id }}/cancel" style="display:inline"><button class="danger" type="submit">Cancel</button></form>
+      {% endif %}</p>
+  </div>
+  {% else %}
+  <div class="card empty"><p class="muted">No topics planned yet. Add one below.</p></div>
+  {% endfor %}
+</div>
 <section>
   <h2>Plan a topic</h2>
   <form method="post" action="/planner">
@@ -39,7 +39,7 @@
     <div class="row">
       <div><label for="format">Format</label>
         <select id="format" name="format"><option value="short">Short (9:16)</option><option value="long">Long (16:9)</option></select></div>
-      <div><label for="target_seconds">Target seconds <span class="muted">(blank = 52 short / 240 long)</span></label>
+      <div><label for="target_seconds">Target seconds <span class="muted">(at most; blank = 60 short / 240 long)</span></label>
         <input type="text" id="target_seconds" name="target_seconds" inputmode="numeric"></div>
     </div>
     <label for="guidelines">Guidelines <span class="muted">(optional, passed to research and the writer)</span></label>
@@ -47,5 +47,4 @@
     <p><button class="primary" type="submit">Add to planner</button></p>
   </form>
 </section>
-{% endif %}
 {% endblock %}

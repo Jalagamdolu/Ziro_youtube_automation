@@ -27,11 +27,13 @@ from app.core.models import Artifact, Cost, Project
 from app.graph.stages import GATES, ORDER, REJECT_TARGETS
 from app.nodes import human_edit, script_checks
 from app.nodes.rendering import PHOTO_CHOICES
+from app.ui import plain
 
 router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 templates.env.globals["mode"] = lambda: config.load()["mode"]
 templates.env.globals["banners"] = engines.banners  # missing keys, said on every page (D-46)
+templates.env.globals["plain"] = plain  # the product view's words (D-63)
 # Finished-run downloads: file name -> button label (the export bundle, one file at a time).
 DOWNLOADS = {"video.mp4": "Video (MP4)", "captions.srt": "Captions (SRT)",
              "captions.vtt": "Captions (VTT)", "thumbnail.png": "Thumbnail",
@@ -79,8 +81,10 @@ def run_page(request: Request, project_id: str, error: str | None = None,
     with db.session() as s:
         gate = {} if waiting else _gate_context(s, project_id, run["status"])
         finish = _finish(s, project_id) if run["status"] == "done" else {}
+        tech = _technical(s, project_id)
     return templates.TemplateResponse(request, "run.html", {
         "run": run, "gate": gate, "error": error, "waiting": waiting, "finish": finish,
+        "tech": tech,
         "stages": stages(run), "edit": None if waiting else _edit_text(run),
         "reject_targets": REJECT_TARGETS.get(run["status"], []),
         "schedule": _schedule(project_id, run["status"]),
@@ -104,7 +108,7 @@ async def decide(request: Request, project_id: str) -> RedirectResponse:
     form = {k: str(v) for k, v in (await request.form()).items()}
     approving = form.get("decision") == "approve"
     kind: Literal["approve", "reject"] = "approve" if approving else "reject"
-    body: dict[str, Any] = {"reviewer": request.state.user["name"],  # who is logged in (D-47)
+    body: dict[str, Any] = {"reviewer": request.state.user["name"],  # the reviewer (D-61)
                             "notes": form.get("notes", "").strip(),
                             "target": form.get("target") or None}
     if kind == "approve" and form.get("ai_synthetic"):
@@ -303,17 +307,24 @@ def _edit_text(run: dict[str, Any]) -> str | None:
 
 
 def _finish(s: Any, project_id: str) -> dict[str, Any]:
-    """A finished run: the video, one download per export file, and what it cost."""
+    """A finished run: the video, one download per export file and the QA summary."""
     files = {name: key for (_, name), key in actions.latest_artifacts(s, project_id).items()}
+    report = actions.read_latest(s, project_id, "qa_report.json")
+    return {"video": files.get("video.mp4"), "thumbnail": files.get("thumbnail.png"),
+            "downloads": [(label, files[name]) for name, label in DOWNLOADS.items()
+                          if name in files],
+            "qa_report": json.loads(report) if report else None}
+
+
+def _technical(s: Any, project_id: str) -> dict[str, Any]:
+    """For Technical details (D-63): the cost breakdown and the raw QA report."""
     costs = s.execute(select(Cost.provider, Cost.observed_or_estimate, func.count(),
                              func.sum(Cost.units), func.sum(Cost.amount))
                       .where(Cost.project_id == project_id)
                       .group_by(Cost.provider, Cost.observed_or_estimate)
                       .order_by(Cost.provider)).all()
-    return {"video": files.get("video.mp4"), "thumbnail": files.get("thumbnail.png"),
-            "downloads": [(label, files[name]) for name, label in DOWNLOADS.items()
-                          if name in files],
-            "costs": costs}
+    report = actions.read_latest(s, project_id, "qa_report.json")
+    return {"costs": costs, "qa_report": json.loads(report) if report else None}
 
 
 def _back(path: str, error: HTTPException) -> RedirectResponse:
