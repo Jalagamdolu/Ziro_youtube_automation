@@ -189,3 +189,26 @@ def test_failed_scripting_offers_the_last_draft_flagged_and_a_fix_reaches_review
     run = status(client, project_id)
     assert run["status"] == "script_review"
     assert any(a["type"] == "human_edit.json" for a in run["artifacts"])
+
+
+def test_a_second_different_hand_edit_is_not_served_from_the_cache(client) -> None:
+    project_id = _start(client)
+    page = client.get(f"/ui/projects/{project_id}").text
+    original = html.unescape(page.split('aria-label="Editable script package">')[1]
+                             .split("</textarea>")[0])
+    for n, tags in enumerate(["first edit tag", "second edit tag"], 1):
+        edited = original.replace("=== TAGS ===\n", f"=== TAGS ===\n{tags}\n")
+        client.post(f"/ui/projects/{project_id}/edit", data={"text": edited})
+        run = status(client, project_id)
+        assert run["status"] == "script_review"
+        jobs = [j["status"] for j in run["jobs"] if j["stage"] == "scripting"]
+        assert jobs[-1] == "succeeded" and len(jobs) == n + 1  # ran, not "cached"
+        assert tags in json.loads(storage_package(run))["tags"]
+
+
+def storage_package(run: dict) -> str:  # type: ignore[type-arg]
+    from app.adapters import storage
+
+    key = [a["storage_path"] for a in run["artifacts"] if a["type"] == "content_package.json"
+           and not a["stale"]][-1]
+    return storage.get().read(key).decode("utf-8")

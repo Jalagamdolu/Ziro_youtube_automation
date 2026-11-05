@@ -3,6 +3,7 @@ over the same actions as the JSON API; HTMX only refreshes the live timeline; ev
 plain form post followed by a redirect. The API never runs the graph inline.
 """
 
+import hashlib
 import io
 import json
 import re
@@ -143,7 +144,10 @@ async def edit(request: Request, project_id: str) -> RedirectResponse:
         if run["status"] == "script_review":
             actions.decide(project_id, "reject", DecisionRequest(
                 reviewer=reviewer, target="scripting",
-                notes=f"Hand-edited script submitted by {reviewer}; it runs through every check."))
+                # The edit's fingerprint keys the stage cache: a second, different edit re-runs.
+                notes=f"Hand-edited script submitted by {reviewer} (edit "
+                      f"{hashlib.sha256(text.encode()).hexdigest()[:8]}); it runs through every "
+                      "check."))
             return RedirectResponse(f"{page}?submitted=script_review", status_code=303)
         actions.retry(project_id)
     except HTTPException as error:
