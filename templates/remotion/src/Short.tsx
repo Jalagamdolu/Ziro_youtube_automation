@@ -4,6 +4,7 @@ import { Capture } from "./Capture";
 import { Captions } from "./Captions";
 import { Echo } from "./Echo";
 import { Photo } from "./Photo";
+import { SceneOffset } from "./motion";
 import { Presenter } from "./Presenter";
 import { TextPop } from "./TextPop";
 import { ChatBubble } from "./scenes/ChatBubble";
@@ -44,7 +45,9 @@ export const Short: React.FC<ShortProps> = ({ title, audio, presenter, scenes, c
           const frames = Math.max(1, Math.round(shot.end * fps) - from);
           return (
             <Sequence key={`${scene.id}-${n}`} from={from} durationInFrames={frames}>
-              <ShotView shot={shot} scene={scene} frames={frames} title={title} wordmark={presenter.wordmark} />
+              <SceneOffset.Provider value={shot.kind === "end" ? 0 : from - Math.round(scene.start * fps)}>
+                <ShotView shot={shot} scene={scene} frames={frames} title={title} clip={presenter.clip} />
+              </SceneOffset.Provider>
             </Sequence>
           );
         });
@@ -55,8 +58,8 @@ export const Short: React.FC<ShortProps> = ({ title, audio, presenter, scenes, c
   );
 };
 
-const ShotView: React.FC<{ shot: Shot; scene: Scene; frames: number; title: string; wordmark: string }> = (
-  { shot, scene, frames, title, wordmark }) => {
+const ShotView: React.FC<{ shot: Shot; scene: Scene; frames: number; title: string; clip: string | null }> = (
+  { shot, scene, frames, title, clip }) => {
   if (shot.layout === "full") {
     switch (shot.kind) {
       case "pop":
@@ -64,7 +67,7 @@ const ShotView: React.FC<{ shot: Shot; scene: Scene; frames: number; title: stri
       case "end":
         return <EndCard scene={scene} title={title} />;
       default:
-        return <Presenter wordmark={wordmark} frames={frames} alt={shot.kind === "presenter_alt"} full />;
+        return <Presenter clip={clip} full />;
     }
   }
   const Card = templates[scene.visual_type] ?? TitleCard;
@@ -85,7 +88,7 @@ const ShotView: React.FC<{ shot: Shot; scene: Scene; frames: number; title: stri
         ) : null}
       </div>
       <div style={{ position: "absolute", left: 0, right: 0, top: split.divider, bottom: 0, overflow: "hidden" }}>
-        <Presenter wordmark={wordmark} frames={frames} full={false} />
+        <Presenter clip={clip} full={false} />
       </div>
       <div style={{ position: "absolute", left: 0, right: 0, top: split.divider - 3, height: 6,
         backgroundColor: theme.primary }} />

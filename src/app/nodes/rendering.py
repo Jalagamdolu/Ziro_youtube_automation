@@ -38,8 +38,6 @@ SHOT_MAX, SNAP, PACE = 3.6, 0.3, (2.0, 4.0)
 CAPTURED = {"definition_card", "quote_card"}  # scenes whose cited source page can be shown (D-37)
 CUE_WORDS = 7  # the small transcription box: two short lines at a time (D-48)
 LOUDNESS = (-15.5, -12.5)  # integrated LUFS the finished video must land in (target -14)
-# Presenter zone placeholder until sir's clip exists (D-48): the wordmark, unaltered.
-WORDMARK = Path(__file__).resolve().parents[3] / "templates" / "brand" / "ziro-wordmark-only.png"
 # A sentence ends at . ? or ! even when a closing quote or bracket follows ('startup."').
 SENTENCE_END = re.compile(r"[.!?][\"”’')]*$")
 SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s+|(?<=[.!?][\"”’')])\s+")
@@ -74,14 +72,13 @@ def rendering(ctx: StageContext) -> Outputs:
         pace = pacing(scenes)
         if not pace["ok"]:
             raise FatalError(f"pacing QA failed: {pace}")
-        for asset in (LOGO, WORDMARK):
-            shutil.copyfile(asset, work / "public" / asset.name)
+        shutil.copyfile(LOGO, work / "public" / LOGO.name)  # the end card only (D-35, D-57)
         for scene in scenes:
             if scene["visual_type"] == "end_card":
                 scene["props"]["logo"] = LOGO.name
         (work / "props.json").write_text(json.dumps({
             "title": package.brief.topic, "audio": "narration.wav", "duration": clock,
-            "presenter": {"clip": None, "wordmark": WORDMARK.name},
+            "presenter": {"clip": None},  # sir's clip drops in here once it exists (D-57)
             "scenes": [{k: scene[k] for k in ("id", "visual_type", "start", "end", "props",
                                               "photo", "capture", "shots", "pop")
                         if k in scene}
@@ -126,7 +123,7 @@ def rendering(ctx: StageContext) -> Outputs:
         "scene_types": sorted({s["visual_type"] for s in scenes}),
         "stock": stock_checks(ctx.project_id, footage),
         "source_captures": sources,
-        "presenter": "brand placeholder (sir's clip not supplied yet)",
+        "presenter": "placeholder: sir's zone, silhouette (clip not supplied yet, D-57)",
         "deferred": ["chapters", "dead-air", "lip-sync (LatentSync)"]}, indent=2)
     outputs["stock.json"] = json.dumps(footage, indent=2, ensure_ascii=False)
     return outputs

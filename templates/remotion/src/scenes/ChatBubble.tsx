@@ -1,13 +1,13 @@
 import React from "react";
-import { AbsoluteFill, useCurrentFrame } from "remotion";
+import { AbsoluteFill } from "remotion";
 import { useEnter } from "../motion";
 import { content, theme } from "../theme";
 import type { Scene } from "../types";
 
 // A user's message (from the beat) and one reply bubble. The reply is drawn as typing dots, so the
 // scene never shows an answer the script does not contain. A generic illustration, not a product UI.
+// The dots are still: a card enters once and then holds (D-58).
 export const ChatBubble: React.FC<{ scene: Scene; title: string }> = ({ scene }) => {
-  const frame = useCurrentFrame();
   const { message } = scene.props as Record<string, string>;
   const asked = useEnter(0);
   const reply = useEnter(0.6);
@@ -24,7 +24,7 @@ export const ChatBubble: React.FC<{ scene: Scene; title: string }> = ({ scene })
       }}>
         {[0, 1, 2].map((i) => (
           <div key={i} style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: theme.muted,
-            opacity: 0.35 + 0.65 * Math.max(0, Math.sin((frame / 6) - i)) }} />
+            opacity: 1 - i * 0.25 }} />
         ))}
       </div>
     </AbsoluteFill>

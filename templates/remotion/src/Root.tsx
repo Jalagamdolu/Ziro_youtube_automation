@@ -9,7 +9,7 @@ const preview: ShortProps = {
   title: "What makes an AI agent different from a chatbot?",
   audio: "",
   duration: 6,
-  presenter: { clip: null, wordmark: "" },
+  presenter: { clip: null },
   scenes: [{
     id: "S1", visual_type: "definition_card", start: 0, end: 6,
     shots: [{ start: 0, end: 6, layout: "split", kind: "card", card: true }],

@@ -378,3 +378,17 @@ Replaces D-37's full-frame shot style (D-39's synthetic-only narration stands).
 - **Header**: the official logo (`templates/brand/ziro-digital-logo-transparent.png`, served unaltered at `/static/brand/`) on the left, the navigation on the right; the favicon is the site's Z icon (`ziro.digital/favicon.png`, copied to `static/favicon.png`).
 - **Pages**: cards are white, 16 px radius, soft shadow; banners are amber pills; status uses green/amber/red pills. On phones, wide tables scroll sideways and form rows stack.
 - Screenshots for review: `tests/manual_qa/ui-v2/` (login, planner, runs, finished run, script gate, QA gate, and phone-width login and planner).
+
+## D-57 The presenter zone is sir's place; the logo is only on the end card (Dolender, 2026-11-05)
+- In every video the presenter zone (the bottom 40% in SPLIT, the whole frame in FULL) shows the approved preview's placeholder: a deep purple gradient, a plain person silhouette (a circle and shoulders, no face) and a small "presenter — sir" label, placed above YouTube's bottom overlay so it stays readable. It is still: no motion.
+- No Ziro logo or wordmark in that zone any more. The official logo appears only on the end card (D-35 unchanged), and a test pins both. `ziro-wordmark-only.png` is no longer used in videos; its license row says so (migration 0008).
+- **When sir's avatar exists** it drops into this exact zone. `Presenter.tsx` already plays `presenter.clip` (an MP4 in the render's public folder) instead of the placeholder when the rendering stage passes one. Which avatar provider produces it is sir's open decision (D-55).
+- Supersedes D-48's "wordmark on a light studio panel".
+
+## D-58 Motion polish inside the locked layout (Dolender, 2026-11-05)
+- **Cards** enter once per scene: fade in and rise 12 px over 250 ms, then hold still. Before, the entrance replayed at every cut within a scene. A scene clock (`motion.SceneOffset`) now gives each shot its offset into the scene. The chat bubble's typing dots no longer pulse.
+- **Captions**: the spoken word in the transcription box turns Ziro orange and scales to 1.06x over 120 ms, with room around it so it never touches its neighbours (1.12x crowded long words). The echo phrase stays in the dark pill on the divider.
+- **Text pops**: the statement scales in from 0.94x as its words rise; the punch words stay in serif italic; still 1–2 per Short.
+- Unchanged: the source-proof capture scrolls slowly to the highlighted quote; photos keep their Ken Burns move; solid scenes and the presenter placeholder stay still.
+- QA on the re-rendered HTTPS Short: longest hold 3.54 s (pacing rule met), loudness -14.1 LUFS.
+- Seen in review, not fixed: the MDN source capture includes the page's own sidebar advert (Hetzner). The capture is genuine, but a third-party ad in our video is unwanted; hiding ad slots in `capture.mjs` is a follow-up.

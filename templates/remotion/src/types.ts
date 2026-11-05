@@ -32,7 +32,7 @@ export type ShortProps = {
   title: string;
   audio: string; // file name inside the render's public dir
   duration: number; // seconds
-  presenter: { clip: string | null; wordmark: string }; // clip: sir's video, when it exists
+  presenter: { clip: string | null }; // sir's clip once it exists; null = placeholder (D-57)
   scenes: Scene[];
   cues: Cue[]; // small transcription box
   echoes: Echo[]; // large phrase on the divider

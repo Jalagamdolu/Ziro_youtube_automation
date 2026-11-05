@@ -133,3 +133,17 @@ def test_without_a_planner_the_code_plans_one_pop_and_every_echo(monkeypatch) ->
     pops = [s["pop"] for s in planned if "pop" in s]
     assert len(pops) == 1 and pops[0]["text"] == "First it searches your files."
     assert pops[0]["punch"] == ["searches"]
+
+
+def test_presenter_zone_is_sirs_place_and_the_logo_is_only_on_the_end_card() -> None:
+    import inspect
+    from pathlib import Path
+
+    rendering = importlib.import_module("app.nodes.rendering")
+    src = Path(rendering.__file__).resolve().parents[3] / "templates" / "remotion" / "src"
+    presenter = (src / "Presenter.tsx").read_text(encoding="utf-8")
+    assert "presenter — sir" in presenter and ".png" not in presenter  # D-57: no brand image
+    assert "wordmark" not in inspect.getsource(rendering).lower()
+    uses_logo = [f.name for f in src.rglob("*.tsx") if "props as Record" in f.read_text(
+        encoding="utf-8") and "logo" in f.read_text(encoding="utf-8")]
+    assert uses_logo == ["EndCard.tsx"]  # D-35: the official logo only on the end card

@@ -15,7 +15,6 @@ export const theme = {
   primary: "#9952E0", // site dark theme --primary, hsl(270 70% 60%); readable on dark
   logoPurple: "#5101D4", // dominant colour of the official logo PNG (too dark for text on dark)
   accent: "#FF7700", // site --ws-brand, hsl(28 100% 50%)
-  studio: "#F4F1FA", // presenter zone placeholder: a light panel the black wordmark reads on
   bodyFont: "Inter, DejaVu Sans, sans-serif", // site body font
   displayFont: "Space Grotesk, Inter, sans-serif", // site display font
   punchFont: "Playfair Display, DejaVu Serif, serif", // text-pop punch words, italic (D-48)
