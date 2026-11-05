@@ -144,6 +144,8 @@ def package(brief: Brief, claims: list[Claim], notes: str | None) -> tuple[str, 
     sections = script_checks.SECTIONS[brief.format]
     low, high = script_checks.runtime(brief)
     words = [round(s * script_checks.WORDS_PER_SECOND) for s in (low, high)]
+    if brief.format == "short":  # pauses come on top of the words; the video stays <= 60 s (D-60)
+        words[1] = min(words[1], script_checks.SHORT_WORD_CAP)
     # Budgets scale with the requested length (D-35); Hook, Relevance and CTA stay short.
     target_words = round(brief.target_seconds * script_checks.WORDS_PER_SECOND)
     relevance_words = min(18, max(8, target_words // 6))
@@ -155,7 +157,8 @@ def package(brief: Brief, claims: list[Claim], notes: str | None) -> tuple[str, 
              f"one worked example told step by step; Takeaway about {takeaway_words}, one "
              f"practical test or rule; "
              f"CTA just the CTA line. Count your words: drafts under {words[0]} or over "
-             f"{words[1]} words are rejected."
+             f"{words[1]} words are rejected. A Short is at most {script_checks.SHORT_MAX} s "
+             "with its pauses, so never go past that word count."
              if brief.format == "short" else
              "Hook (including the learning outcome) at most 37 spoken words (15 s); Context with "
              "prerequisites; Build is the step-by-step demonstration; Recap names one limitation "
@@ -193,7 +196,7 @@ def package(brief: Brief, claims: list[Claim], notes: str | None) -> tuple[str, 
    Visuals are illustrations and text cards only: no real product screens, no people. Words in
    quotes on screen must be words the narration says; never show a word the voice doesn't.
 3. Narration: {words[0]}-{words[1]} spoken words in total (150 words per minute, {low}-{high} s);
-   aim for about {sum(words) // 2}.
+   aim for about {target_words}.
    {shape}
 4. Every sentence that uses a fact from the claim ledger ends with its marker, e.g. "[C2]". Use
    only the ledger's facts, in its wording or a faithful paraphrase. Any sentence with a digit,

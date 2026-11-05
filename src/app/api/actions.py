@@ -19,7 +19,7 @@ from app.core.models import Approval, Artifact, Event, Job, Project
 from app.graph.stages import CANCELLED, DONE, FAILED, GATES, REJECT_TARGETS
 from app.jobs.queue import enqueue_once
 
-DEFAULT_SECONDS = {"short": 60, "long": 240}
+DEFAULT_SECONDS = {"short": 52, "long": 240}  # 52 s ±15% = 44-60 s for a Short (D-60)
 
 
 class CreateRequest(BaseModel):

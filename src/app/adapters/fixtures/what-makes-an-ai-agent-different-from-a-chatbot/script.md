@@ -4,7 +4,7 @@ Your chatbot answers. Why can't it act?
 
 ## Relevance
 [ON SCREEN: a student's project board with "Build an AI agent" pinned at the top]
-If you are building AI projects, this difference decides what you actually build next.
+If you build AI projects, this difference decides what you build next.
 
 ## Example
 [ON SCREEN: definition card - "What is a chatbot?", source: IBM]
@@ -14,7 +14,7 @@ For example, ask it when your exam is, and it answers, then waits for your next 
 [ON SCREEN: definition card - "What are AI agents?", source: IBM]
 An agent is different: a system that autonomously performs tasks by designing workflows with available tools. [C3]
 [ON SCREEN: illustrative flow, labelled "example": search, read, shortlist, calendar]
-For example, give it a goal like "shortlist internships that match my résumé and add the deadlines to my calendar", and it plans the steps, searches, reads, shortlists and writes the entries itself.
+For example, give it a goal like "shortlist internships and add the deadlines to my calendar", and it plans the steps, searches, reads and shortlists by itself.
 [ON SCREEN: quote card, source: Anthropic, "Building effective agents"]
 Anthropic describes agents as systems where the model directs its own process and tool use. [C1]
 

@@ -4,6 +4,7 @@ Script format: `## Section` headings; `[ON SCREEN: ...]` lines are visuals; ever
 narration, with `[C#]` markers citing approved claims.
 """
 
+import math
 import re
 
 from app.core.contracts import Brief, Claim
@@ -21,10 +22,27 @@ NOT_A_FACT = re.compile(r"^(for example|for instance|imagine|suppose|say you|pic
                         r"you\b|if you\b|try\b|let's\b)", re.IGNORECASE)
 
 
+SHORT_MAX = 60  # a Short is at most 60 s, everything included (D-60)
+SENTENCE_PAUSE, SECTION_PAUSE = 0.15, 0.35  # the silence rendering adds; estimates use the same
+# Words a Short may have once its pauses (~4 s) are allowed for; the prompt states it (D-60).
+SHORT_WORD_CAP = round((SHORT_MAX - 4) * WORDS_PER_SECOND)
+
+
 def runtime(brief: Brief) -> tuple[int, int]:
-    """(low, high) seconds the script may run for this brief's target."""
+    """(low, high) seconds the script may run for this brief's target; a Short never past 60."""
+    high = round(brief.target_seconds * (1 + TOLERANCE))
     return (round(brief.target_seconds * (1 - TOLERANCE)),
-            round(brief.target_seconds * (1 + TOLERANCE)))
+            min(high, SHORT_MAX) if brief.format == "short" else high)
+
+
+def video_seconds(script: str) -> float:
+    """The finished video's length from the script: speech at 150 wpm plus the pause rendering
+    puts after every sentence and between sections (D-60)."""
+    found = sections(script)
+    narration = " ".join(line for lines in found.values() for line in lines)
+    speech = spoken_words([narration]) / WORDS_PER_SECOND
+    return speech + SENTENCE_PAUSE * len(sentences(narration)) \
+        + SECTION_PAUSE * max(0, len(found) - 1)
 
 MARKER = re.compile(r"\[C(\d+)\]")
 # Needs a source: any figure, percentage, year or calendar date. A month name states a date only
@@ -175,6 +193,12 @@ def shape_problems(script: str, brief: Brief) -> list[str]:
                         f"{low}-{high}s: {'add' if words < middle else 'cut'} about "
                         f"{abs(middle - words)} spoken words in the {expected[2]} section")
     if brief.format == "short":
+        video = video_seconds(script)
+        if video > SHORT_MAX:
+            cut = math.ceil((video - SHORT_MAX) * WORDS_PER_SECOND)
+            problems.append(f"with its pauses the Short would run {video:.0f}s; a Short is at "
+                            f"most {SHORT_MAX}s: cut about {cut} spoken words in the "
+                            f"{expected[2]} section")
         if seconds["Hook"] > 3:
             problems.append(f"hook takes {seconds['Hook']:.1f}s; a Short's hook must land by 3s "
                             "(at most 7 words)")
