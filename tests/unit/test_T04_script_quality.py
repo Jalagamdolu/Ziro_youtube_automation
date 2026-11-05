@@ -38,7 +38,7 @@ def test_shape_violations_are_caught(break_it, expected: str) -> None:
 
 
 def test_any_requested_length_within_tolerance() -> None:
-    """D-35: the target drives the runtime check (±15%), e.g. a 30 s Short."""
+    """D-35, D-62: the target drives the runtime check; for a Short it is a ceiling (15% under)."""
     import pytest
     from pydantic import ValidationError
 
@@ -47,7 +47,7 @@ def test_any_requested_length_within_tolerance() -> None:
 
     brief = Brief(topic="t", audience="a", learning_outcome="o", language="en", format="short",
                   target_seconds=30, cta="Explore AI learning at ziro.digital")
-    assert runtime(brief) == (26, 34)
+    assert runtime(brief) == (26, 30)
     with pytest.raises(ValidationError):
         Brief.model_validate(brief.model_dump() | {"target_seconds": 10})
 
@@ -60,4 +60,4 @@ def test_any_requested_length_within_tolerance() -> None:
 
     assert not [p for p in shape_problems(script(52), brief) if p.startswith("runtime")]
     too_long = [p for p in shape_problems(script(120), brief) if p.startswith("runtime")]
-    assert too_long and "cut about" in too_long[0] and "26-34s" in too_long[0]
+    assert too_long and "cut about" in too_long[0] and "26-30s" in too_long[0]

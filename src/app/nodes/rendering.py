@@ -29,6 +29,7 @@ from app.nodes import script_checks
 from app.nodes.context import Outputs, StageContext
 
 SENTENCE_PAUSE, SECTION_PAUSE = script_checks.SENTENCE_PAUSE, script_checks.SECTION_PAUSE
+TIGHT_PAUSES = (0.05, 0.12)  # used only when the normal pauses would pass a Short's length (D-62)
 # The reviewer's photo swaps at qa_review (D-34): {scene id: candidate index}.
 PHOTO_CHOICES = "{}/rendering/photo_choices.json"
 END_CARD_SECONDS = 2.0  # voice.md: end card about 2 seconds
@@ -61,7 +62,9 @@ def rendering(ctx: StageContext) -> Outputs:
     with tempfile.TemporaryDirectory() as folder:
         work = Path(folder)
         (work / "public").mkdir()
-        narration, segments, clock = _synthesised(ctx.project_id, scenes)
+        # A Short's requested length is a ceiling (D-62); a long video keeps its ±25% QA band.
+        narration, segments, clock = _synthesised(ctx.project_id, scenes,
+                                                  package.brief.target_seconds)
         spoken = aligner.get().align(_resample(narration, tts.RATE, aligner.RATE), segments)
         words = written_words(spoken, segments)
         cues = make_cues(words)
@@ -112,15 +115,13 @@ def rendering(ctx: StageContext) -> Outputs:
             outputs[name] = (work / name).read_bytes()
         duration = _probe_seconds(work / "video.mp4")
         lufs = _loudness(work / "video.mp4")
-    # The finished video adds sentence and section pauses to the script's 150 wpm estimate.
-    low, high = (round(package.brief.target_seconds * 0.75),
-                 round(package.brief.target_seconds * 1.25))
-    # A Short is at most 60 s (D-60): scripting checks it with the pauses counted; this is the
-    # backstop on the real video (0.5 s for encoder padding).
-    high = min(high, script_checks.SHORT_MAX)
-    if duration > script_checks.SHORT_MAX + 0.5:
-        raise FatalError(f"the Short runs {duration:.1f}s; a Short is at most "
-                         f"{script_checks.SHORT_MAX}s. Reject to scripting to cut words.")
+    # A Short's requested length is a ceiling (D-62): up to 15% under is fine, over fails QA
+    # (0.1 s for the container's frame rounding). Scripting already counts the pauses.
+    target = package.brief.target_seconds
+    low, high = round(target * (1 - script_checks.TOLERANCE)), target
+    if duration > target + 0.1:
+        raise FatalError(f"the Short runs {duration:.1f}s but was asked for at most {target}s, "
+                         "even with the pauses tightened. Reject to scripting to cut words.")
     outputs["qa_report.json"] = json.dumps({
         "duration_s": round(duration, 1), "duration_ok": low <= duration <= high,
         "resolution": "1080x1920", "layout": "split (D-48)", "voice": engines.voice(),
@@ -136,32 +137,51 @@ def rendering(ctx: StageContext) -> Outputs:
     return outputs
 
 
-def _synthesised(project_id: str, scenes: list[dict[str, Any]]
+def _synthesised(project_id: str, scenes: list[dict[str, Any]], ceiling: float | None = None
                  ) -> tuple[Any, list[dict[str, Any]], float]:
     """Narration one beat (scene) at a time; scene start/end and scene["timed"] (one entry per
     sentence) are the exact audio times. Each beat is one WAV at -14 LUFS, cached by its text
-    and voice settings, so a re-render (photo swap, QA reject) never pays for speech twice."""
+    and voice settings, so a re-render (photo swap, QA reject) never pays for speech twice.
+    Past `ceiling` (a Short's requested length, D-62) the pauses tighten, cut from the same
+    audio; QA fails whatever still runs over."""
+    voice, store = tts.get(project_id), storage.get()
+    beats, characters = [], 0
+    for scene in scenes:
+        lines = sentences([scene["text"]])
+        beat, lengths, made = _beat(voice, store, lines)
+        beats.append((lines, beat, lengths))
+        characters += made
+    with db.session() as s, s.begin():
+        costs.record_cost(s, project_id, "rendering", voice.name, characters)
+    for pauses in ((SENTENCE_PAUSE, SECTION_PAUSE), TIGHT_PAUSES):
+        assembled = _assemble(scenes, beats, *pauses)
+        if ceiling is None or assembled[2] <= ceiling:
+            break
+    return assembled
+
+
+def _assemble(scenes: list[dict[str, Any]], beats: list[tuple[list[str], Any, list[float]]],
+              sentence_pause: float, section_pause: float
+              ) -> tuple[Any, list[dict[str, Any]], float]:
+    """The narration track with these pauses; sets each scene's start, end and timed sentences."""
     import numpy as np  # worker image only (D-24)
 
     pronunciation = config.load()["pronunciation"]
-    voice, store = tts.get(project_id), storage.get()
     audio: list[Any] = []
     segments: list[dict[str, Any]] = []
-    clock, section, characters = 0.0, None, 0
-    for scene in scenes:
+    clock, section = 0.0, None
+    for scene, (lines, beat, lengths) in zip(scenes, beats, strict=True):
         if section is not None and scene["section"] != section:
-            audio.append(np.zeros(int(SECTION_PAUSE * tts.RATE), dtype=np.float32))
-            clock += SECTION_PAUSE
+            audio.append(np.zeros(int(section_pause * tts.RATE), dtype=np.float32))
+            clock += section_pause
         section, scene["start"] = scene["section"], clock
-        lines = sentences([scene["text"]])
-        beat, lengths, made = _beat(voice, store, lines)
-        characters += made
+        beat = _respaced(beat, lengths, sentence_pause)
         scene["timed"] = []
         for sentence, length in zip(lines, lengths, strict=True):
             segments.append({"text": tts.spoken_text(sentence, pronunciation), "written": sentence,
                              "start": clock, "end": clock + length})
             scene["timed"].append({"text": sentence, "start": clock, "end": clock + length})
-            clock += length + SENTENCE_PAUSE
+            clock += length + sentence_pause
         audio.append(beat)
         clock = scene["start"] + len(beat) / tts.RATE
         if scene["visual_type"] == "end_card" and clock - scene["start"] < END_CARD_SECONDS:
@@ -169,9 +189,22 @@ def _synthesised(project_id: str, scenes: list[dict[str, Any]]
             audio.append(np.zeros(int(hold * tts.RATE), dtype=np.float32))
             clock += hold
         scene["end"] = clock
-    with db.session() as s, s.begin():
-        costs.record_cost(s, project_id, "rendering", voice.name, characters)
     return np.concatenate(audio), segments, clock
+
+
+def _respaced(beat: Any, lengths: list[float], pause: float) -> Any:
+    """A cached beat (each sentence followed by SENTENCE_PAUSE of silence) with `pause` instead:
+    the sentences are cut out of the same audio, nothing is re-synthesised."""
+    import numpy as np
+
+    if pause == SENTENCE_PAUSE:
+        return beat
+    gap, start, parts = int(SENTENCE_PAUSE * tts.RATE), 0, []
+    for length in lengths:
+        n = round(length * tts.RATE)
+        parts += [beat[start:start + n], np.zeros(int(pause * tts.RATE), dtype=np.float32)]
+        start += n + gap
+    return np.concatenate(parts) if parts else beat
 
 
 def _beat(voice: tts.TTS, store: storage.Storage, lines: list[str]

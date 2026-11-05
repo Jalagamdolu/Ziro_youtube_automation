@@ -12,7 +12,7 @@ BRIEF = {
     "audience": "Final-year engineering students",
     "language": "en",
     "cta": "Find project guides at ziro.digital",
-    "target_seconds": 55,
+    "target_seconds": 60,
 }
 
 
@@ -26,13 +26,13 @@ def test_brief_fields_persist_into_outputs(client) -> None:
     run = status(client, project_id)
 
     assert run["brief"] == {"topic": SHORT_TOPIC, "audience": BRIEF["audience"], "language": "en",
-                            "format": "short", "target_seconds": 55, "cta": BRIEF["cta"]}
+                            "format": "short", "target_seconds": 60, "cta": BRIEF["cta"]}
 
     paths = {a["type"]: a["storage_path"] for a in run["artifacts"]}
     brief = _read(paths["brief.json"])
     package = _read(paths["content_package.json"])
     receipt = _read(paths["publish_receipt.json"])
-    assert brief["audience"] == BRIEF["audience"] and brief["target_seconds"] == 55
+    assert brief["audience"] == BRIEF["audience"] and brief["target_seconds"] == 60
     assert package["brief"] == brief
     assert BRIEF["cta"] in package["script"] and BRIEF["cta"] in package["description"]
     assert BRIEF["cta"] in receipt["request"]["snippet"]["description"]

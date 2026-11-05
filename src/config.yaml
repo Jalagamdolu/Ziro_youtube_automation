@@ -52,6 +52,11 @@ tts:
   voice: af_heart         # Kokoro
   phonemes: en-us
   speed: 0.95
+  # Speaking rate each voice really has (measured on cached runs, D-62); a Short's length is
+  # budgeted at its voice's rate. Sarvam ishita_en_stories: 132-141 wpm; Kokoro af_heart: ~166.
+  words_per_minute:
+    kokoro: 160
+    sarvam: 130
   sarvam:
     model: bulbul:v4-flash
     speaker: ishita_en_stories   # stock Ishita voice (D-52); sir's cloned voice ID goes here when ready
@@ -104,6 +109,9 @@ prices:
 
 # Hard cap on recorded spend per video (USD).
 spend_cap_usd: 5.0
+
+# Costs are shown in rupees on the run page (D-63). Approximate rate; update when it moves.
+inr_per_usd: 88.0
 
 # Paid-API budget (D-45): a call that would pass either cap is refused and the run fails cleanly.
 budget:

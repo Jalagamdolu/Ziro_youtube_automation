@@ -143,11 +143,11 @@ def package(brief: Brief, claims: list[Claim], notes: str | None) -> tuple[str, 
     formulas = [f"{h['name']}: {h['shape']}" for h in hooks["hooks"]]
     sections = script_checks.SECTIONS[brief.format]
     low, high = script_checks.runtime(brief)
-    words = [round(s * script_checks.WORDS_PER_SECOND) for s in (low, high)]
-    if brief.format == "short":  # pauses come on top of the words; the video stays <= 60 s (D-60)
-        words[1] = min(words[1], script_checks.SHORT_WORD_CAP)
+    # D-62: a Short's requested length is a ceiling; the writer aims at 90% of it.
+    fewest, target_words, most = script_checks.word_budget(brief)
+    wpm = round(script_checks.speech_rate(brief) * 60)  # the voice's own rate for a Short
+    words = [fewest, most]
     # Budgets scale with the requested length (D-35); Hook, Relevance and CTA stay short.
-    target_words = round(brief.target_seconds * script_checks.WORDS_PER_SECOND)
     relevance_words = min(18, max(8, target_words // 6))
     takeaway_words = max(8, round(target_words * 0.18))
     example_words = max(10, target_words - 6 - relevance_words - takeaway_words
@@ -157,8 +157,8 @@ def package(brief: Brief, claims: list[Claim], notes: str | None) -> tuple[str, 
              f"one worked example told step by step; Takeaway about {takeaway_words}, one "
              f"practical test or rule; "
              f"CTA just the CTA line. Count your words: drafts under {words[0]} or over "
-             f"{words[1]} words are rejected. A Short is at most {script_checks.SHORT_MAX} s "
-             "with its pauses, so never go past that word count."
+             f"{words[1]} words are rejected. The finished Short, pauses included, must not "
+             f"run longer than {brief.target_seconds} s, so never go past that word count."
              if brief.format == "short" else
              "Hook (including the learning outcome) at most 37 spoken words (15 s); Context with "
              "prerequisites; Build is the step-by-step demonstration; Recap names one limitation "
@@ -195,7 +195,7 @@ def package(brief: Brief, claims: list[Claim], notes: str | None) -> tuple[str, 
    [ON SCREEN: "Short headline"]                                   anything else
    Visuals are illustrations and text cards only: no real product screens, no people. Words in
    quotes on screen must be words the narration says; never show a word the voice doesn't.
-3. Narration: {words[0]}-{words[1]} spoken words in total (150 words per minute, {low}-{high} s);
+3. Narration: {words[0]}-{words[1]} spoken words in total ({wpm} words per minute, {low}-{high} s);
    aim for about {target_words}.
    {shape}
 4. Every sentence that uses a fact from the claim ledger ends with its marker, e.g. "[C2]". Use

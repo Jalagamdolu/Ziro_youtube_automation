@@ -7,6 +7,7 @@ narration, with `[C#]` markers citing approved claims.
 import math
 import re
 
+from app.core import config, engines
 from app.core.contracts import Brief, Claim
 
 WORDS_PER_SECOND = 150 / 60
@@ -24,23 +25,47 @@ NOT_A_FACT = re.compile(r"^(for example|for instance|imagine|suppose|say you|pic
 
 SHORT_MAX = 60  # a Short is at most 60 s, everything included (D-60)
 SENTENCE_PAUSE, SECTION_PAUSE = 0.15, 0.35  # the silence rendering adds; estimates use the same
-# Words a Short may have once its pauses (~4 s) are allowed for; the prompt states it (D-60).
-SHORT_WORD_CAP = round((SHORT_MAX - 4) * WORDS_PER_SECOND)
+# A Short's requested length is a ceiling (D-62): the speech aims at 90% of it and the words stop
+# where ~8% is left for pauses, so a requested 40 s lands at 36-40 s, never over.
+SHORT_AIM, PAUSE_SHARE = 0.9, 0.08
 
 
 def runtime(brief: Brief) -> tuple[int, int]:
-    """(low, high) seconds the script may run for this brief's target; a Short never past 60."""
-    high = round(brief.target_seconds * (1 + TOLERANCE))
+    """(low, high) seconds of speech the script may have. A Short's target is a ceiling: up to
+    15% under it, never over (D-62); a long video keeps ±15%."""
+    if brief.format == "short":
+        return round(brief.target_seconds * (1 - TOLERANCE)), brief.target_seconds
     return (round(brief.target_seconds * (1 - TOLERANCE)),
-            min(high, SHORT_MAX) if brief.format == "short" else high)
+            round(brief.target_seconds * (1 + TOLERANCE)))
 
 
-def video_seconds(script: str) -> float:
+def speech_rate(brief: Brief) -> float:
+    """Words per second for a length check. A Short's length is a ceiling, so it is measured at
+    the speaking rate of the voice that will say it (config tts.words_per_minute, D-62); the
+    brief's 150 wpm stays for everything else (hook by 3 s, relevance by 10 s, long videos)."""
+    if brief.format != "short":
+        return WORDS_PER_SECOND
+    return float(config.load()["tts"]["words_per_minute"][engines.voice()]) / 60
+
+
+def word_budget(brief: Brief) -> tuple[int, int, int]:
+    """(fewest, aim, most) spoken words for the brief; for a Short the most leaves room for the
+    pauses inside the requested length (D-62)."""
+    low, high = runtime(brief)
+    if brief.format == "short":
+        target, rate = brief.target_seconds, speech_rate(brief)
+        return (round(low * rate), round(target * SHORT_AIM * rate),
+                math.floor(target * (1 - PAUSE_SHARE) * rate))
+    return (round(low * WORDS_PER_SECOND), round(brief.target_seconds * WORDS_PER_SECOND),
+            round(high * WORDS_PER_SECOND))
+
+
+def video_seconds(script: str, rate: float = WORDS_PER_SECOND) -> float:
     """The finished video's length from the script: speech at 150 wpm plus the pause rendering
     puts after every sentence and between sections (D-60)."""
     found = sections(script)
     narration = " ".join(line for lines in found.values() for line in lines)
-    speech = spoken_words([narration]) / WORDS_PER_SECOND
+    speech = spoken_words([narration]) / rate
     return speech + SENTENCE_PAUSE * len(sentences(narration)) \
         + SECTION_PAUSE * max(0, len(found) - 1)
 
@@ -184,20 +209,21 @@ def shape_problems(script: str, brief: Brief) -> list[str]:
     problems = [f"section {name} has no [ON SCREEN: ...] visual"
                 for name in _sections_without_visuals(script)]
     seconds = {name: spoken_words(lines) / WORDS_PER_SECOND for name, lines in found.items()}
-    total = sum(seconds.values())
+    rate = speech_rate(brief)
+    total = sum(spoken_words(lines) for lines in found.values()) / rate
     low, high = runtime(brief)
     if not low <= total <= high:
-        words, middle = round(total * WORDS_PER_SECOND), round(brief.target_seconds
-                                                               * WORDS_PER_SECOND)
-        problems.append(f"runtime {total:.0f}s ({words} spoken words) at 150 wpm is outside "
+        words, middle = round(total * rate), word_budget(brief)[1]
+        problems.append(f"runtime {total:.0f}s ({words} spoken words) at {rate * 60:.0f} wpm is "
+                        "outside "
                         f"{low}-{high}s: {'add' if words < middle else 'cut'} about "
                         f"{abs(middle - words)} spoken words in the {expected[2]} section")
     if brief.format == "short":
-        video = video_seconds(script)
-        if video > SHORT_MAX:
-            cut = math.ceil((video - SHORT_MAX) * WORDS_PER_SECOND)
-            problems.append(f"with its pauses the Short would run {video:.0f}s; a Short is at "
-                            f"most {SHORT_MAX}s: cut about {cut} spoken words in the "
+        video, ceiling = video_seconds(script, rate), brief.target_seconds
+        if video > ceiling:
+            cut = math.ceil((video - ceiling) * rate)
+            problems.append(f"with its pauses the Short would run {video:.1f}s; it was asked "
+                            f"for at most {ceiling}s: cut about {cut} spoken words in the "
                             f"{expected[2]} section")
         if seconds["Hook"] > 3:
             problems.append(f"hook takes {seconds['Hook']:.1f}s; a Short's hook must land by 3s "
