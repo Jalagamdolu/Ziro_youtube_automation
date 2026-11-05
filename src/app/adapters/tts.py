@@ -122,8 +122,7 @@ class SarvamTTS:
         price = float(config.load()["prices"][self.name])
         costs.check_budget(self.project_id, 0, len(text) * price, [])
         body = {"text": self.said(text), "language_code": self.settings["language_code"],
-                "model": self.settings["model"], "speaker": self.settings["speaker"],
-                "pace": self.settings["pace"], "speech_sample_rate": RATE}
+                "speech_sample_rate": RATE} | self.voice()
         attempts = self.settings["attempts"]
         for attempt in range(1, attempts + 1):
             try:
@@ -147,8 +146,18 @@ class SarvamTTS:
             raise FatalError(f"sarvam returned {response.status_code}: {response.text[:300]}")
         return response.json()
 
+    def voice(self) -> dict[str, Any]:
+        """The parameters that shape the sound, each only for the models Sarvam accepts it on
+        (D-54): pitch and loudness on bulbul:v2, temperature on v3 and v4-flash."""
+        model = self.settings["model"]
+        sent = ["model", "speaker", "pace"] + (
+            ["pitch", "loudness"] if model == "bulbul:v2" else ["temperature"])
+        return {k: self.settings[k] for k in sent if k in self.settings}
+
     def settings_key(self) -> str:
-        return repr(("sarvam", sorted((k, str(v)) for k, v in self.settings.items())))
+        """Speaker + parameters + spelling: change one and only beats made otherwise re-bill."""
+        return repr(("sarvam", sorted(self.voice().items()), self.settings["language_code"],
+                     sorted(self.settings.get("spelling", {}).items())))
 
 
 def _model(folder: Path, name: str) -> Path:

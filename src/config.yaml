@@ -56,7 +56,12 @@ tts:
     model: bulbul:v4-flash
     speaker: ishita_en_stories   # stock Ishita voice (D-52); sir's cloned voice ID goes here when ready
     language_code: en-IN
-    pace: 1.0
+    # Voice controls (D-54), Sarvam's own parameters. Each is sent only to the models that take
+    # it; changing one re-synthesises (and re-bills) only beats not yet made with that value.
+    pace: 1.0                 # speed; all models (0.5-2.0 on v3/v4-flash, 0.3-3.0 on v2)
+    temperature: 0.6          # expressiveness; v3 and v4-flash only (0.01-1.0)
+    pitch: 0.0                # bulbul:v2 only (-0.75 to 0.75); not sent to v3/v4-flash
+    loudness: 1.0             # bulbul:v2 only (0.3-3.0); every beat is set to -14 LUFS anyway
     attempts: 4               # per sentence, on 429 / 5xx / timeout (CLAUDE.md: TTS 4)
     # Sarvam reads text, not phonemes: spell brand words the way they are said. Captions and
     # the screen keep the written form ("Ziro"). Drop the entry if the listen test says so.

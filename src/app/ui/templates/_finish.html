@@ -6,7 +6,7 @@
              src="/ui/projects/{{ run.id }}/files/{{ finish.video }}"></video>{% else %}<p class="muted">No video artifact.</p>{% endif %}
     </div>
     <div>
-      {% if finish.thumbnail %}<img alt="Thumbnail" style="width:100%;border:1px solid var(--line)"
+      {% if finish.thumbnail %}<img class="thumb" alt="Thumbnail" style="width:100%"
            src="/ui/projects/{{ run.id }}/files/{{ finish.thumbnail }}">{% endif %}
       <h3>Downloads</h3>
       <p>{% for label, key in finish.downloads %}

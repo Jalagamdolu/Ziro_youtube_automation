@@ -93,3 +93,33 @@ def test_keys_switch_the_engines_on(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_prototype_mode_always_uses_kokoro(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SARVAM_API_KEY", "s")
     assert engines.voice() == "kokoro"
+
+
+@respx.mock
+def test_voice_controls_reach_only_the_models_that_take_them() -> None:
+    route = respx.post(tts.SARVAM).mock(return_value=httpx.Response(200, json={
+        "audios": [base64.b64encode(WAV).decode()]}))
+    sarvam().wav("Hello.")
+    body = json.loads(route.calls[0].request.content)
+    assert body["pace"] == 1.0 and body["temperature"] == 0.6  # bulbul:v4-flash (D-54)
+    assert "pitch" not in body and "loudness" not in body
+    cfg = config.load()
+    v2 = tts.SarvamTTS(cfg["tts"]["sarvam"] | {"model": "bulbul:v2", "speaker": "anushka"},
+                       cfg["pronunciation"], "k", None)
+    v2.wav("Hello.")
+    body = json.loads(route.calls[1].request.content)
+    assert body["pitch"] == 0.0 and body["loudness"] == 1.0 and "temperature" not in body
+
+
+def test_audio_cache_key_follows_the_sound_not_the_retry_count() -> None:
+    cfg = config.load()["tts"]["sarvam"]
+    base = sarvam().settings_key()
+
+    def key(**change: object) -> str:
+        return tts.SarvamTTS(cfg | change, config.load()["pronunciation"], "k", None
+                             ).settings_key()
+
+    assert key(attempts=9) == base
+    assert key(pitch=0.5) == base  # not sent to bulbul:v4-flash, so the sound is the same
+    assert key(pace=1.2) != base and key(speaker="ishita_en_social") != base
+    assert key(temperature=0.3) != base

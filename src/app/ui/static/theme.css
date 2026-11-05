@@ -1,0 +1,114 @@
+/* Ziro AI Content Studio theme (D-56): ziro.digital's light design language. Every colour below
+   is taken from the site's live CSS (assets/index-*.css, :root, fetched 2026-11-05) or its
+   exam-portal login (/exam-portal/login, computed styles); the hsl() each came from is noted. */
+
+:root {
+  --primary: #8c3cdd;          /* --primary hsl(270 70% 55%) */
+  --primary-glow: #a462e6;     /* --primary-glow hsl(270 76% 65%) */
+  --magenta: #c23cdd;          /* --accent hsl(290 70% 55%) */
+  --gradient: linear-gradient(135deg, var(--primary) 0%, var(--magenta) 100%); /* --gradient-hero */
+  --ink: #1d2530;              /* --foreground hsl(215 25% 15%) */
+  --muted: #615072;            /* --muted-foreground hsl(270 18% 38%) */
+  --line: #e1e7ef;             /* --border hsl(214 32% 91%) */
+  --lavender: #f5f3f7;         /* --secondary / --muted hsl(270 20% 96%) */
+  --page: #f9fafb;             /* body background on the site */
+  --card: #ffffff;
+  --ok: #1ca665;               /* --crm-ahead hsl(152 71% 38%) */
+  --warn: #f59e0b;             /* --warning hsl(38 92% 50%) */
+  --bad: #ef4444;              /* --destructive hsl(0 84% 60%) */
+  --shadow-card: 0 4px 20px -2px rgba(29, 37, 48, .08);          /* --shadow-card */
+  --shadow-elegant: 0 10px 40px -10px rgba(140, 60, 221, .10);   /* --shadow-elegant */
+  --shadow-login: 0 60px 140px -30px rgba(124, 58, 237, .5), 0 28px 70px -20px rgba(168, 85, 247, .32),
+                  0 10px 28px -10px rgba(168, 85, 247, .2), inset 0 1.5px 0 rgba(255, 255, 255, .95);
+  --radius: 1rem;              /* rounded-2xl */
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+       color: var(--ink); background: var(--page);
+       background-image: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(140, 60, 221, .10), transparent); /* --gradient-aurora */
+       min-height: 100vh; }
+a { color: var(--primary); text-decoration: none; } a:hover { text-decoration: underline; }
+
+/* Header: the official logo left, navigation right. */
+.topbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 24px;
+          padding: 12px 28px; background: rgba(255, 255, 255, .85); backdrop-filter: blur(10px);
+          border-bottom: 1px solid var(--line); }
+.topbar .logo img { height: 34px; display: block; }
+.topbar nav { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.topbar nav a { color: var(--ink); font-weight: 600; font-size: 14px; padding: 8px 14px; border-radius: 999px; }
+.topbar nav a:hover { background: var(--lavender); text-decoration: none; }
+.topbar .who { color: var(--muted); font-size: 13px; padding: 0 6px 0 12px; }
+.topbar form { margin: 0; }
+.mode { display: inline-block; font-size: 12px; font-weight: 600; color: var(--primary);
+        background: var(--lavender); border-radius: 999px; padding: 3px 10px; }
+
+/* Banners: missing keys and modes, as pills under the header. */
+.banners { max-width: 1120px; margin: 16px auto 0; padding: 0 24px; display: flex; flex-direction: column; gap: 8px; }
+.banner { align-self: flex-start; font-size: 13px; color: #8a5a00; background: #fff7e6;
+          border: 1px solid #fde3a7; border-radius: 999px; padding: 6px 14px; }
+.banner::before { content: "●"; color: var(--warn); margin-right: 8px; }
+
+main { max-width: 1120px; margin: 0 auto; padding: 24px; }
+section { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+          box-shadow: var(--shadow-card); padding: 24px 28px; margin-bottom: 20px; }
+h1 { font-size: 24px; letter-spacing: -.02em; margin: 0 0 6px; }
+h2 { font-size: 18px; letter-spacing: -.01em; margin: 0 0 14px; }
+h3 { font-size: 15px; margin: 22px 0 10px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 10px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: 13px; background: var(--lavender); }
+tr:first-child th:first-child { border-top-left-radius: 10px; } tr:first-child th:last-child { border-top-right-radius: 10px; }
+tr:hover td { background: #fcfbfe; }
+pre { white-space: pre-wrap; background: var(--lavender); padding: 14px; border-radius: 12px; font-size: 13px; }
+video, img.thumb { border-radius: 14px; box-shadow: var(--shadow-elegant); }
+
+label { display: block; font-weight: 600; font-size: 14px; margin: 12px 0 6px; }
+input[type=text], input[type=password], input[type=datetime-local], textarea, select {
+  width: 100%; padding: 10px 12px; font: inherit; color: var(--ink); background: rgba(255, 255, 255, .7);
+  border: 1px solid rgba(124, 58, 237, .18); border-radius: 10px; }  /* exam-portal inputs */
+input:focus, textarea:focus, select:focus { outline: none; border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(140, 60, 221, .15); }
+input[readonly] { background: var(--lavender); color: var(--muted); }
+textarea { min-height: 60px; }
+
+button { font: inherit; font-weight: 600; font-size: 14px; padding: 9px 18px; border-radius: 999px;
+         border: 1px solid rgba(124, 58, 237, .25); background: rgba(255, 255, 255, .7); color: var(--ink);
+         cursor: pointer; transition: transform .14s, box-shadow .24s; }
+button:hover { transform: translateY(-1px); box-shadow: var(--shadow-card); }
+button.primary { background: var(--gradient); color: #fff; border-color: transparent;
+                 box-shadow: 0 8px 24px -8px rgba(140, 60, 221, .55); }
+button.primary:hover { box-shadow: 0 0 30px rgba(164, 98, 230, .35); }  /* --shadow-glow */
+button.danger { color: var(--bad); border-color: rgba(239, 68, 68, .4); }
+
+.row { display: flex; gap: 18px; flex-wrap: wrap; } .row > * { flex: 1; min-width: 260px; }
+.muted { color: var(--muted); } .small { font-size: 13px; } .top { font-weight: 600; }
+.pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
+        background: var(--lavender); color: var(--muted); }
+.pill.ok { color: #10784a; background: #e6f6ee; }
+.pill.warn { color: #8a5a00; background: #fff4dc; }
+.pill.bad { color: #b42318; background: #fde8e8; }
+section.error, .error { border-color: rgba(239, 68, 68, .45); color: #b42318; background: #fff6f6; }
+q { color: var(--muted); }
+
+/* Login: a centred card on the exam portal's lavender gradient, the logo above. */
+body.auth { background: linear-gradient(135deg, #f3ecfa 0%, #ede3f8 50%, #f8f2fe 100%); }
+.auth main { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.auth .brand { height: 54px; margin-bottom: 26px; }
+.auth section { width: 100%; max-width: 420px; padding: 36px; border-radius: 1.75rem;
+  border: 1px solid rgba(255, 255, 255, .85); box-shadow: var(--shadow-login);
+  background: linear-gradient(155deg, rgba(255, 255, 255, .78) 0%, rgba(255, 255, 255, .55) 60%, rgba(245, 237, 255, .6) 100%); }
+.auth h1 { text-align: center; font-size: 20px; }
+.auth .sub { text-align: center; color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+.auth button.primary { width: 100%; padding: 12px; margin-top: 8px; }
+
+/* Phones: one column, tables scroll sideways instead of squashing. */
+@media (max-width: 720px) {
+  .topbar { padding: 10px 16px; gap: 10px; flex-wrap: wrap; }
+  .topbar .logo img { height: 28px; }
+  main, .banners { padding: 16px; }
+  section { padding: 18px; }
+  table { display: block; overflow-x: auto; white-space: nowrap; }
+  .row > * { min-width: 100%; }
+}

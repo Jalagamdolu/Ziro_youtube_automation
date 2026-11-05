@@ -348,3 +348,33 @@ Replaces D-37's full-frame shot style (D-39's synthetic-only narration stands).
 ## D-53 "Certificate" is allowed when a source uses it (Dolender, 2026-11-05)
 - Live run be7d0678 ("How does HTTPS keep a connection private?") failed scripting three times on one problem: the banned-claim scan matched `certif(ied|icate|ication)`, and a TLS/digital certificate is the core of how HTTPS works.
 - "certificate(s)" moved from the always-banned list to the outcome-word rule: allowed only when an approved claim uses the word (here C4, C5), refused otherwise (a course certificate is still a claim). "certified" and "certification" stay banned outright. The prompt's word list says so; test in `test_uncited_and_support.py`.
+
+## D-54 Sarvam voice controls in config (Dolender, 2026-11-05)
+- `tts.sarvam` now holds the voice controls, using Sarvam's own parameter names (docs.sarvam.ai text-to-speech):
+  - `pace` 1.0, all models;
+  - `temperature` 0.6, expressiveness, bulbul:v3 and v4-flash only;
+  - `pitch` 0.0 and `loudness` 1.0, bulbul:v2 only.
+- Sarvam documents pitch and loudness as "NOT supported for bulbul:v3 or bulbul:v4-flash", so `SarvamTTS.voice()` sends each parameter only to the models that take it. On the current model (v4-flash) modulation is pace + temperature. Loudness is set per beat to -14 LUFS regardless (D-46).
+- The per-beat audio cache key is speaker + the parameters actually sent + language + spelling. A changed value re-synthesises (and re-bills) only beats not yet made with it; values the model ignores (pitch on v4-flash) and the retry count do not invalidate the cache.
+- The listen sample was re-made at the defaults (`ishita_en_stories`, pace 1.0, temperature 0.6), with the Zyro/Ziro A/B.
+
+## D-55 The split-layout look is locked; avatar provider is sir's open decision (Dolender, 2026-11-05)
+- Dolender approved the split-layout preview as-is. Locked as the v2 look:
+  - the Remotion Short template (SPLIT/FULL states);
+  - the two-layer captions (transcription box + echo pill on the divider);
+  - serif-italic text pops;
+  - the one source-proof capture per video;
+  - the end card (official logo on a white panel, D-35).
+  Changes to these need a new decision.
+- **Open decision, owner: sir.** Which avatar provider fills the presenter zone (HeyGen or others; LatentSync on own GPU was the v2 doc's plan). Until he decides, the brand placeholder panel stays. No avatar work is done.
+
+## D-56 UI theme: ziro.digital's light design language (Dolender, 2026-11-05)
+- One stylesheet, `src/app/ui/static/theme.css`, replaces the inline styles in `base.html`. No frontend framework; HTMX unchanged; no behaviour changes.
+- **Colours** are copied from ziro.digital's live CSS (`:root` of `assets/index-*.css`, light theme), each noted in the file:
+  - primary #8C3CDD (`--primary` hsl(270 70% 55%));
+  - primary buttons and highlights use the site's `--gradient-hero`, #8C3CDD → #C23CDD (`--accent`, magenta);
+  - foreground, muted, border, lavender surface, shadows and the aurora glow are the site's tokens.
+- **Login** follows the exam portal (`/exam-portal/login`, computed styles): a centred 28 px-radius frosted card on the #F3ECFA → #EDE3F8 → #F8F2FE gradient, with the official logo above.
+- **Header**: the official logo (`templates/brand/ziro-digital-logo-transparent.png`, served unaltered at `/static/brand/`) on the left, the navigation on the right; the favicon is the site's Z icon (`ziro.digital/favicon.png`, copied to `static/favicon.png`).
+- **Pages**: cards are white, 16 px radius, soft shadow; banners are amber pills; status uses green/amber/red pills. On phones, wide tables scroll sideways and form rows stack.
+- Screenshots for review: `tests/manual_qa/ui-v2/` (login, planner, runs, finished run, script gate, QA gate, and phone-width login and planner).

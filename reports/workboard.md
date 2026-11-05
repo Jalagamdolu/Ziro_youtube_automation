@@ -33,6 +33,8 @@ Waiting on people:
 - Sir's base clip (1–2 min, good light) + signed consent, and the GPU own/rent decision: lip-sync and FLUX start then.
 
 Open v2 items:
+- OPEN DECISION, owner sir: avatar provider for the presenter zone (HeyGen or others). The brand placeholder stays until then (D-55).
+- Pick the default Ishita voice by ear (samples sent 2026-11-05); `ishita_en_stories` until then (D-52).
 - Missed-review notification (v2 §10 "the reviewer is notified"): shown on the planner and run page only, nothing is sent.
 - Runs stranded at the retired research_review gate (905bc1b2, f00d6ed1): cancel and restart.
 - The deterministic text-pop picker chooses plain lines ("So here is the test."); the Sonnet planner should do better once the key is in.
