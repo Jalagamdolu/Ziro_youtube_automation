@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}{{ topic.topic }}{% endblock %}
+{% block content %}
+{# A planned row before its video exists (D-64): what it is, when it goes out, one next action. #}
+<section class="hero">
+  <div class="hero-top">
+    <div>
+      <h1>{{ topic.topic }}</h1>
+      <p class="muted small">{{ topic.format | capitalize }} · {% if topic.target_seconds %}up to {{ topic.target_seconds }} s{% else %}default length{% endif %}</p>
+    </div>
+    <span class="pill {{ tone }}">{{ chip }}</span>
+  </div>
+  {% if topic.guidelines %}<h3>Guidelines</h3><p>{{ topic.guidelines }}</p>{% endif %}
+  <h3>Publish time</h3>
+  {% if when %}<p><strong>{{ when }}</strong> — making starts by itself at {{ starts }}, so both your reviews fit before it.</p>
+  {% else %}<p class="muted">No time yet. Make it now; once you approve the final video, give it a slot.</p>{% endif %}
+  {% if topic.status == "planned" %}
+  <div class="actionbar static">
+    <form method="post" action="/planner/{{ topic.id }}/run"><button class="primary big" type="submit">Make now</button></form>
+    <form method="post" action="/planner/{{ topic.id }}/cancel"><button class="big danger" type="submit">Cancel</button></form>
+  </div>
+  {% endif %}
+</section>
+<p><a href="/planner">← Back to the planner</a></p>
+{% endblock %}

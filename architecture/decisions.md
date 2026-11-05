@@ -462,3 +462,13 @@ Supersedes the two-tab plan and D-47's "approved late, publishes at once".
 - **Detail view** (click a row): topic, progress, the video player, the slot controls, the approvals in plain words, the script, and the next action. Technical details stay collapsed.
 - Migration 0009: a row's publish time is optional, and a row has a kind (generated | upload).
 - Screenshots: `tests/manual_qa/ui-planner/`.
+
+## D-65 Planner final design: reshaped, not rebuilt (Dolender, 2026-11-05)
+- The planner final design (one list, date-time slots, mock publish; real YouTube parked until sir's OK) is D-64 with these additions:
+  - **Ready, Scheduled and Published rows** show the video's real length (from its QA report) and its cost in rupees. A Published row reads "Published (mock)" and links its publish receipt.
+  - **A planned row has its own page** (`/planner/<id>`): topic, guidelines, format, length, publish time and one next action (Make now, or Cancel). Once its video exists, the row opens that video's page.
+- **Safety, now tested explicitly:**
+  - the schedule control is not offered on the row or the video page until the final approval;
+  - a slot reached before the final approval shows "Missed" and never publishes;
+  - firing is idempotent. A slot fires once (`publish_due` marks the row as firing; a second call finds nothing). A worker that dies after the mock publish but before the step is saved is restarted by the reaper, and the publish still happens exactly once (MockPublisher is idempotent on the video).
+- Screenshots: `tests/manual_qa/ui-planner/` (list, phone, and the Planned, Ready, Scheduled and Published row pages).

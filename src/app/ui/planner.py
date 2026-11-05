@@ -6,16 +6,18 @@ existed) is a row too. Ready videos without a slot are pinned at the top; the re
 publish time. Publishing needs the final approval: no final approval, no scheduling (D-06).
 """
 
+import json
 from datetime import UTC, datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 from starlette.datastructures import UploadFile
 
+from app.adapters import storage
 from app.core import config, db
-from app.core.models import Artifact, Project, Topic
+from app.core.models import Artifact, Cost, Project, Topic
 from app.jobs import scheduler
 from app.ui import plain
 from app.ui.routes import templates
@@ -57,7 +59,7 @@ def state(topic: Topic | None, project: Project | None, approved: datetime | Non
         return f"Planned · starts {shown(when - lead)}", "", "upcoming"
     status = project.status
     if status == "done":
-        return "Published", "ok", "published"
+        return "Published (mock)", "ok", "published"
     if status in ("failed", "cancelled"):
         return ("Stopped", "bad", "closed") if status == "failed" else ("Cancelled", "", "closed")
     if status == scheduler.WAITING:
@@ -76,15 +78,31 @@ def state(topic: Topic | None, project: Project | None, approved: datetime | Non
         "upcoming" if when else "unscheduled",)
 
 
+FILES = ("thumbnail.png", "publish_receipt.json", "qa_report.json")
+
+
+def _seconds(files: dict[tuple[str, str], str], project: Project | None) -> float | None:
+    """A finished video's real length, from its QA report (Ready, Scheduled, Published)."""
+    if project is None or project.status not in (scheduler.WAITING, "done"):
+        return None
+    key = files.get((project.id, "qa_report.json"))
+    if key is None:
+        return None
+    seconds = json.loads(storage.get().read(key)).get("duration_s")
+    return float(seconds) if seconds is not None else None
+
+
 def rows() -> list[dict[str, Any]]:
     """Every video, grouped and sorted for the list (D-64)."""
     now = datetime.now(UTC)
     with db.session() as s:
         topics = s.scalars(select(Topic)).all()
         projects = {p.id: p for p in s.scalars(select(Project)).all()}
-        thumbs = {a.project_id: a.storage_path for a in s.scalars(
-            select(Artifact).where(Artifact.type == "thumbnail.png", Artifact.stale.is_(False))
+        files = {(a.project_id, a.type): a.storage_path for a in s.scalars(
+            select(Artifact).where(Artifact.type.in_(FILES), Artifact.stale.is_(False))
             .order_by(Artifact.version))}
+        spent = dict(s.execute(select(Cost.project_id, func.sum(Cost.amount))
+                               .group_by(Cost.project_id)).all())
         approved = {p: scheduler.final_approved_at(s, p) for p, project in projects.items()
                     if project.status == scheduler.WAITING}
     linked = {t.project_id for t in topics if t.project_id}
@@ -102,7 +120,10 @@ def rows() -> list[dict[str, Any]]:
             "title": topic.topic if topic else project.topic if project else "",
             "when": when, "when_shown": shown(when) if when else "",
             "when_input": local_input(when), "created": created,
-            "thumb": thumbs.get(project.id) if project else None,
+            "thumb": files.get((project.id, "thumbnail.png")) if project else None,
+            "receipt": files.get((project.id, "publish_receipt.json")) if project else None,
+            "seconds": _seconds(files, project),
+            "cost": plain.rupees(spent.get(project.id) or 0) if project else "",
             "upload": bool(topic and topic.kind == "upload"),
             "doing": plain.status(project.status) if project else ""})
 
@@ -143,6 +164,23 @@ async def add_topic(request: Request) -> RedirectResponse:
     with db.session() as s, s.begin():
         s.add(topic)
     return RedirectResponse("/planner", status_code=303)
+
+
+@router.get("/planner/{topic_id}", response_class=HTMLResponse, response_model=None)
+def planned(request: Request, topic_id: int) -> HTMLResponse | RedirectResponse:
+    """A planned row's own page; once its video exists, that video's page is the row's page."""
+    with db.session() as s:
+        topic = s.get(Topic, topic_id)
+    if topic is None:
+        raise HTTPException(404, "no such row")
+    if topic.project_id:
+        return RedirectResponse(f"/ui/projects/{topic.project_id}", status_code=303)
+    lead = timedelta(hours=config.load()["planner"]["start_hours_before"])
+    chip, tone, _ = state(topic, None, None, datetime.now(UTC))
+    return templates.TemplateResponse(request, "planned.html", {
+        "topic": topic, "chip": chip, "tone": tone,
+        "when": shown(topic.publish_at) if topic.publish_at else None,
+        "starts": shown(topic.publish_at - lead) if topic.publish_at else None})
 
 
 @router.post("/planner/{topic_id}/run")

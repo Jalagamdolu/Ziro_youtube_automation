@@ -112,7 +112,7 @@ def test_schedule_reschedule_unschedule_then_it_fires_in_its_slot(client) -> Non
     run = status(client, project_id)
     assert run["status"] == "done"
     assert any(a["type"] == "publish_receipt.json" for a in run["artifacts"])
-    assert ">Published<" in client.get("/planner").text
+    assert ">Published (mock)<" in client.get("/planner").text
 
 
 def test_no_final_approval_no_scheduling(client) -> None:
@@ -166,3 +166,67 @@ def test_an_uploaded_recording_is_a_row_with_the_same_slots_and_lock(client) -> 
     assert run["status"] == "done"
     receipt = next(a for a in run["artifacts"] if a["type"] == "publish_receipt.json")
     assert Path(receipt["storage_path"]).name == "publish_receipt.json"
+
+
+def test_rows_show_real_length_cost_and_the_receipt_and_planned_rows_have_a_page(
+        client, monkeypatch) -> None:
+    import json
+
+    import app.nodes as nodes
+    from app.nodes import stubs
+
+    def measured(ctx):  # type: ignore[no-untyped-def]
+        return stubs.rendering(ctx) | {"qa_report.json": json.dumps({"duration_s": 37.0})}
+
+    monkeypatch.setitem(nodes.FUNCS, "rendering", measured)
+    topic_id = plan(client, None)
+    page = client.get(f"/planner/{topic_id}").text
+    assert "No time yet" in page and "Make now" in page
+    project_id = ready(client)
+    row = client.get("/planner").text
+    assert "37.0 s · ₹0.00" in row  # its real length and cost, not "up to"
+    slot(client, project_id, 10)
+    scheduler.publish_due(datetime.now(UTC) + timedelta(minutes=11))
+    row = client.get("/planner").text
+    assert ">Published (mock)<" in row and ">receipt</a>" in row
+    client.post(f"/planner/{topic_id}/run")
+    assert client.get(f"/planner/{topic_id}", follow_redirects=False).status_code == 303
+
+
+def test_the_schedule_control_is_only_offered_after_the_final_approval(client) -> None:
+    project_id = create(client)
+    approve(client, project_id)  # at the final review
+    assert f"/videos/{project_id}/schedule" not in client.get("/planner").text
+    assert f"/videos/{project_id}/schedule" not in client.get(f"/ui/projects/{project_id}").text
+    approve(client, project_id, ai_disclosure=DISCLOSURE)
+    assert f"/videos/{project_id}/schedule" in client.get("/planner").text
+
+
+class WorkerKilled(BaseException):
+    pass
+
+
+def test_firing_is_idempotent_even_when_a_worker_dies_mid_publish(client, monkeypatch) -> None:
+    import app.nodes as nodes
+    from app.core.models import Publishing
+
+    real, kills = nodes.FUNCS["mock_published"], iter([True])
+
+    def dies_after_publishing(ctx):  # type: ignore[no-untyped-def]
+        outputs = real(ctx)  # the mock publish row is written...
+        if next(kills, False):
+            raise WorkerKilled  # ...then the worker dies before the step is saved
+        return outputs
+
+    monkeypatch.setitem(nodes.FUNCS, "mock_published", dies_after_publishing)
+    project_id = ready(client)
+    slot(client, project_id, 10)
+    due = datetime.now(UTC) + timedelta(minutes=11)
+    assert scheduler.publish_due(due) == [project_id]
+    assert scheduler.publish_due(due) == []  # the same slot never fires twice
+    assert status(client, project_id)["status"] == "mock_published"  # stuck mid-publish
+    assert reaper.reap(datetime.now(UTC) + timedelta(hours=1)) == [project_id]  # a restart
+    assert status(client, project_id)["status"] == "done"
+    with db.session() as s:
+        assert len(s.scalars(select(Publishing).where(
+            Publishing.project_id == project_id)).all()) == 1  # one publish, not two
