@@ -18,8 +18,7 @@ class WorkerKilled(BaseException):
 
 
 def test_reaper_resumes_after_kill(client, calls: Counter[str], monkeypatch) -> None:
-    project_id = create(client)
-    approve(client, project_id)
+    project_id = create(client)  # at script_review
 
     real = nodes.FUNCS["storyboarding"]
     kills = iter([True])

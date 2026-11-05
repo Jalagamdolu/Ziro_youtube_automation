@@ -9,7 +9,7 @@
           {% for t in reject_targets %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
         </select>
       </div>
-      <div><label for="rj-reviewer">Reviewer</label><input type="text" id="rj-reviewer" name="reviewer" value="Dolender" required></div>
+      <div><label for="rj-reviewer">Reviewer</label><input type="text" id="rj-reviewer" name="reviewer" value="{{ request.state.user.name }}" readonly></div>
     </div>
     <label for="rj-notes">What must change (required; passed to that stage)</label>
     <textarea id="rj-notes" name="notes" required></textarea>

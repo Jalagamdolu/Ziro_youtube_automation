@@ -72,8 +72,11 @@ class AgentResearch:
         found: dict[str, str] = {}  # url -> title, from search results
         pages: dict[str, search.Page] = {}
         claims: list[Claim] = []
+        from app.adapters import prompts
+
         transcript = [f"Video topic: {brief.topic}\nAudience: {brief.audience}\n"
-                      f"Learning outcome: {brief.learning_outcome}\nStart by searching."]
+                      f"Learning outcome: {brief.learning_outcome}\n{prompts.guidance(brief)}"
+                      "Start by searching."]
         explainer = script_checks.is_explainer(brief.topic)
         need = script_checks.MIN_MECHANISM if explainer else 0
         system = SYSTEM.replace("{target}", str(self.target)).replace(

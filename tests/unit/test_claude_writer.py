@@ -142,17 +142,18 @@ def test_daily_spend_cap_counts_every_run_today(client) -> None:
 
 
 def test_a_run_over_budget_fails_cleanly_with_the_reason(client, monkeypatch) -> None:
-    from conftest import approve, status
+    from conftest import status
 
-    project_id = create(client)
-    assert status(client, project_id)["status"] == "research_review"  # fixture research
-    config.load()["mode"] = "production"  # scripting onward: Claude, with a tiny token cap
+    from app.adapters import research
+
+    config.load()["mode"] = "production"  # Claude writes, with a tiny token cap
     _caps(tokens=1_000, usd=100.0)
+    monkeypatch.setattr(research, "get", lambda: research.FixtureResearch())
     monkeypatch.setenv("ANTHROPIC_API_KEY", "a-key")
     called: list[Any] = []
     monkeypatch.setattr(anthropic.resources.messages.Messages, "parse",
                         lambda *a, **k: called.append(a))
-    approve(client, project_id)
+    project_id = create(client, learning_outcome="Tell a chatbot from an agent.")
     run = status(client, project_id)
     assert run["status"] == "failed" and not called
     failed = [j for j in run["jobs"] if j["status"] == "failed"][-1]

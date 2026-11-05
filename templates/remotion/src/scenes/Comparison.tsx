@@ -1,7 +1,7 @@
 import React from "react";
 import { AbsoluteFill } from "remotion";
 import { useEnter } from "../motion";
-import { safe, theme } from "../theme";
+import { content, theme } from "../theme";
 import type { Scene } from "../types";
 
 const Side: React.FC<{ text: string; color: string; delay: number }> = ({ text, color, delay }) => (
@@ -17,7 +17,7 @@ export const Comparison: React.FC<{ scene: Scene; title: string }> = ({ scene })
   const { left, right, between } = scene.props as Record<string, string>;
   const mark = useEnter(0.5);
   return (
-    <AbsoluteFill style={{ paddingTop: safe.top + 140, paddingLeft: safe.left, paddingRight: safe.right,
+    <AbsoluteFill style={{ paddingTop: content.top, paddingLeft: content.left, paddingRight: content.right,
       gap: 36 }}>
       <Side text={left} color={theme.primary} delay={0} />
       <div style={{ ...mark, alignSelf: "center", color: theme.accent, fontFamily: theme.displayFont,

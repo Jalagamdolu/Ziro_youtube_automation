@@ -150,7 +150,8 @@ def _previous_script(ctx: StageContext) -> str | None:
 
 
 def approved_claims(project_id: str, researched: list[dict[str, Any]]) -> list[Claim]:
-    """Claims as the reviewer left them at research_review: removals dropped, edits applied."""
+    """The researched claims, with removals/edits from a research_review approval (runs from
+    before v2 had that gate; D-50)."""
     with db.session() as s:
         approval = s.scalars(
             select(Approval)

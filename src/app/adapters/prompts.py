@@ -70,6 +70,32 @@ def support(cited: list[tuple[str, list[str]]], claims: list[Claim]) -> tuple[st
     return SUPPORT_SYSTEM, f"{listed}\n\nExactly {len(cited)} verdicts."
 
 
+SHOT_PLAN_SYSTEM = """You plan the on-screen text of a 9:16 educational Short. The narration is
+fixed; you only choose words from it to show. Reply with JSON only.
+
+echoes: for EVERY sentence, in order, 1-4 key words copied from that sentence, shown large while
+it is spoken. Pick the words that carry the idea (nouns, verbs, numbers), never filler.
+pops: 1 or 2 full-screen statements for the whole video, each 2-9 words copied in order from ONE
+sentence of the Relevance, Example or Takeaway sections, the line a viewer should remember;
+punch: 1-2 of its words to set in serif italics (the surprising or decisive word).
+
+Never show a word the sentence does not say. No hype or outcome words (better, faster, boost,
+accurate, best, reliable, improves, fixes)."""
+
+
+def shot_plan(listed: list[tuple[str, str]]) -> tuple[str, str]:
+    """Shot planner (D-49): sentences as (section, text), numbered from 0."""
+    lines = "\n".join(f"{i}. [{section}] {text}" for i, (section, text) in enumerate(listed))
+    return SHOT_PLAN_SYSTEM, f"{lines}\n\nExactly {len(listed)} echoes."
+
+
+def guidance(brief: Brief) -> str:
+    """The planner's keywords and guidelines (D-47) as prompt lines; empty when unset."""
+    lines = [f"Keywords: {', '.join(brief.keywords)}"] if brief.keywords else []
+    lines += [f"Guidelines from the reviewer: {brief.guidelines}"] if brief.guidelines else []
+    return "".join(f"{line}\n" for line in lines)
+
+
 def learning_outcome(brief: Brief) -> tuple[str, str]:
     system = ("You plan short educational YouTube videos for Ziro. Reply with JSON only: "
               '{"learning_outcome": "<one sentence>"}.')
@@ -212,7 +238,7 @@ def package(brief: Brief, claims: list[Claim], notes: str | None) -> tuple[str, 
         rules,
         f"# Brief\nTopic: {brief.topic}\nAudience: {brief.audience}\nLearning outcome: "
         f"{brief.learning_outcome}\nLanguage: {brief.language}\nFormat: {brief.format}, target "
-        f"{brief.target_seconds} s\nCTA: {brief.cta}",
+        f"{brief.target_seconds} s\nCTA: {brief.cta}\n{guidance(brief)}",
         f"# Claim ledger (the only facts you may state)\n{ledger}",
         "# Example of the script format (a Short on another topic; copy the format, not the "
         f"content)\n{example}" if brief.format == "short" else "",

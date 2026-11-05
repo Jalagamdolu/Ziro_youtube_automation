@@ -43,15 +43,23 @@
     .pill.warn { color: var(--warn); border-color: var(--warn); }
     .error { border-color: var(--bad); color: var(--bad); }
     .top { font-weight: 600; }
+    .banner { background: #fff4e5; border-bottom: 1px solid #f5c98b; color: var(--warn);
+              padding: 8px 24px; font-size: 14px; }
   </style>
 </head>
 <body>
   <header>
-    <a href="/">Ziro YouTube automation</a>
+    <a href="/">Ziro AI Content Studio</a>
+    {% if request.state.user is defined %}
+    <a href="/planner" class="tag">Planner</a>
     <a href="/" class="tag">Runs</a>
     <a href="/new" class="tag">New video</a>
-    <span class="tag">sandbox · {{ mode() }} mode · publishing is mocked · no login (local only)</span>
+    <span class="tag">sandbox · {{ mode() }} mode · publishing is mocked</span>
+    <form method="post" action="/logout" style="margin-left:auto"><span class="tag">{{ request.state.user.name }} ({{ request.state.user.role }})</span>
+      <button type="submit" style="padding:2px 10px">Log out</button></form>
+    {% endif %}
   </header>
+  {% for line in banners() %}<div class="banner">{{ line }}</div>{% endfor %}
   <main>
     {% if error %}<section class="error"><strong>Not done:</strong> {{ error }}</section>{% endif %}
     {% block content %}{% endblock %}

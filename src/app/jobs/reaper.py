@@ -9,6 +9,7 @@ from app.core import config, db
 from app.core.log import log
 from app.core.models import Event, Job, Project
 from app.graph.stages import WORK
+from app.jobs import scheduler
 from app.jobs.queue import enqueue_once
 
 MOVING = [*WORK, "approved"]  # not at a gate, not done/failed/cancelled
@@ -20,6 +21,8 @@ def reap(now: datetime | None = None) -> list[str]:
     stalled: list[str] = []
     with db.session() as s, s.begin():
         for project in s.scalars(select(Project).where(Project.status.in_(MOVING))):
+            if scheduler.waiting_for_publish(project, now):  # parked on purpose (D-47)
+                continue
             last = max(
                 s.scalar(select(func.max(Event.at)).where(Event.project_id == project.id))
                 or project.created_at,

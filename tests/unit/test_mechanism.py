@@ -89,18 +89,15 @@ def test_research_fails_loudly_without_mechanism_claims(monkeypatch) -> None:
         node.researching(Ctx())  # type: ignore[arg-type]
 
 
-def test_research_gate_labels_definition_and_mechanism(client, monkeypatch) -> None:
+def test_script_review_labels_definition_and_mechanism(client, monkeypatch) -> None:
     from conftest import create
 
     from app.adapters import research
 
-    class Labelled:
-        calls: list = []
-
-        def find_claims(self, _brief: Brief) -> list[Claim]:
-            return CLAIMS
-
-    monkeypatch.setattr(research, "get", lambda: Labelled())
+    kinds = {"C1": "definition", "C2": "mechanism", "C3": "mechanism"}
+    found = research.FixtureResearch.find_claims
+    monkeypatch.setattr(research.FixtureResearch, "find_claims", lambda self, brief: [
+        c.model_copy(update={"kind": kinds.get(c.id, "other")}) for c in found(self, brief)])
     project_id = create(client)
     page = client.get(f"/ui/projects/{project_id}").text
     assert "1 definition</strong>" in page and "2 mechanism</strong>" in page

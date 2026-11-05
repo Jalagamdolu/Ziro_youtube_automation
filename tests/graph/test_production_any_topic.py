@@ -9,7 +9,7 @@ from pathlib import Path
 import httpx
 import pytest
 import respx
-from conftest import approve, create, status
+from conftest import create, status
 from sqlalchemy import select
 
 from app.adapters import llm, search
@@ -65,10 +65,7 @@ def test_any_topic_reaches_script_review_through_real_adapters(client, productio
 
     project_id = create(client, prompt=TOPIC)
     run = status(client, project_id)
-    assert run["status"] == "research_review", run["jobs"]
-    assert approve(client, project_id).status_code == 202
-    run = status(client, project_id)
-    assert run["status"] == "script_review", run["jobs"]
+    assert run["status"] == "script_review", run["jobs"]  # claims + script, one gate (D-50)
 
     assert run["brief"]["topic"] == TOPIC  # T01: the entered topic survives unchanged
     with db.session() as s:

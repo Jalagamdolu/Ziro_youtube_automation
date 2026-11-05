@@ -33,13 +33,13 @@ def test_captions_show_written_brand_with_spoken_timing() -> None:
     assert words[-1]["start"] == spoken[-3]["start"] and words[-1]["end"] == 4.0
 
 
-def test_cues_stop_at_three_words_and_at_sentence_ends() -> None:
-    tokens = ["one", "two", "three", "four", "five.", "six", "seven"]
+def test_cues_stop_at_seven_words_and_at_sentence_ends() -> None:
+    tokens = ["one", "two", "three", "four", "five.", *(f"w{i}" for i in range(9))]
     words = [{"text": t, "start": float(i), "end": i + 0.5} for i, t in enumerate(tokens)]
     cues = make_cues(words)
-    assert [len(c["words"]) for c in cues] == [3, 2, 2]  # D-37: 2-3 big words at a time
-    assert to_srt(cues).startswith("1\n00:00:00,000 --> 00:00:02,500\none two three")
-    assert to_vtt(cues).startswith("WEBVTT\n\n00:00:00.000 --> 00:00:02.500\n")
+    assert [len(c["words"]) for c in cues] == [5, 7, 2]  # D-48: the two-line transcription box
+    assert to_srt(cues).startswith("1\n00:00:00,000 --> 00:00:04,500\none two three four five.")
+    assert to_vtt(cues).startswith("WEBVTT\n\n00:00:00.000 --> 00:00:04.500\n")
 
 
 def test_whisperx_may_split_our_sentence_in_two() -> None:

@@ -25,7 +25,7 @@ GROQ = "https://api.groq.com/openai/v1/chat/completions"
 TIMEOUT = 180.0
 MINUTE_RETRIES = 3  # per-minute 429s are waited out in place before the stage retry takes over
 MAX_OUTPUT_TOKENS = 4000
-SUPPORT_MAX_TOKENS = 8000  # support check: one short verdict per cited sentence
+SUPPORT_MAX_TOKENS = 8000  # support check / shot planner: short structured replies
 
 # Usage of one paid call, as (price key in config.yaml, units). Free tier still records tokens.
 Usage = tuple[str, float]
@@ -40,6 +40,17 @@ class SupportVerdict(BaseModel):
 
 class SupportReport(BaseModel):
     verdicts: list[SupportVerdict]
+
+
+class PopPlan(BaseModel):
+    index: int  # which sentence (0-based, in the order given)
+    text: str
+    punch: list[str]
+
+
+class ShotPlan(BaseModel):
+    echoes: list[str]  # one per sentence
+    pops: list[PopPlan]
 
 
 class QuotaExhausted(FatalError):
@@ -335,11 +346,20 @@ def chat(stage: str = "default", project_id: str | None = None) -> FallbackChat:
 
 def support_chat(project_id: str) -> ClaudeChat | None:
     """Claude Haiku for the support check (D-44); None in prototype mode or without a key."""
+    return _claude("support_model", project_id)
+
+
+def planner_chat(project_id: str) -> ClaudeChat | None:
+    """Claude Sonnet for the shot planner (D-49); None in prototype mode or without a key."""
+    return _claude("planner_model", project_id)
+
+
+def _claude(model: str, project_id: str) -> ClaudeChat | None:
     cfg = config.load()
     key = os.environ.get("ANTHROPIC_API_KEY")
     if cfg["mode"] == "prototype" or not key:
         return None
-    return ClaudeChat(cfg["llm"]["support_model"], key, "medium", SUPPORT_MAX_TOKENS, project_id)
+    return ClaudeChat(cfg["llm"][model], key, "medium", SUPPORT_MAX_TOKENS, project_id)
 
 
 def get(stage: str = "default", project_id: str | None = None) -> LLM:

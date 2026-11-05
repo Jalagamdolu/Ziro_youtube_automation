@@ -29,7 +29,7 @@
       <td>{% for c in ph.candidates %}{% if loop.index0 != ph.chosen %}
         <form method="post" action="/ui/projects/{{ run.id }}/photo" style="display:inline-block;margin:0 8px 8px 0;vertical-align:top;text-align:center">
           <input type="hidden" name="scene" value="{{ ph.scene }}"><input type="hidden" name="index" value="{{ loop.index0 }}">
-          <input type="hidden" name="reviewer" value="Dolender">
+          <input type="hidden" name="reviewer" value="{{ request.state.user.name }}">
           <a href="{{ c.page_url }}" target="_blank" rel="noopener noreferrer"><img alt="Alternative photo for {{ ph.scene }}" src="{{ c.preview_url }}" style="height:110px;border-radius:4px"></a><br>
           <button type="submit" class="small">Use this photo</button>
         </form>{% endif %}{% endfor %}</td>
@@ -52,7 +52,7 @@
       <input type="text" id="qa-reason" name="ai_reason" required placeholder="e.g. synthetic narration voice">
     </fieldset>
     <div class="row">
-      <div><label for="qa-reviewer">Reviewer</label><input type="text" id="qa-reviewer" name="reviewer" value="Dolender" required></div>
+      <div><label for="qa-reviewer">Reviewer</label><input type="text" id="qa-reviewer" name="reviewer" value="{{ request.state.user.name }}" readonly></div>
       <div><label for="qa-notes">Notes (optional)</label><input type="text" id="qa-notes" name="notes"></div>
     </div>
     <p><button class="primary" type="submit">Approve for export (mock publish only)</button></p>

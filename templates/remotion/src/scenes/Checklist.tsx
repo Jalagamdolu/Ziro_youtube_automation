@@ -1,7 +1,7 @@
 import React from "react";
 import { AbsoluteFill } from "remotion";
 import { useEnter } from "../motion";
-import { safe, theme } from "../theme";
+import { content, theme } from "../theme";
 import type { Scene } from "../types";
 
 // Items from the beat; "condition: verdict" items show the verdict in the accent colour.
@@ -27,7 +27,7 @@ const Item: React.FC<{ text: string; delay: number }> = ({ text, delay }) => {
 export const Checklist: React.FC<{ scene: Scene; title: string }> = ({ scene }) => {
   const items = (scene.props.items ?? []) as string[];
   return (
-    <AbsoluteFill style={{ paddingTop: safe.top + 60, paddingLeft: safe.left, paddingRight: safe.right,
+    <AbsoluteFill style={{ paddingTop: content.top, paddingLeft: content.left, paddingRight: content.right,
       gap: 40 }}>
       {items.map((item, i) => <Item key={i} text={item} delay={i * 0.8} />)}
     </AbsoluteFill>

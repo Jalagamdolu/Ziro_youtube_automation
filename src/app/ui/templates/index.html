@@ -3,7 +3,7 @@
 {% block content %}
 <section>
   <h1>Make a video</h1>
-  <p class="muted small">Type a topic. The run researches it, writes a script and renders the video, pausing at three review gates on the run page.</p>
+  <p class="muted small">Type a topic. The run researches it, writes a script and renders the video, pausing at two review gates on the run page: the script (with its claims) and the final video. To schedule a video, use the Planner.</p>
   <form method="post" action="/ui/projects">
     <label for="prompt">Topic</label>
     <input type="text" id="prompt" name="prompt" required autofocus
@@ -29,7 +29,7 @@
     {% if mode() == "prototype" %}
     <p class="muted small">Prototype mode: only topics with a hand-written fixture have content; any other topic stops at research with a clear error. Switch <code>mode</code> to <code>production</code> in <code>src/config.yaml</code> for any topic (free-tier keys in <code>.env</code>).</p>
     {% else %}
-    <p class="muted small">Production mode (free tiers, D-27): any topic. Rendering is Shorts only for now.</p>
+    <p class="muted small">Production mode: any topic. Rendering is Shorts only for now.</p>
     {% endif %}
     <button class="primary" type="submit">Start run</button>
   </form>

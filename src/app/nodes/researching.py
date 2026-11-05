@@ -28,7 +28,7 @@ def researching(ctx: StageContext) -> Outputs:
         raise FatalError("research found no verified claims")
     mechanism = research.mechanism_count(claims)
     if script_checks.is_explainer(brief.topic) and mechanism < script_checks.MIN_MECHANISM:
-        raise FatalError(  # say so rather than pass vague claims to research_review (D-40)
+        raise FatalError(  # say so rather than pass vague claims to script_review (D-40)
             f"research found {mechanism} 'how it works' (mechanism) claims; an explainer needs "
             f"{script_checks.MIN_MECHANISM}. Verified claims were: "
             + "; ".join(f"{c.id} {c.kind}: {c.claim}" for c in claims)

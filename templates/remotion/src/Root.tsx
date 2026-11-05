@@ -9,8 +9,10 @@ const preview: ShortProps = {
   title: "What makes an AI agent different from a chatbot?",
   audio: "",
   duration: 6,
+  presenter: { clip: null, wordmark: "" },
   scenes: [{
     id: "S1", visual_type: "definition_card", start: 0, end: 6,
+    shots: [{ start: 0, end: 6, layout: "split", kind: "card", card: true }],
     props: {
       headline: "What is a chatbot?",
       definition: "A chatbot is a software application that communicates with people through text or voice.",
@@ -23,6 +25,7 @@ const preview: ShortProps = {
     start: 0, end: 6,
     words: ["A", "chatbot", "is", "a", "software"].map((text, i) => ({ text, start: i * 0.4, end: i * 0.4 + 0.4 })),
   }],
+  echoes: [{ start: 0, end: 6, text: "chatbot software", brand: false }],
 };
 
 export const Root: React.FC = () => (

@@ -42,4 +42,4 @@ def test_reject_requires_valid_target_and_notes(client) -> None:
     assert reject(client, project_id, "draft").status_code == 422
     assert reject(client, project_id, "rendering", notes=" ").status_code == 422
     assert [a["stage"] for a in status(client, project_id)["approvals"]] == [
-        "research_review", "script_review"]  # nothing recorded for the invalid rejects
+        "script_review"]  # nothing recorded for the invalid rejects

@@ -4,12 +4,20 @@ x-app-env: &app-env
   DATABASE_URL: postgresql://postgres@postgres:5432/ziro
   REDIS_URL: redis://redis:6379/0
   RUNS_DIR: /app/runs
-  # mode: production only (D-27); read from the git-ignored .env, empty otherwise.
+  # Read from the git-ignored .env, empty otherwise. Missing keys fall back, never block (D-46).
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  SARVAM_API_KEY: ${SARVAM_API_KEY:-}
   GEMINI_API_KEY: ${GEMINI_API_KEY:-}
   GROQ_API_KEY: ${GROQ_API_KEY:-}
   TAVILY_API_KEY: ${TAVILY_API_KEY:-}
   PIXABAY_API_KEY: ${PIXABAY_API_KEY:-}
   PEXELS_API_KEY: ${PEXELS_API_KEY:-}
+  # Login (D-47): two users, no registration.
+  ZIRO_ADMIN_USER: ${ZIRO_ADMIN_USER:-}
+  ZIRO_ADMIN_PASSWORD: ${ZIRO_ADMIN_PASSWORD:-}
+  ZIRO_REVIEWER_USER: ${ZIRO_REVIEWER_USER:-}
+  ZIRO_REVIEWER_PASSWORD: ${ZIRO_REVIEWER_PASSWORD:-}
+  ZIRO_SESSION_SECRET: ${ZIRO_SESSION_SECRET:-}
 
 services:
   postgres:

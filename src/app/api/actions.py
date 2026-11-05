@@ -31,6 +31,8 @@ class CreateRequest(BaseModel):
     cta: str = "Explore AI learning at ziro.digital"
     target_seconds: int | None = None
     learning_outcome: str | None = None
+    keywords: list[str] = []  # from the topic planner (D-47)
+    guidelines: str = ""
 
 
 class DecisionRequest(BaseModel):
@@ -38,8 +40,6 @@ class DecisionRequest(BaseModel):
     notes: str = ""
     target: str | None = None
     ai_disclosure: AiDisclosure | None = None
-    removed_claims: list[str] = []  # research_review only (D-20)
-    edited_claims: dict[str, str] = {}
 
 
 def create_project(request: CreateRequest) -> str:
@@ -52,6 +52,8 @@ def create_project(request: CreateRequest) -> str:
             format=request.format,
             target_seconds=request.target_seconds or DEFAULT_SECONDS[request.format],
             cta=request.cta,
+            keywords=request.keywords,
+            guidelines=request.guidelines,
         )
     except ValidationError as error:
         raise HTTPException(422, errors(error)) from error
@@ -101,12 +103,6 @@ def decide(project_id: str, kind: Literal["approve", "reject"], body: DecisionRe
         if gate not in GATES:
             raise HTTPException(409, f"run is not at a gate (status: {gate})")
         opening = audit.gate_openings(s, project_id, gate)
-        touched = set(body.removed_claims) | set(body.edited_claims)
-        if touched and gate == "research_review":
-            claims = json.loads(read_latest(s, project_id, "claims.json") or "[]")
-            unknown = touched - {c["id"] for c in claims}
-            if unknown:
-                raise HTTPException(422, f"unknown claim ids: {', '.join(sorted(unknown))}")
     if kind == "reject" and body.target not in REJECT_TARGETS[gate]:
         raise HTTPException(422, f"{gate} can reject to: {', '.join(REJECT_TARGETS[gate])}")
     decision_id = f"{project_id}:{gate}:{opening}"

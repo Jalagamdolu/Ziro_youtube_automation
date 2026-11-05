@@ -20,16 +20,17 @@ from sqlalchemy import func, select
 from app.adapters import storage
 from app.api import actions
 from app.api.actions import CreateRequest, DecisionRequest
-from app.core import config, db
+from app.core import config, db, engines
 from app.core.contracts import ContentPackage, HookDraft, PackageDraft
 from app.core.models import Artifact, Cost, Project
 from app.graph.stages import GATES, ORDER, REJECT_TARGETS
-from app.nodes import human_edit
+from app.nodes import human_edit, script_checks
 from app.nodes.rendering import PHOTO_CHOICES
 
 router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 templates.env.globals["mode"] = lambda: config.load()["mode"]
+templates.env.globals["banners"] = engines.banners  # missing keys, said on every page (D-46)
 # Finished-run downloads: file name -> button label (the export bundle, one file at a time).
 DOWNLOADS = {"video.mp4": "Video (MP4)", "captions.srt": "Captions (SRT)",
              "captions.vtt": "Captions (VTT)", "thumbnail.png": "Thumbnail",
@@ -81,6 +82,7 @@ def run_page(request: Request, project_id: str, error: str | None = None,
         "run": run, "gate": gate, "error": error, "waiting": waiting, "finish": finish,
         "stages": stages(run), "edit": None if waiting else _edit_text(run),
         "reject_targets": REJECT_TARGETS.get(run["status"], []),
+        "schedule": _schedule(project_id, run["status"]),
     })
 
 
@@ -101,14 +103,12 @@ async def decide(request: Request, project_id: str) -> RedirectResponse:
     form = {k: str(v) for k, v in (await request.form()).items()}
     approving = form.get("decision") == "approve"
     kind: Literal["approve", "reject"] = "approve" if approving else "reject"
-    body: dict[str, Any] = {"reviewer": form.get("reviewer", "").strip(),
+    body: dict[str, Any] = {"reviewer": request.state.user["name"],  # who is logged in (D-47)
                             "notes": form.get("notes", "").strip(),
                             "target": form.get("target") or None}
-    if kind == "approve":
-        body |= _claim_edits(project_id, form)
-        if form.get("ai_synthetic"):
-            body["ai_disclosure"] = {"synthetic": form["ai_synthetic"] == "yes",
-                                     "reason": form.get("ai_reason", "").strip()}
+    if kind == "approve" and form.get("ai_synthetic"):
+        body["ai_disclosure"] = {"synthetic": form["ai_synthetic"] == "yes",
+                                 "reason": form.get("ai_reason", "").strip()}
     try:
         decision_id = actions.decide(project_id, kind, DecisionRequest.model_validate(body))
     except ValidationError as error:
@@ -125,7 +125,7 @@ async def edit(request: Request, project_id: str) -> RedirectResponse:
     one scripting run and goes through every check. At script_review this is a reject to
     scripting; after a failed scripting run it is a retry."""
     form = {k: str(v) for k, v in (await request.form()).items()}
-    reviewer = form.get("reviewer", "").strip() or "Dolender"
+    reviewer = request.state.user["name"]
     text = re.sub(r"(=== EDITED BY ===\n)[^\n]*", lambda m: m.group(1) + reviewer,
                   form.get("text", "").replace("\r\n", "\n"))
     page = f"/ui/projects/{project_id}"
@@ -156,7 +156,7 @@ async def swap_photo(request: Request, project_id: str) -> RedirectResponse:
     """qa_review: use another candidate photo for one scene (D-34). The choice is stored and the
     run goes back to rendering with a note naming the reviewer and the swap."""
     form = {k: str(v) for k, v in (await request.form()).items()}
-    reviewer = form.get("reviewer", "").strip() or "Dolender"
+    reviewer = request.state.user["name"]
     scene, index = form.get("scene", ""), int(form.get("index", "0") or 0)
     page = f"/ui/projects/{project_id}"
     if actions.run_status(project_id)["status"] != "qa_review":
@@ -224,17 +224,27 @@ def _gate_context(s: Any, project_id: str, status: str) -> dict[str, Any]:
         text = actions.read_latest(s, project_id, name)
         return json.loads(text) if text else None
 
-    if status == "research_review":
-        return {"claims": load("claims.json") or []}
     if status == "script_review":
         lint = {t["title"]: t for t in load("title_lint.json") or []}
-        return {"package": load("content_package.json"), "title_lint": lint,
-                "support": load("support_flags.json")}
+        package, support = load("content_package.json"), load("support_flags.json")
+        return {"package": package, "title_lint": lint, "support": support,
+                "script_lines": script_lines(package["script"], support)}
     if status == "qa_review":
         return {"package": load("content_package.json"), "qa_report": load("qa_report.json"),
                 "video": files.get("video.mp4"), "thumbnail": files.get("thumbnail.png"),
                 "photos": (load("stock.json") or {}).get("scenes", [])}
     return {}
+
+
+def script_lines(script: str, support: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """The script line by line, each with the support-check flags (D-44) for its sentences."""
+    flagged = [v for v in (support or {}).get("verdicts", []) if not v["supported"]]
+    lines = []
+    for text in script.strip().splitlines():
+        bare = script_checks.MARKER.sub("", text)
+        lines.append({"text": text, "flags": [v for v in flagged
+                                              if v["sentence"][:60].strip() in bare]})
+    return lines
 
 
 def stages(run: dict[str, Any]) -> list[dict[str, Any]]:
@@ -302,18 +312,13 @@ def _finish(s: Any, project_id: str) -> dict[str, Any]:
             "costs": costs}
 
 
-def _claim_edits(project_id: str, form: dict[str, str]) -> dict[str, Any]:
-    """Per-claim choices from the research_review form: action_<id> and text_<id> (D-20)."""
-    with db.session() as s:
-        claims = json.loads(actions.read_latest(s, project_id, "claims.json") or "[]")
-    removed = [c["id"] for c in claims if form.get(f"action_{c['id']}") == "remove"]
-    edited = {c["id"]: form[f"text_{c['id']}"].strip() for c in claims
-              if c["id"] not in removed and f"text_{c['id']}" in form
-              and form[f"text_{c['id']}"].strip() not in ("", c["claim"])}
-    return {"removed_claims": removed, "edited_claims": edited}
-
-
 def _back(path: str, error: HTTPException) -> RedirectResponse:
     detail = error.detail if isinstance(error.detail, str) else "; ".join(
         f"{'.'.join(str(p) for p in e.get('loc', []))}: {e.get('msg')}" for e in error.detail)
     return RedirectResponse(f"{path}?error={quote(detail)}", status_code=303)
+
+
+def _schedule(project_id: str, status: str) -> dict[str, Any] | None:
+    from app.ui import planner  # planner renders with this module's templates
+
+    return planner.schedule(project_id, status)

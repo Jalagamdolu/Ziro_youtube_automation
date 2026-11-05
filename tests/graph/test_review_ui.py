@@ -1,4 +1,5 @@
-"""Review UI (§8): the three gate screens, form decisions, run log, file serving and the bundle."""
+"""Review UI (§8): the two gate screens (D-50), form decisions, run log, file serving and the
+bundle."""
 
 import html
 import io
@@ -23,28 +24,19 @@ def _decide(client, project_id: str, **form: str):
     return parse_qs(urlparse(response.headers["location"]).query).get("error", [None])[0]
 
 
-def _keep_all(**extra: str) -> dict[str, str]:
-    return {"decision": "approve", "reviewer": "Dolender",
-            **{f"action_C{i}": "keep" for i in range(1, 5)}, **extra}
 
-
-def test_research_review_screen_and_per_claim_edit(client) -> None:
+def test_script_review_shows_the_claims_above_the_script(client) -> None:
     project_id = _start(client)
     page = client.get(f"/ui/projects/{project_id}").text
-    assert "Research review" in page
+    assert "Script review" in page and "Research review" not in page
     assert 'href="https://www.ibm.com/think/topics/chatbots"' in page
     assert "A chatbot is a software application that communicates" in page  # the quote
-
-    edited = "IBM: a chatbot is software that talks with people by text or voice."
-    assert _decide(client, project_id, **_keep_all(text_C2=edited)) is None
-    run = status(client, project_id)
-    assert run["status"] == "script_review"
-    assert run["approvals"][0]["claim_edits"] == {"removed": [], "edited": {"C2": edited}}
+    assert page.index("Claims (4)") < page.index("<h3>Script")
+    assert "definition</span>" in page or "other</span>" in page  # kind labels
 
 
 def test_script_and_qa_screens_through_to_done(client) -> None:
     project_id = _start(client)
-    _decide(client, project_id, **_keep_all())
 
     page = client.get(f"/ui/projects/{project_id}").text
     assert "Five hooks" in page and page.count("top 2</span>") == 2
@@ -104,8 +96,8 @@ def test_live_view_reloads_on_any_new_transition(client) -> None:
 
 def test_decided_gate_is_hidden_until_the_run_moves(client) -> None:
     project_id = _start(client)
-    page = client.get(f"/ui/projects/{project_id}", params={"submitted": "research_review"})
-    assert "Decision recorded" in page.text and "Approve claims" not in page.text
+    page = client.get(f"/ui/projects/{project_id}", params={"submitted": "script_review"})
+    assert "Decision recorded" in page.text and "Approve script and package" not in page.text
 
 
 def test_first_visit_is_the_prompt_then_the_runs_list(client) -> None:
@@ -121,11 +113,10 @@ def test_stage_table_shows_the_gate_waiting_and_approve_all_advances(client) -> 
     project_id = _start(client)
     page = client.get(f"/ui/projects/{project_id}").text
     assert "<h2>Stages</h2>" in page and "waiting for you" in page
-    assert "Approve all 4 claims as-is" in page
-    assert _decide(client, project_id, decision="approve", reviewer="Dolender") is None
+    assert _decide(client, project_id, decision="approve", reviewer="someone else") is None
     run = status(client, project_id)
-    assert run["status"] == "script_review"
-    assert run["approvals"][0]["claim_edits"] == {"removed": [], "edited": {}}
+    assert run["status"] == "qa_review"
+    assert run["approvals"][0]["approver"] == "Dolender"  # the logged-in user, not the form
 
 
 def test_hand_edit_from_the_browser_goes_through_every_check(client) -> None:
@@ -133,7 +124,6 @@ def test_hand_edit_from_the_browser_goes_through_every_check(client) -> None:
     from app.nodes import human_edit
 
     project_id = _start(client)
-    _decide(client, project_id, **_keep_all())
     page = client.get(f"/ui/projects/{project_id}").text
     assert "Edit before approving" in page
     # the edit option sits above the Approve button, so it's seen before approving
@@ -144,26 +134,25 @@ def test_hand_edit_from_the_browser_goes_through_every_check(client) -> None:
 
     hype = original.replace("AI Agent vs Chatbot for Students", "Boost Your Chatbot Skills")
     edited = client.post(f"/ui/projects/{project_id}/edit",
-                         data={"text": hype, "reviewer": "Asha"}, follow_redirects=False)
+                         data={"text": hype, "reviewer": "Dolender"}, follow_redirects=False)
     assert edited.status_code == 303
     run = status(client, project_id)
     assert run["status"] == "failed" and "'Boost'" in run["jobs"][-1]["error_message"]
-    assert run["approvals"][-1]["notes"].startswith("Hand-edited script submitted by Asha")
+    assert run["approvals"][-1]["notes"].startswith("Hand-edited script submitted by Dolender")
     page = html.unescape(client.get(f"/ui/projects/{project_id}").text)
     assert "!! RULE: packaging claims 'Boost'" in page  # the failed edit comes back annotated
     assert not storage.get().exists(human_edit.KEY.format(project_id))  # retry won't reuse it
 
-    client.post(f"/ui/projects/{project_id}/edit", data={"text": original, "reviewer": "Asha"})
+    client.post(f"/ui/projects/{project_id}/edit", data={"text": original, "reviewer": "Dolender"})
     run = status(client, project_id)
     assert run["status"] == "script_review"
     trail = next(a for a in run["artifacts"] if a["type"] == "human_edit.json")
-    assert json.loads(storage.get().read(trail["storage_path"]))["edited_by"] == "Asha"
+    assert json.loads(storage.get().read(trail["storage_path"]))["edited_by"] == "Dolender"
     assert not storage.get().exists(human_edit.KEY.format(project_id))  # used once
 
 
 def test_finished_run_shows_player_downloads_and_cost(client) -> None:
     project_id = _start(client)
-    _decide(client, project_id, **_keep_all())
     _decide(client, project_id, decision="approve", reviewer="Dolender")
     _decide(client, project_id, decision="approve", reviewer="Dolender", ai_synthetic="yes",
             ai_reason="synthetic narration voice")
@@ -187,7 +176,6 @@ def test_failed_scripting_offers_the_last_draft_flagged_and_a_fix_reaches_review
 
     monkeypatch.setattr(llm, "get", lambda *args, **kwargs: Hype())
     project_id = _start(client)
-    _decide(client, project_id, **_keep_all())
     assert status(client, project_id)["status"] == "failed"  # the model never passed
 
     page = html.unescape(client.get(f"/ui/projects/{project_id}").text)

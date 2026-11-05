@@ -8,7 +8,7 @@
   <form method="post" action="/ui/projects/{{ run.id }}/edit">
     <textarea name="text" rows="28" style="font-family:ui-monospace,Consolas,monospace;font-size:13px" aria-label="Editable script package">{{ edit }}</textarea>
     <div class="row" style="align-items:end">
-      <div><label for="ed-reviewer">Editor</label><input type="text" id="ed-reviewer" name="reviewer" value="Dolender" required></div>
+      <div><label for="ed-reviewer">Editor</label><input type="text" id="ed-reviewer" name="reviewer" value="{{ request.state.user.name }}" readonly></div>
       <div><button class="primary" type="submit">Submit my edit through all checks</button></div>
     </div>
   </form>

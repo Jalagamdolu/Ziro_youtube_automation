@@ -19,6 +19,8 @@ class Brief(BaseModel):
     target_seconds: int
     cta: str = Field(min_length=1)
     brand_profile: str = "Ziro"
+    keywords: list[str] = []  # from the topic planner (D-47): steer research and wording
+    guidelines: str = ""
 
     @model_validator(mode="after")
     def _duration_fits_format(self) -> Self:
@@ -108,8 +110,6 @@ class Decision(BaseModel):
     notes: str = ""
     target: str | None = None
     ai_disclosure: AiDisclosure | None = None
-    removed_claims: list[str] = []
-    edited_claims: dict[str, str] = {}
     decided_at: datetime
 
     @model_validator(mode="after")
@@ -118,6 +118,4 @@ class Decision(BaseModel):
             raise ValueError("reject requires a target stage and notes")
         if self.gate == "qa_review" and self.decision == "approve" and self.ai_disclosure is None:
             raise ValueError("qa_review approval requires ai_disclosure")
-        if (self.removed_claims or self.edited_claims) and self.gate != "research_review":
-            raise ValueError("claim edits belong to research_review")
         return self

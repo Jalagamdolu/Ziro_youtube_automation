@@ -24,9 +24,10 @@ def advance(project_id: str, resume: dict[str, Any] | None = None) -> str:
     thread: RunnableConfig = {"configurable": {"thread_id": project_id}}
     with checkpointer() as saver:
         graph = build(saver)
-        if resume is not None:
+        paused = graph.get_state(thread)
+        if resume is not None and paused.interrupts:
             start: Any = Command(resume=resume)
-        elif graph.get_state(thread).values:
+        elif paused.values:
             start = None  # continue from the last checkpoint (retry, reaper)
         else:
             start = {"project_id": project_id, "artifacts": {}, "review_notes": {},

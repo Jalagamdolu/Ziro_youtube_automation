@@ -9,6 +9,7 @@ mode: prototype
 llm:
   claude_model: claude-opus-5-5           # content agent (scripting), D-42
   support_model: claude-haiku-5-5         # support check, flags only (D-44)
+  planner_model: claude-sonnet-5-5        # shot planner: echo phrases + text pops (D-49)
   claude_effort: high
   claude_max_tokens: 16000
   gemini_model: gemini-flash-lite-latest  # Flash took ~140 s per call on this free tier (D-27)
@@ -46,11 +47,21 @@ stock:
   providers: [pixabay, pexels]
 
 # Narration (D-23, Dolender's pick by ear). Rendering re-synthesises from scratch on change.
+# Production mode with SARVAM_API_KEY: Sarvam; otherwise Kokoro, local and free (D-46).
 tts:
-  engine: kokoro          # local + free in both modes for now (D-27); sarvam not built (D-19)
-  voice: af_heart
+  voice: af_heart         # Kokoro
   phonemes: en-us
   speed: 0.95
+  sarvam:
+    model: bulbul:v4-flash
+    speaker: shubh_enhi_ads   # stock voice; sir's cloned voice ID goes here when ready
+    language_code: en-IN
+    pace: 1.0
+    attempts: 4               # per sentence, on 429 / 5xx / timeout (CLAUDE.md: TTS 4)
+    # Sarvam reads text, not phonemes: spell brand words the way they are said. Captions and
+    # the screen keep the written form ("Ziro"). Drop the entry if the listen test says so.
+    spelling:
+      Ziro: Zyro
 
 # Written form -> how the narrator says it (brief §07: written "Ziro", spoken "ZAIRO").
 pronunciation:
@@ -78,6 +89,13 @@ prices:
   claude-haiku-5-5-output: 0.5e-6
   claude-haiku-5-5-cache-write: 0.125e-6
   claude-haiku-5-5-cache-read: 0.01e-6
+  claude-sonnet-5-5-input: 2.0e-6
+  claude-sonnet-5-5-output: 10.0e-6
+  claude-sonnet-5-5-cache-write: 2.5e-6
+  claude-sonnet-5-5-cache-read: 0.2e-6
+  # Sarvam TTS, USD per character. ESTIMATE (v2 doc §13: ~₹3 per 60 s Short of ~900
+  # characters); replace with the price on sarvam.ai/pricing before relying on it.
+  sarvam-tts-characters: 0.00004
 
 # Hard cap on recorded spend per video (USD).
 spend_cap_usd: 5.0
@@ -86,3 +104,10 @@ spend_cap_usd: 5.0
 budget:
   max_tokens_per_run: 200000   # Claude tokens (input + output + cache) across one run
   max_usd_per_day: 15.0        # all recorded spend, all runs, per UTC day
+
+# Topic planner + scheduler (D-47): a planned run starts this long before its publish time, so
+# both reviews fit; publish times are entered and shown in this offset (IST).
+planner:
+  start_hours_before: 3
+  utc_offset: "+05:30"
+  check_seconds: 60

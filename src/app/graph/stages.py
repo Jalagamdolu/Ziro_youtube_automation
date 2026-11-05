@@ -1,9 +1,10 @@
-"""State-machine names from brief §05 (D-04) and the gate routing rules from ARCHITECTURE §3–§4."""
+"""State-machine names from brief §05 (D-04) and the gate routing rules from ARCHITECTURE §3–§4.
+Two human gates since v2 (D-50): the claims are reviewed with the script at script_review.
+"""
 
 ORDER = [
     "draft",
     "researching",
-    "research_review",
     "scripting",
     "script_review",
     "storyboarding",
@@ -14,17 +15,15 @@ ORDER = [
     "mock_published",
     "metrics_stub",
 ]
-WORK = [s for s in ORDER if s not in ("research_review", "script_review", "qa_review", "approved")]
+WORK = [s for s in ORDER if s not in ("script_review", "qa_review", "approved")]
 
 NEXT_ON_APPROVE = {
-    "research_review": "scripting",
     "script_review": "storyboarding",
     "qa_review": "export_ready",
 }
 GATES = list(NEXT_ON_APPROVE)
 
 REJECT_TARGETS = {
-    "research_review": ["researching"],
     "script_review": ["researching", "scripting"],
     "qa_review": ["storyboarding", "rendering"],
 }

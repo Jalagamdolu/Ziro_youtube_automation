@@ -1,7 +1,7 @@
 import React from "react";
 import { AbsoluteFill, useCurrentFrame } from "remotion";
 import { useEnter } from "../motion";
-import { safe, theme } from "../theme";
+import { content, theme } from "../theme";
 import type { Scene } from "../types";
 
 // A user's message (from the beat) and one reply bubble. The reply is drawn as typing dots, so the
@@ -12,7 +12,7 @@ export const ChatBubble: React.FC<{ scene: Scene; title: string }> = ({ scene })
   const asked = useEnter(0);
   const reply = useEnter(0.6);
   return (
-    <AbsoluteFill style={{ paddingTop: safe.top + 140, paddingLeft: safe.left, paddingRight: safe.right,
+    <AbsoluteFill style={{ paddingTop: content.top, paddingLeft: content.left, paddingRight: content.right,
       gap: 40 }}>
       <div style={{
         ...asked, alignSelf: "flex-end", maxWidth: "80%", backgroundColor: theme.primary, color: theme.ink,

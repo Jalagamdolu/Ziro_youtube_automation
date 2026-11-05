@@ -1,12 +1,15 @@
-"""rendering: narration (TTS) → word alignment (WhisperX) → SRT/VTT → Remotion video → FFmpeg
-loudness finishing → thumbnail + preview frame (§4, D-07, D-08).
+"""rendering: narration (TTS, one cached WAV per beat at -14 LUFS) → word alignment (WhisperX) →
+SRT/VTT → Remotion split-layout Short → FFmpeg loudness finishing → thumbnail + previews → QA
+(§4, D-07, D-08, D-46, D-48).
 
 Scenes come from storyboarding's scenes.json; their start/end are the exact times of the audio
 synthesised for them. Shorts only for now (D-26); chapters and dead-air QA follow.
 """
 
 import hashlib
+import io
 import json
+import math
 import re
 import shutil
 import subprocess
@@ -18,7 +21,7 @@ from typing import Any
 from sqlalchemy import func, select
 
 from app.adapters import aligner, stock, storage, tts
-from app.core import config, costs, db
+from app.core import config, costs, db, engines
 from app.core.contracts import ContentPackage
 from app.core.errors import FatalError
 from app.core.models import AssetLicense
@@ -29,9 +32,14 @@ SENTENCE_PAUSE, SECTION_PAUSE = 0.15, 0.35
 # The reviewer's photo swaps at qa_review (D-34): {scene id: candidate index}.
 PHOTO_CHOICES = "{}/rendering/photo_choices.json"
 END_CARD_SECONDS = 2.0  # voice.md: end card about 2 seconds
-SHOT_SECONDS = 3.5  # cut roughly this often, at a word boundary (D-37)
-CAPTURED = {"definition_card", "quote_card"}  # scenes whose cited source page is shown (D-37)
-CUE_WORDS = 3  # 2-3 big words at a time, the Shorts caption style (D-37)
+# A visual change every 2-4 s (v2 §8, D-48): shots aim under SHOT_MAX and snap to a word end
+# at most SNAP away, so none passes PACE's ceiling; QA measures the result.
+SHOT_MAX, SNAP, PACE = 3.6, 0.3, (2.0, 4.0)
+CAPTURED = {"definition_card", "quote_card"}  # scenes whose cited source page can be shown (D-37)
+CUE_WORDS = 7  # the small transcription box: two short lines at a time (D-48)
+LOUDNESS = (-15.5, -12.5)  # integrated LUFS the finished video must land in (target -14)
+# Presenter zone placeholder until sir's clip exists (D-48): the wordmark, unaltered.
+WORDMARK = Path(__file__).resolve().parents[3] / "templates" / "brand" / "ziro-wordmark-only.png"
 # A sentence ends at . ? or ! even when a closing quote or bracket follows ('startup."').
 SENTENCE_END = re.compile(r"[.!?][\"”’')]*$")
 SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s+|(?<=[.!?][\"”’')])\s+")
@@ -62,17 +70,23 @@ def rendering(ctx: StageContext) -> Outputs:
         footage = photos(ctx.project_id, scenes, work / "public")
         sources = captures(ctx.project_id, scenes, work / "public")
         plan_shots(scenes, words)
-        shutil.copyfile(LOGO, work / "public" / LOGO.name)
+        echoes = echo_track(scenes)
+        pace = pacing(scenes)
+        if not pace["ok"]:
+            raise FatalError(f"pacing QA failed: {pace}")
+        for asset in (LOGO, WORDMARK):
+            shutil.copyfile(asset, work / "public" / asset.name)
         for scene in scenes:
             if scene["visual_type"] == "end_card":
                 scene["props"]["logo"] = LOGO.name
         (work / "props.json").write_text(json.dumps({
             "title": package.brief.topic, "audio": "narration.wav", "duration": clock,
+            "presenter": {"clip": None, "wordmark": WORDMARK.name},
             "scenes": [{k: scene[k] for k in ("id", "visual_type", "start", "end", "props",
-                                              "photo", "capture", "shots")
+                                              "photo", "capture", "shots", "pop")
                         if k in scene}
                        for scene in scenes],
-            "cues": cues}), encoding="utf-8")
+            "cues": cues, "echoes": echoes}), encoding="utf-8")
         _run(["npx", "remotion", "render", "src/index.ts", "Short", str(work / "raw.mp4"),
               f"--props={work / 'props.json'}", f"--public-dir={work / 'public'}"], TEMPLATES)
         _run(["ffmpeg", "-y", "-i", "raw.mp4", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
@@ -99,27 +113,34 @@ def rendering(ctx: StageContext) -> Outputs:
                   name], work)
             outputs[name] = (work / name).read_bytes()
         duration = _probe_seconds(work / "video.mp4")
+        lufs = _loudness(work / "video.mp4")
     # The finished video adds sentence and section pauses to the script's 150 wpm estimate.
     low, high = (round(package.brief.target_seconds * 0.75),
                  round(package.brief.target_seconds * 1.25))
     outputs["qa_report.json"] = json.dumps({
         "duration_s": round(duration, 1), "duration_ok": low <= duration <= high,
-        "resolution": "1080x1920", "loudness_target_lufs": -14, "words": len(words),
-        "cues": len(cues), "scene_types": sorted({s["visual_type"] for s in scenes}),
+        "resolution": "1080x1920", "layout": "split (D-48)", "voice": engines.voice(),
+        "loudness_lufs": lufs, "loudness_ok": LOUDNESS[0] <= lufs <= LOUDNESS[1],
+        "pacing": pace, "words": len(words), "cues": len(cues), "echoes": len(echoes),
+        "text_pops": sum(1 for s in scenes if s.get("pop")),
+        "scene_types": sorted({s["visual_type"] for s in scenes}),
         "stock": stock_checks(ctx.project_id, footage),
         "source_captures": sources,
-        "deferred": ["chapters", "dead-air"]}, indent=2)
+        "presenter": "brand placeholder (sir's clip not supplied yet)",
+        "deferred": ["chapters", "dead-air", "lip-sync (LatentSync)"]}, indent=2)
     outputs["stock.json"] = json.dumps(footage, indent=2, ensure_ascii=False)
     return outputs
 
 
 def _synthesised(project_id: str, scenes: list[dict[str, Any]]
                  ) -> tuple[Any, list[dict[str, Any]], float]:
-    """Kokoro narration, one sentence at a time; scene start/end are the exact audio times."""
+    """Narration one beat (scene) at a time; scene start/end and scene["timed"] (one entry per
+    sentence) are the exact audio times. Each beat is one WAV at -14 LUFS, cached by its text
+    and voice settings, so a re-render (photo swap, QA reject) never pays for speech twice."""
     import numpy as np  # worker image only (D-24)
 
     pronunciation = config.load()["pronunciation"]
-    voice = tts.get()
+    voice, store = tts.get(project_id), storage.get()
     audio: list[Any] = []
     segments: list[dict[str, Any]] = []
     clock, section, characters = 0.0, None, 0
@@ -128,36 +149,80 @@ def _synthesised(project_id: str, scenes: list[dict[str, Any]]
             audio.append(np.zeros(int(SECTION_PAUSE * tts.RATE), dtype=np.float32))
             clock += SECTION_PAUSE
         section, scene["start"] = scene["section"], clock
-        for sentence in sentences([scene["text"]]):
-            samples = voice.synthesize(sentence)
-            length = len(samples) / tts.RATE
+        lines = sentences([scene["text"]])
+        beat, lengths, made = _beat(voice, store, lines)
+        characters += made
+        scene["timed"] = []
+        for sentence, length in zip(lines, lengths, strict=True):
             segments.append({"text": tts.spoken_text(sentence, pronunciation), "written": sentence,
                              "start": clock, "end": clock + length})
-            audio += [samples, np.zeros(int(SENTENCE_PAUSE * tts.RATE), dtype=np.float32)]
+            scene["timed"].append({"text": sentence, "start": clock, "end": clock + length})
             clock += length + SENTENCE_PAUSE
-            characters += len(sentence)
+        audio.append(beat)
+        clock = scene["start"] + len(beat) / tts.RATE
         if scene["visual_type"] == "end_card" and clock - scene["start"] < END_CARD_SECONDS:
             hold = scene["start"] + END_CARD_SECONDS - clock
             audio.append(np.zeros(int(hold * tts.RATE), dtype=np.float32))
             clock += hold
         scene["end"] = clock
     with db.session() as s, s.begin():
-        costs.record_cost(s, project_id, "rendering", "kokoro-local", characters)
+        costs.record_cost(s, project_id, "rendering", voice.name, characters)
     return np.concatenate(audio), segments, clock
+
+
+def _beat(voice: tts.TTS, store: storage.Storage, lines: list[str]
+          ) -> tuple[Any, list[float], int]:
+    """(beat samples incl. a pause after each sentence, sentence lengths in s, characters newly
+    synthesised). Cached under _tts/ by voice settings + text."""
+    import numpy as np
+    import soundfile as sf
+
+    key = "_tts/" + hashlib.sha256(json.dumps([voice.settings_key(), lines]).encode()
+                                   ).hexdigest()[:20]
+    if store.exists(f"{key}.wav") and store.exists(f"{key}.json"):
+        samples, _ = sf.read(io.BytesIO(store.read(f"{key}.wav")), dtype="float32")
+        return samples, json.loads(store.read(f"{key}.json")), 0
+    pause = np.zeros(int(SENTENCE_PAUSE * tts.RATE), dtype=np.float32)
+    pieces = [voice.synthesize(line) for line in lines]
+    raw = np.concatenate([part for piece in pieces for part in (piece, pause)] or [pause])
+    beat = _normalised(raw)
+    lengths = [len(piece) / tts.RATE for piece in pieces]
+    buffer = io.BytesIO()
+    sf.write(buffer, beat, tts.RATE, format="WAV")
+    store.write(f"{key}.wav", buffer.getvalue())
+    store.write(f"{key}.json", json.dumps(lengths).encode())
+    return beat, lengths, sum(len(line) for line in lines)
+
+
+def _normalised(samples: Any) -> Any:
+    """One beat at -14 LUFS (v2 §4 stage 6), same length; FFmpeg's loudnorm."""
+    import numpy as np
+    import soundfile as sf
+
+    with tempfile.TemporaryDirectory() as folder:
+        work = Path(folder)
+        sf.write(work / "in.wav", samples, tts.RATE)
+        _run(["ffmpeg", "-y", "-i", "in.wav", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
+              "-ar", str(tts.RATE), "-ac", "1", "out.wav"], work)
+        normalised, _ = sf.read(work / "out.wav", dtype="float32")
+    if len(normalised) < len(samples):
+        normalised = np.pad(normalised, (0, len(samples) - len(normalised)))
+    return normalised[:len(samples)]
 
 
 def captures(project_id: str, scenes: list[dict[str, Any]], public: Path) -> list[str]:
     """The real page each cited claim comes from (D-37): a tall screenshot taken with the headless
     Chrome Remotion already ships, scrolled to the quoted passage and highlighting it, then panned
     slowly on screen with the source credited. Genuine capture, never a mock-up; cached per URL and
-    quote; a page that blocks, times out or renders blank just isn't shown."""
+    quote; a page that blocks, times out or renders blank just isn't shown. One source-proof
+    shot per video (D-48): the first cited scene whose page captures."""
     store, shown = storage.get(), list[str]()
     if not CHROME.exists():  # only the worker image ships Remotion's headless Chrome
         return shown
     for scene in scenes:
         props = scene.get("props", {})
         url = props.get("source_url")
-        if scene["visual_type"] not in CAPTURED or not url:
+        if scene["visual_type"] not in CAPTURED or not url or shown:
             continue
         quote = props.get("quote") or props.get("definition", "").strip("“”\"")
         key = f"_captures/{hashlib.sha256(f'{url} {quote}'.encode()).hexdigest()[:16]}.png"
@@ -186,33 +251,95 @@ def captures(project_id: str, scenes: list[dict[str, Any]], public: Path) -> lis
 
 
 def plan_shots(scenes: list[dict[str, Any]], words: list[dict[str, Any]]) -> None:
-    """Cut each scene into shots of about SHOT_SECONDS, at word boundaries, alternating looks
-    (D-37): a cited scene opens on its source page; then two camera moves on the scene's photo
-    alternate (or the card on the solid background)."""
-    for scene in scenes:
-        start, end = scene["start"], scene["end"]
+    """The split-layout timeline (v2 §8, D-48). Each shot has a layout and a kind:
+    - FULL (presenter zone full screen): the Hook ("presenter"), a text pop ("pop") and the
+      close: an engagement question on the presenter, then the end card ("end").
+    - SPLIT (content top ~60%, presenter zone bottom ~40%): the body. Looks alternate: the
+      source-proof capture once per video, then the scene's photo and card (or two framings of
+      the card when the scene has no photo).
+    Shots stay under SHOT_MAX and cut at word ends, so the picture changes every 2-4 s. The
+    silence between beats belongs to the beat before it."""
+    ends = [w["end"] for w in words]
+    proof_shown = False
+    for i, scene in enumerate(scenes):
+        if i + 1 < len(scenes):
+            scene["end"] = max(scene["end"], scenes[i + 1]["start"])
+        a, b = scene["start"], scene["end"]
+        timed = scene.get("timed") or [{"start": a, "end": b}]
         if scene["visual_type"] == "end_card":
-            scene["shots"] = [{"start": start, "end": end, "kind": "end", "card": True}]
-            continue
-        count = max(1, round((end - start) / SHOT_SECONDS))
-        ends = [w["end"] for w in words if start < w["end"] < end]
-        cuts = [start]
-        for k in range(1, count):
-            target = start + (end - start) * k / count
-            cut = min(ends, key=lambda t: abs(t - target)) if ends else target
-            if cut - cuts[-1] > 1.0:
-                cuts.append(cut)
-        cuts.append(end)
-        kinds = _looks(scene)
-        scene["shots"] = [{"start": a, "end": b, "kind": kinds[n % len(kinds)],
-                           "card": kinds[n % len(kinds)] != "capture"}
-                          for n, (a, b) in enumerate(zip(cuts, cuts[1:], strict=False))]
+            shots = _chunks(a, timed[-1]["start"], ends, ["presenter", "presenter_alt"], "full")
+            shots.append({"start": timed[-1]["start"], "end": b, "kind": "end",
+                          "layout": "full"})
+        elif scene["section"] == "Hook":
+            shots = _chunks(a, b, ends, ["presenter", "presenter_alt"], "full")
+        else:
+            looks = (["capture"] if scene.get("capture") and not proof_shown else []) + (
+                ["photo", "card"] if scene.get("photo") else ["card", "card_alt"])
+            spans = [(a, b, looks)]
+            if pop := scene.get("pop"):
+                k = pop["sentence"]
+                top = timed[k]["start"]
+                end = timed[k + 1]["start"] if k + 1 < len(timed) else b
+                spans = [(a, top, looks), (top, end, ["pop"]), (end, b, looks)]
+            shots = []
+            for x, y, kinds in spans:
+                if kinds != ["pop"] and any(s["kind"] == "capture" for s in shots):
+                    kinds = [k for k in kinds if k != "capture"]
+                shots += _chunks(x, y, ends, kinds, "full" if kinds == ["pop"] else "split")
+        for shot in shots:
+            shot["card"] = shot["kind"] in ("card", "card_alt")
+        proof_shown = proof_shown or any(s["kind"] == "capture" for s in shots)
+        scene["shots"] = shots
 
 
-def _looks(scene: dict[str, Any]) -> list[str]:
-    capture = ["capture"] if scene.get("capture") else []
-    base = ["photo", "photo_alt"] if scene.get("photo") else ["card"]
-    return [*capture, *base]
+def _chunks(a: float, b: float, ends: list[float], kinds: list[str], layout: str
+            ) -> list[dict[str, Any]]:
+    """[a, b) cut into shots under SHOT_MAX at the nearest word end (within SNAP), kinds in
+    turn; the capture, if listed first, only opens."""
+    if b - a < 0.05:
+        return []
+    count = max(1, math.ceil((b - a) / SHOT_MAX))
+    cuts = [a]
+    for k in range(1, count):
+        target = a + (b - a) * k / count
+        near = [t for t in ends if abs(t - target) <= SNAP and t - cuts[-1] > 1.0]
+        cuts.append(min(near, key=lambda t: abs(t - target)) if near else target)
+    cuts.append(b)
+    first, rest = (kinds[0], kinds[1:]) if kinds[0] == "capture" and len(kinds) > 1 \
+        else (None, kinds)
+    shots = []
+    for n, (x, y) in enumerate(zip(cuts, cuts[1:], strict=False)):
+        kind = first if n == 0 and first else rest[(n - (1 if first else 0)) % len(rest)]
+        shots.append({"start": x, "end": y, "kind": kind, "layout": layout})
+    return shots
+
+
+def echo_track(scenes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The big phrase on the divider (D-48): one per sentence, from the shot plan; every third
+    in the brand colour. Not shown under a text pop or the end card, which carry their own."""
+    track: list[dict[str, Any]] = []
+    for scene in scenes:
+        pop = scene.get("pop")
+        last = len(scene.get("timed", [])) - 1
+        for k, (line, phrase) in enumerate(zip(scene.get("timed", []), scene.get("echo", []),
+                                               strict=False)):
+            if (pop and pop["sentence"] == k) or (scene["visual_type"] == "end_card"
+                                                   and k == last):
+                continue
+            track.append({"start": line["start"], "end": line["end"], "text": phrase,
+                          "brand": len(track) % 3 == 2})
+    return track
+
+
+def pacing(scenes: list[dict[str, Any]]) -> dict[str, Any]:
+    """QA (D-48): how long the picture holds between changes. The closing end card is exempt."""
+    held = [s["end"] - s["start"] for scene in scenes for s in scene["shots"]
+            if s["kind"] != "end"]
+    longest = max(held, default=0.0)
+    return {"shots": len(held) + 1, "longest_s": round(longest, 2),
+            "shortest_s": round(min(held, default=0.0), 2),
+            "under_2s": sum(1 for h in held if h < PACE[0]),  # short beats; reported, not failed
+            "ok": longest <= PACE[1] + 0.25, "rule": "a visual change every 2-4 s"}
 
 
 def photos(project_id: str, scenes: list[dict[str, Any]], public: Path) -> dict[str, Any]:
@@ -329,6 +456,14 @@ def _resample(samples: Any, rate: int, target: int) -> Any:
     n = int(len(samples) * target / rate)
     return np.interp(np.linspace(0, len(samples) - 1, n), np.arange(len(samples)),
                      samples).astype(np.float32)
+
+
+def _loudness(path: Path) -> float:
+    """Integrated loudness (LUFS) of the finished video, from FFmpeg's EBU R128 meter."""
+    done = subprocess.run(["ffmpeg", "-nostats", "-i", str(path), "-af", "ebur128", "-f", "null",
+                           "-"], capture_output=True, text=True, check=True)
+    found = re.findall(r"I:\s+(-?\d+(?:\.\d+)?) LUFS", done.stderr)
+    return float(found[-1]) if found else float("nan")
 
 
 def _probe_seconds(path: Path) -> float:

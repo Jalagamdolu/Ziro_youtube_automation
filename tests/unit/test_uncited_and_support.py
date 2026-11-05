@@ -97,22 +97,24 @@ def test_support_check_does_not_run_in_prototype_mode() -> None:
     assert llm.support_chat("p1") is None
 
 
-def test_script_review_shows_the_flags_and_approval_still_works(client, monkeypatch) -> None:
+def test_script_review_shows_flags_beside_their_line_and_approval_still_works(
+        client, monkeypatch) -> None:
+    line = ("A chatbot is a software application that communicates with people through text "
+            "or voice.")
     stub = StubSupport({"verdicts": [
-        {"sentence": "A chatbot answers.", "claims": ["C1"], "supported": True, "says_more": ""},
-        {"sentence": "An agent always finishes the task.", "claims": ["C2"], "supported": False,
-         "says_more": "'always finishes'"}]})
+        {"sentence": "Anthropic describes agents as systems.", "claims": ["C1"],
+         "supported": True, "says_more": ""},
+        {"sentence": line, "claims": ["C2"], "supported": False, "says_more": "'with people'"}]})
     monkeypatch.setattr(llm, "support_chat", lambda project_id: stub)
-    project_id = create(client)
-    approve(client, project_id)
+    project_id = create(client)  # at script_review: claims and script together (D-50)
     page = client.get(f"/ui/projects/{project_id}").text
-    assert "Support check" in page and "1 of 2 cited lines flagged." in page
-    assert "An agent always finishes the task." in page
+    assert "1 of 2 cited lines flagged." in page
+    row = page[page.index(line + " [C2]"):].split("</tr>")[0]
+    assert "says more than C2: &#39;with people&#39;" in row  # the flag sits beside its line
     approve(client, project_id)  # flags never block
     assert status(client, project_id)["status"] == "qa_review"
 
 
 def test_prototype_script_review_says_the_check_was_not_run(client) -> None:
     project_id = create(client)
-    approve(client, project_id)
-    assert "Not run: needs production mode" in client.get(f"/ui/projects/{project_id}").text
+    assert "not run: needs production mode" in client.get(f"/ui/projects/{project_id}").text

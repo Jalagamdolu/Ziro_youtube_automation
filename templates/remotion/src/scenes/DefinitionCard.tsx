@@ -1,7 +1,7 @@
 import React from "react";
 import { AbsoluteFill } from "remotion";
 import { useEnter } from "../motion";
-import { safe, theme } from "../theme";
+import { content, theme } from "../theme";
 import type { Scene } from "../types";
 
 // A sourced definition or quote: headline from the [ON SCREEN] beat, body = the approved claim's
@@ -11,7 +11,7 @@ export const DefinitionCard: React.FC<{ scene: Scene; title: string }> = ({ scen
   const enter = useEnter();
   const { label, headline, definition, source, source_title } = scene.props as Record<string, string>;
   return (
-    <AbsoluteFill style={{ paddingTop: safe.top + 40, paddingLeft: safe.left, paddingRight: safe.right }}>
+    <AbsoluteFill style={{ paddingTop: content.top, paddingLeft: content.left, paddingRight: content.right }}>
       <div style={{
         ...enter,
         backgroundColor: theme.surface, borderRadius: 32, padding: "56px 56px 48px",

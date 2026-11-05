@@ -23,8 +23,7 @@ def _publish_rows(project_id: str) -> int:
 
 
 def test_rejected_script_never_renders(client, calls: Counter[str]) -> None:
-    project_id = create(client)
-    approve(client, project_id)
+    project_id = create(client)  # stops at script_review (D-50)
     assert reject(client, project_id, "scripting", notes="unsupported claim").status_code == 202
 
     run = status(client, project_id)

@@ -1,7 +1,7 @@
 import React from "react";
 import { AbsoluteFill } from "remotion";
 import { useEnter } from "../motion";
-import { safe, theme } from "../theme";
+import { content, theme } from "../theme";
 import type { Scene } from "../types";
 
 const Step: React.FC<{ text: string; n: number; last: boolean; delay: number }> = ({ text, n, last, delay }) => (
@@ -25,7 +25,7 @@ export const Flow: React.FC<{ scene: Scene; title: string }> = ({ scene }) => {
   const label = scene.props.label as string;
   const tag = useEnter(0);
   return (
-    <AbsoluteFill style={{ paddingTop: safe.top + 20, paddingLeft: safe.left, paddingRight: safe.right,
+    <AbsoluteFill style={{ paddingTop: content.top, paddingLeft: content.left, paddingRight: content.right,
       alignItems: "center" }}>
       {label ? (
         <div style={{ ...tag, alignSelf: "flex-start", color: theme.accent, fontFamily: theme.displayFont,

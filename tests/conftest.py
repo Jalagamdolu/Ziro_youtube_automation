@@ -25,6 +25,10 @@ if os.environ.get("ZIRO_LIVE") != "1":
                  "SARVAM_API_KEY"):
         os.environ.pop(_key, None)
 
+# The two seeded users (D-47); short dummy passwords, never real ones.
+os.environ |= {"ZIRO_ADMIN_USER": "Dolender", "ZIRO_ADMIN_PASSWORD": "pw",
+               "ZIRO_REVIEWER_USER": "reviewer", "ZIRO_REVIEWER_PASSWORD": "pw2"}
+
 ROOT = Path(__file__).resolve().parents[1]
 TABLES = ("approvals", "artifacts", "costs", "events", "jobs", "publishing", "sources",
           "asset_licenses", "projects", "checkpoints", "checkpoint_writes", "checkpoint_blobs")
@@ -105,7 +109,11 @@ def client(pipeline: None) -> Any:
 
     from app.api.main import app
 
-    return TestClient(app)  # not entered as a context manager, so the reaper thread stays off
+    client = TestClient(app)  # not entered as a context manager: no reaper or scheduler thread
+    response = client.post("/login", data={"username": "Dolender", "password": "pw"},
+                           follow_redirects=False)
+    assert response.status_code == 303 and "ziro_session" in response.cookies
+    return client
 
 
 DISCLOSURE = {"synthetic": True, "reason": "AI narration and generated visuals"}
@@ -134,7 +142,6 @@ def status(client: Any, project_id: str) -> dict[str, Any]:
 
 def run_to_qa_review(client: Any, **overrides: Any) -> str:
     project_id = create(client, **overrides)
-    assert approve(client, project_id).status_code == 202  # research_review
-    assert approve(client, project_id).status_code == 202  # script_review
+    assert approve(client, project_id).status_code == 202  # script_review (claims + script)
     assert status(client, project_id)["status"] == "qa_review"
     return project_id

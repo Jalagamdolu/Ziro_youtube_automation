@@ -1,10 +1,12 @@
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from datetime import UTC, datetime
 from typing import Any
 
 from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
+from langgraph.types import interrupt
 
 from app.core import config, retry
 from app.graph.gates import gate_node
@@ -16,7 +18,7 @@ from app.nodes.runner import run_stage
 EDGES = [
     (START, "draft"),
     ("draft", "researching"),
-    ("researching", "research_review"),
+    ("researching", "scripting"),
     ("scripting", "script_review"),
     ("storyboarding", "rendering"),
     ("rendering", "qa_review"),
@@ -40,9 +42,21 @@ def build(checkpointer: PostgresSaver) -> CompiledStateGraph[Any, Any, Any, Any]
 
 def _work_node(stage: str) -> Callable[..., Any]:
     def node(state: State) -> dict[str, Any]:
+        if stage == "mock_published":
+            _wait_for_publish_time(state["project_id"])
         return run_stage(stage, state)
 
     return node
+
+
+def _wait_for_publish_time(project_id: str) -> None:
+    """A planned topic's run publishes at its publish_at, not before (D-47): until then it stays
+    at export_ready. Nothing runs before interrupt(); the scheduler resumes it when due."""
+    from app.jobs import scheduler
+
+    when = scheduler.publish_at(project_id)
+    if when is not None and datetime.now(UTC) < when:
+        interrupt({"gate": scheduler.WAITING, "publish_at": when.isoformat()})
 
 
 @contextmanager

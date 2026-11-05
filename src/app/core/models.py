@@ -33,6 +33,23 @@ class Project(Base):
     created_at: Mapped[datetime] = mapped_column(default=now)
 
 
+class Topic(Base):
+    """A planned video (D-47): the scheduler starts its run before publish_at."""
+
+    __tablename__ = "topics"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    topic: Mapped[str] = mapped_column(Text)
+    keywords: Mapped[list[str]] = mapped_column(JSON)
+    guidelines: Mapped[str] = mapped_column(Text)
+    format: Mapped[str]
+    target_seconds: Mapped[int | None]
+    publish_at: Mapped[datetime]
+    status: Mapped[str]  # planned | started | cancelled
+    project_id: Mapped[str | None] = mapped_column(ForeignKey("projects.id"), index=True)
+    created_by: Mapped[str]
+    created_at: Mapped[datetime] = mapped_column(default=now)
+
+
 class Source(Base):
     __tablename__ = "sources"
     id: Mapped[int] = mapped_column(primary_key=True)

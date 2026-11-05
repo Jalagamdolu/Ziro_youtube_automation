@@ -5,7 +5,7 @@ import os
 from collections import Counter
 from pathlib import Path
 
-from conftest import approve, create, reject, run_to_qa_review, status
+from conftest import create, reject, run_to_qa_review, status
 
 
 def test_qa_reject_reruns_from_rendering_only(client, calls: Counter[str]) -> None:
@@ -25,8 +25,7 @@ def test_qa_reject_reruns_from_rendering_only(client, calls: Counter[str]) -> No
 
 
 def test_script_reject_reruns_scripting_not_research(client, calls: Counter[str]) -> None:
-    project_id = create(client)
-    approve(client, project_id)
+    project_id = create(client)  # at script_review
     assert reject(client, project_id, "scripting", notes="hook 1 overclaims").status_code == 202
 
     run = status(client, project_id)
@@ -48,7 +47,6 @@ def test_script_reject_hands_the_reviewed_script_to_the_writer(client, monkeypat
 
     monkeypatch.setattr(llm, "get", lambda *args, **kwargs: Spy())
     project_id = create(client)
-    approve(client, project_id)
     reject(client, project_id, "scripting", notes="tighten the hook")
 
     assert seen[0] is None
@@ -74,7 +72,7 @@ def test_human_edited_script_goes_through_every_check(client, monkeypatch) -> No
     monkeypatch.setattr(llm, "get", lambda *args, **kwargs: (_ for _ in ()).throw(
         AssertionError("a human-edited package must not call the model")))
 
-    approve(client, project_id)
+    reject(client, project_id, "scripting", notes="hand edit")  # what the UI's edit box does
     run = status(client, project_id)
     assert run["status"] == "failed"
     assert "failed checks after 0 revisions" in run["jobs"][-1]["error_message"]
