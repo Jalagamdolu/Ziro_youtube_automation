@@ -36,3 +36,7 @@ Filled in as each phase wires a vendored file into the pipeline (file → where 
 | Uncited-line detector | `src/app/nodes/script_checks.py` (`uncited_problems`) | D-43: the pack has no notion of a claim ledger. |
 | Support check (Claude Haiku, flags only) | `src/app/nodes/scripting.py` (`support_flags`), `prompts.py` | D-44. |
 | Budget caps | `src/app/core/costs.py` (`check_budget`) | D-45. |
+| Sarvam TTS adapter, per-beat audio cache | `src/app/adapters/tts.py` (`SarvamTTS`), `src/app/nodes/rendering.py` (`_beat`) | D-46: the pack has no TTS client. |
+| Topic planner, scheduler, login | `src/app/ui/planner.py`, `src/app/jobs/scheduler.py`, `src/app/ui/auth.py` | D-47. |
+| Split-layout Short, two-layer captions, text pops, pacing QA | `templates/remotion/src/` (`Short.tsx`, `Presenter.tsx`, `Echo.tsx`, `TextPop.tsx`, `Captions.tsx`), `rendering.plan_shots` | D-48. |
+| Shot planner (Claude Sonnet + validator) | `src/app/nodes/storyboarding.py` (`plan_beats`), `prompts.shot_plan` | D-49. |

@@ -279,3 +279,59 @@ Run 9bde8902 passed every check with "The model generates an answer that blends 
 - **Checked before every Claude call** (`costs.check_budget`), against the call's worst case: input guessed high from the prompt length, output at its `max_tokens`, priced at the cache-write and output rates, plus usage the stage has not recorded yet. A call that would pass either cap is refused with `BudgetExceeded` (a FatalError, never retried). The run fails at that stage with the cap named in the reason, nothing is sent and nothing is spent; Retry resumes once the cap is raised or the day rolls over.
 - Prices for Opus 5.5 and Haiku 5.5 are in config.yaml (claude-api price table, 2026-10-06; cache writes at 1.25x input, Haiku cache reads at 0.1x input).
 - Sarvam (Step 2) will be checked against the same daily cap.
+
+## D-46 Keys upgrade quality, never block; Sarvam voice (Dolender, 2026-11-05)
+- **Rule.** The pipeline runs end to end with whatever keys are present. `app.core.engines` decides from mode + keys and says so: logged at API startup (key names and presence only, never values) and as a banner on every page.
+  - No `ANTHROPIC_API_KEY`: the free-tier writers (Groq, Gemini) write scripts; no support check, no shot-planner model.
+  - No `SARVAM_API_KEY`: Kokoro narrates.
+  - Prototype mode: fixture scripts (the Claude stand-in) and Kokoro, whatever keys exist.
+- **Sarvam adapter** (`tts.SarvamTTS`, production mode with the key): `POST https://api.sarvam.ai/text-to-speech`, one request per sentence at 24 kHz WAV. Model, speaker (the voice ID: a stock `bulbul:v4-flash` voice until sir's clone exists), language and pace come from `config.yaml tts.sarvam`. 429, 5xx and timeouts are retried up to 4 times with backoff (CLAUDE.md: TTS 4); other 4xx fail at once. Every call is checked against the daily budget first (D-45). Characters are recorded at `sarvam-tts-characters`; that price is an ESTIMATE from the v2 doc and must be checked against sarvam.ai pricing.
+- **Pronunciation.** Sarvam reads text, not phonemes, so `tts.sarvam.spelling` spells brand words as said ("Ziro" → "Zyro") in what Sarvam is sent only. Captions, the screen and the forced alignment keep the written "Ziro". It is on by default; drop the entry if the listen test says Sarvam pronounces "Ziro" right.
+- **Per-beat WAVs at -14 LUFS.** Rendering synthesises one beat (scene) at a time, normalises it with FFmpeg's loudnorm to -14 LUFS and caches it under `runs/_tts/` keyed by voice settings + text. A re-render (photo swap, QA reject) never pays for speech again. The finished video is normalised again and its integrated loudness is measured in QA (pass: -15.5 to -12.5 LUFS).
+- `docker-compose.yml` now passes `ANTHROPIC_API_KEY` and `SARVAM_API_KEY` into the containers (Step 1 had missed the first).
+- Not yet heard: the live listen test waits for the key.
+
+## D-47 Topic planner, scheduler, minimal login (Dolender, 2026-11-05)
+- **Planner** (`/planner`, `topics` table, migration 0007): topic, keywords, guidelines, format, target seconds, publish time (entered and shown in IST, `planner.utc_offset`), status. Keywords and guidelines travel in the brief to the research agent and the writer. The admin adds topics, starts one now, or cancels a planned one.
+- **Scheduler**: APScheduler (`apscheduler==3.11.3`, a dependency because v2 §3 names it) runs one job in the API process every `planner.check_seconds`:
+  - It starts each planned topic's run `planner.start_hours_before` (3 h) before publish_at, through the same `create_project` path as "Run now". A topic starts once (claimed with a conditional update).
+  - It publishes at publish_at, never earlier. After the final approval a planned run waits at `export_ready`: the `mock_published` node interrupts before doing anything, and the scheduler resumes it when due. The reaper leaves those runs alone.
+- **Nothing publishes without both reviews.** The Publisher still refuses a run without an approved qa_review (D-06). A run still in review at publish_at keeps waiting; the planner row says "MISSED publish time · nothing published · waiting for your …" and the run page says the same in red. Approved late, it publishes straight away (mock).
+- **Login**: two users from env (`ZIRO_ADMIN_USER/PASSWORD`, `ZIRO_REVIEWER_USER/PASSWORD`), no registration, no users table. The session is an HMAC-signed cookie (stdlib), signed with `ZIRO_SESSION_SECRET`; logins end on restart if it is unset. Every page and the JSON API need a session (401 for the API). Both users review gates; only the admin plans topics. **Gate decisions record the logged-in name**, whatever a form or API body says.
+- Not done: email or other notification of a missed review (v2 §10 "the reviewer is notified"); the planner page and run page show it instead.
+
+## D-48 Split-layout Short, two-layer captions, text pops, pacing QA (Dolender, 2026-11-05)
+Replaces D-37's full-frame shot style (D-39's synthetic-only narration stands).
+- **Two states** (`templates/remotion/src/Short.tsx`):
+  - SPLIT: content in the top 60% (0–1152 px), the presenter zone below, a brand-purple divider.
+  - FULL: the presenter zone full-screen for the Hook and the closing engagement question, a text pop, or the end card.
+- **Presenter zone**: sir's clip once it exists (lip-sync is deferred). Until then a brand placeholder: the supplied `ziro-wordmark-only.png`, unaltered, on a light studio panel with a slow push-in. Never a drawn or generated person. Recording nothing, waiting for nothing (D-39 holds).
+- **Captions, two layers.**
+  - (a) A small transcription box: up to two short lines (7 words), white on black, under the top bar, the spoken word in orange. SRT/VTT use the same cues.
+  - (b) The echo: the sentence's key words, large, in a dark pill straddling the divider; every third one in brand purple.
+- **Text pops**: 1–2 per Short, full screen. The statement is narration words; the punch words are set in Playfair Display italic (`@fontsource/playfair-display` 5.2.8, OFL, license row added).
+- **Source proof**: the cited page capture (D-37) now appears once per video, the first cited scene whose page captures.
+- **Cards** draw at 85% inside the content box; each body shot alternates photo and card (or two framings of the card).
+- **Pacing rule**: a visual change every 2–4 s. Shots aim under 3.6 s and cut at the nearest word end within 0.3 s. QA measures the longest hold, and over 4.25 s fails the render (`pacing` in qa_report). The closing end card is exempt; beats under 2 s are reported, not failed.
+- **CTA**: the end card (D-35: official logo PNG on a white panel + ziro.digital) takes the CTA line. A sentence before it, such as an engagement question, plays on the presenter zone.
+- **Long format** still has no templates (D-26).
+
+## D-49 Shot planner: Claude Sonnet proposes, code validates (Dolender, 2026-11-05)
+- In storyboarding, `llm.planner_model` (default `claude-sonnet-5-5`) gets every narration sentence with its section. It returns one echo phrase per sentence (1–4 words) and 1–2 text pops (2–9 words from one Relevance/Example/Takeaway sentence, 1–2 punch words). Structured output, `ShotPlan`.
+- **Validator** (`storyboarding.valid_phrase` / `valid_pop`):
+  - every word shown must be said in that sentence (the screen–voice rule, D-29);
+  - the packaging scan applies (banned and outcome words);
+  - pops only in body sections, never the Hook or the end card.
+  - Anything that fails is replaced by the deterministic plan: echo = the sentence's three longest content words; pop = the first short body sentence (or a body sentence's first clause), its longest word as the punch.
+- Shot TYPES (presenter / split card / photo / source proof / pop / end) are placed by code from the pacing rule, not by the model. The v2 doc's image prompts wait for FLUX (deferred).
+- No key or prototype mode: the deterministic plan alone. Its calls are cost rows (`claude-sonnet-5-5-*`) under the same budget caps.
+
+## D-50 Two gates: the claims are reviewed with the script (Dolender, 2026-11-05)
+- research_review is retired (v2 §14: 3 gates → 2). researching goes straight to scripting.
+- **script_review** now shows:
+  - the claims first: kind pill, definition/mechanism count, source link, verified quote, dates;
+  - then the script line by line, with the Haiku support flags (D-44) beside the lines they concern;
+  - then hooks, titles and package as before.
+- To change claims: reject to researching with notes. To change wording: hand-edit (D-30) or reject to scripting. Per-claim keep/edit/remove (D-20) went with the gate. Scripting still applies such edits recorded by older runs.
+- **Gates now**: script_review (claims + script) and qa_review (final video, AI disclosure).
+- **Stranded runs.** Runs created before this change and still waiting at research_review cannot resume, because their checkpoint points at a node that no longer exists. On 2026-11-05 that is 905bc1b2 and f00d6ed1; cancel and restart them.

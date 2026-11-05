@@ -25,6 +25,18 @@ Why: on run 69869d1c, Claude's prepared draft (D-32) was overwritten by a submit
 ## v2 Content Studio (branch `v2-content-studio`, from `architecture/v2-architecture.md`)
 Build order: Step 1 Claude writer + uncited-line detector + Haiku support flags + budget caps (D-42..D-45) · Step 2 Sarvam voice · Step 3 topic planner + scheduler + login · Step 4 split layout + two-layer captions + shot planner.
 
+Status 2026-11-05: Steps 1-4 built with mocks (D-42..D-50), 169 tests green. Full mock run fbeba525 went planner → scheduler → fixture script → script gate → split-layout render (placeholder presenter, Kokoro) → QA → final gate → mock publish.
+
+Waiting on people:
+- ANTHROPIC_API_KEY: then one live scripting run to script_review (drafts needed, cost).
+- SARVAM_API_KEY + voice ID (sir's clone, else a stock bulbul:v4-flash voice): then one listen test; drop the "Ziro → Zyro" spelling if Sarvam says Ziro right. Check the Sarvam price (config `sarvam-tts-characters` is an estimate).
+- Sir's base clip (1–2 min, good light) + signed consent, and the GPU own/rent decision: lip-sync and FLUX start then.
+
+Open v2 items:
+- Missed-review notification (v2 §10 "the reviewer is notified"): shown on the planner and run page only, nothing is sent.
+- Runs stranded at the retired research_review gate (905bc1b2, f00d6ed1): cancel and restart.
+- The deterministic text-pop picker chooses plain lines ("So here is the test."); the Sonnet planner should do better once the key is in.
+
 Deferred, not in this build (logged 2026-11-05):
 - LatentSync lip-sync of sir's clip (needs a GPU and sir's base clip + signed consent).
 - FLUX.1 schnell topic images (needs a GPU). Pixabay photos and v1 cards stay the content visuals.
