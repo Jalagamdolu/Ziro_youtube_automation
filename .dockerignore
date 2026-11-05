@@ -7,3 +7,7 @@ outputs
 **/.ruff_cache
 **/.pytest_cache
 templates/remotion/node_modules
+# Secrets reach containers only as environment variables from docker-compose (D-41).
+.env
+.env.*
+!.env.example

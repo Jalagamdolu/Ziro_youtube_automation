@@ -34,7 +34,7 @@ FACTUAL = re.compile(r"\d")
 BANNED = re.compile(
     r"₹|\$\d|\b(salar(y|ies)|lpa|ctc|lakhs?|crores?|rs\.|placements?|placed|get hired|"
     r"job guarantee|guaranteed (job|placement|income)|earn(s|ing|ings)?|income|testimonials?|"
-    r"our students|alumni|partner(s|ship|ships|ed)?|certif(ied|icate|ication)|accredited|"
+    r"our students|alumni|partner(s|ship|ships|ed)?|certif(ied|ication)|accredited|"
     r"million (views|users|students)|\d+\s?k\+? (students|learners|users))\b", re.IGNORECASE)
 # Function words carry no content, so the screen may show them unspoken (D-29).
 FILLER = {"what", "when", "where", "which", "while", "who's", "whose", "that", "this", "these",
@@ -47,11 +47,14 @@ FILLER = {"what", "when", "where", "which", "while", "who's", "whose", "that", "
 OUTCOME_WORDS = ("hallucinations, accurate/accuracy, error-free, reliable/reliability, fix/fixes, "
                  "solve/solves, eliminate, prevent/prevents, guarantee, proven, best, #1, "
                  "number one, better, faster, cheaper, outperform, reduce/reduces, "
-                 "improve/improves/improving, boost, perfect, 10x")
+                 "improve/improves/improving, boost, perfect, 10x, certificate")
 OUTCOME = re.compile(
     r"#1|\b(hallucinat\w*|accura\w*|error[- ]free|reliab\w*|fix(es|ed)?|solv(e|es|ed)|"
     r"eliminat\w*|prevent\w*|guarantee\w*|proven|best|number one|better|faster|cheaper|"
-    r"outperform\w*|reduc\w*|improv\w*|boost\w*|perfect\w*|\d+x)\b", re.IGNORECASE)
+    # A TLS or digital certificate is a technical term only when a source says so; a course
+    # certificate is a claim (D-53). "Certified" / "certification" stay banned outright.
+    r"outperform\w*|reduc\w*|improv\w*|boost\w*|perfect\w*|\d+x|certificates?)\b",
+    re.IGNORECASE)
 
 
 def sections(script: str) -> dict[str, list[str]]:

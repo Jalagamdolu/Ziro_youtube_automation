@@ -118,3 +118,13 @@ def test_script_review_shows_flags_beside_their_line_and_approval_still_works(
 def test_prototype_script_review_says_the_check_was_not_run(client) -> None:
     project_id = create(client)
     assert "not run: needs production mode" in client.get(f"/ui/projects/{project_id}").text
+
+
+def test_certificate_needs_a_source_and_certified_is_always_banned() -> None:
+    tls = CLAIMS + [CLAIMS[0].model_copy(update={
+        "id": "C3", "claim": "The server presents its digital certificate.",
+        "quote": "the server presents its digital certificate"})]
+    text = script("The server presents its certificate. [C3]")
+    assert script_checks.claim_problems(text, tls) == []  # a sourced technical term (D-53)
+    assert any("'certificate'" in p for p in script_checks.claim_problems(text, CLAIMS))
+    assert script_checks.packaging_problems(["Get certified in AI"], tls)

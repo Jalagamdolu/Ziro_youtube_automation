@@ -340,7 +340,8 @@ def chat(stage: str = "default", project_id: str | None = None) -> FallbackChat:
             found.append(GeminiChat(cfg["gemini_model"], key, wait) if name == "gemini"
                          else GroqChat(cfg["groq_model"], key, wait))
     if not found:
-        raise FatalError("production mode needs GEMINI_API_KEY or GROQ_API_KEY (see .env.example)")
+        raise FatalError("production mode needs ANTHROPIC_API_KEY (or GEMINI_API_KEY / "
+                         "GROQ_API_KEY; see .env.example)")
     return FallbackChat(found)
 
 

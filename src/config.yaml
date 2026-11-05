@@ -15,7 +15,7 @@ llm:
   gemini_model: gemini-flash-lite-latest  # Flash took ~140 s per call on this free tier (D-27)
   groq_model: openai/gpt-oss-120b         # Llama 3.3 70B is no longer offered on Groq (D-28)
   order:
-    default: [gemini, groq]               # draft, research agent
+    default: [claude, gemini, groq]       # draft, research agent, photo search (D-51)
     scripting: [claude, groq, gemini]     # Flash-Lite could not pass the script checks (D-28)
   rate_limit_wait_max_seconds: 60   # per-minute 429s waited out in place up to this long
 
@@ -54,7 +54,7 @@ tts:
   speed: 0.95
   sarvam:
     model: bulbul:v4-flash
-    speaker: shubh_enhi_ads   # stock voice; sir's cloned voice ID goes here when ready
+    speaker: ishita_en_stories   # stock Ishita voice (D-52); sir's cloned voice ID goes here when ready
     language_code: en-IN
     pace: 1.0
     attempts: 4               # per sentence, on 429 / 5xx / timeout (CLAUDE.md: TTS 4)

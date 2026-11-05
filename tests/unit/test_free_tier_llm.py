@@ -115,7 +115,7 @@ def test_production_without_keys_fails_with_a_clear_message(monkeypatch: pytest.
                                                               ) -> None:
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
-    with pytest.raises(FatalError, match="GEMINI_API_KEY or GROQ_API_KEY"):
+    with pytest.raises(FatalError, match="needs ANTHROPIC_API_KEY"):
         llm.chat()
 
 

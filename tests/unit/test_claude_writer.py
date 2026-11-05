@@ -114,7 +114,7 @@ def test_scripting_uses_claude_first_and_runs_without_a_key(monkeypatch: pytest.
     assert [c.name for c in chats] == ["claude", "groq", "gemini"]
     assert isinstance(chats[0], llm.ClaudeChat) and chats[0].project_id == "p1"
     assert chats[0].model == config.load()["llm"]["claude_model"]  # configurable
-    assert [c.name for c in llm.chat().chats] == ["gemini", "groq"]  # research stays as built
+    assert [c.name for c in llm.chat().chats] == ["claude", "gemini", "groq"]  # D-51
 
 
 def _caps(tokens: int, usd: float) -> None:

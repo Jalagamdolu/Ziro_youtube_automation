@@ -335,3 +335,16 @@ Replaces D-37's full-frame shot style (D-39's synthetic-only narration stands).
 - To change claims: reject to researching with notes. To change wording: hand-edit (D-30) or reject to scripting. Per-claim keep/edit/remove (D-20) went with the gate. Scripting still applies such edits recorded by older runs.
 - **Gates now**: script_review (claims + script) and qa_review (final video, AI disclosure).
 - **Stranded runs.** Runs created before this change and still waiting at research_review cannot resume, because their checkpoint points at a node that no longer exists. On 2026-11-05 that is 905bc1b2 and f00d6ed1; cancel and restart them.
+
+## D-51 Claude runs every LLM step; Gemini and Groq keys removed (Dolender, 2026-11-05)
+- Dolender removed `GEMINI_API_KEY` and `GROQ_API_KEY` from `.env`: Claude does all text work (v2 §2). Until now the draft (learning outcome), the research agent and the storyboarding photo search ran on `llm.order.default: [gemini, groq]`, which would fail every run at its first step without those keys.
+- `default` is now `[claude, gemini, groq]`: Claude (`llm.claude_model`) runs those steps; Gemini and Groq stay listed only as fallbacks that are skipped while their keys are absent. Search stays on Tavily. Supersedes the D-42 note "research stays Gemini + Tavily".
+- Every Claude call is checked against the budget caps (D-45); the research agent makes several calls per run, so expect research to cost more than scripting.
+
+## D-52 Stock voice: Sarvam Ishita until sir's clone exists (Dolender, 2026-11-05)
+- Sarvam has no "Ishitha"; the name is `ishita`. In `bulbul:v4-flash` it comes in 16 persona IDs (`ishita_<language>_<style>`, docs.sarvam.ai voices guide), five in English: `ishita_en_customer`, `ishita_en_medical`, `ishita_en_numbers`, `ishita_en_social`, `ishita_en_stories`. None is an edtech or explainer style.
+- `tts.sarvam.speaker` is `ishita_en_stories` (closest to narration) until Dolender picks by ear. Listen samples were made in `ishita_en_stories`, `ishita_en_social` and `ishita_en_customer` (all three IDs accepted by the live API), each with an A/B of "Zyro" vs "Ziro" to decide whether the spelling map stays (D-46).
+
+## D-53 "Certificate" is allowed when a source uses it (Dolender, 2026-11-05)
+- Live run be7d0678 ("How does HTTPS keep a connection private?") failed scripting three times on one problem: the banned-claim scan matched `certif(ied|icate|ication)`, and a TLS/digital certificate is the core of how HTTPS works.
+- "certificate(s)" moved from the always-banned list to the outcome-word rule: allowed only when an approved claim uses the word (here C4, C5), refused otherwise (a course certificate is still a claim). "certified" and "certification" stay banned outright. The prompt's word list says so; test in `test_uncited_and_support.py`.
