@@ -159,7 +159,7 @@ def test_swapping_a_photo_at_qa_review_rerenders_with_a_recorded_note(client, mo
 
 
 def test_mock_publish_credits_the_images(client, monkeypatch) -> None:
-    from conftest import DISCLOSURE, approve, run_to_qa_review, status
+    from conftest import DISCLOSURE, approve, publish, run_to_qa_review, status
 
     import app.nodes as nodes
     from app.adapters import storage
@@ -171,6 +171,7 @@ def test_mock_publish_credits_the_images(client, monkeypatch) -> None:
     monkeypatch.setitem(nodes.FUNCS, "rendering", rendering_with_photos)
     project_id = run_to_qa_review(client)
     approve(client, project_id, ai_disclosure=DISCLOSURE)
+    publish(project_id)
     receipt = next(a for a in status(client, project_id)["artifacts"]
                    if a["type"] == "publish_receipt.json")
     description = json.loads(storage.get().read(receipt["storage_path"]))["request"]["snippet"][

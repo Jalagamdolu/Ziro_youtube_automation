@@ -6,7 +6,7 @@ import os
 from collections import Counter
 from pathlib import Path
 
-from conftest import DISCLOSURE, approve, create, reject, run_to_qa_review, status
+from conftest import DISCLOSURE, approve, create, publish, reject, run_to_qa_review, status
 from rq import Queue, SimpleWorker
 from sqlalchemy import func, select
 
@@ -43,6 +43,16 @@ def test_duplicate_publish_click_yields_one_job(client, monkeypatch) -> None:
     assert async_queue.count == 1
 
     SimpleWorker([async_queue], connection=queue.redis()).work(burst=True)
+    assert status(client, project_id)["status"] == "export_ready"  # Ready: waits for a slot
+    from datetime import UTC, datetime, timedelta
+
+    from app.jobs import scheduler
+
+    when = datetime.now(UTC) + timedelta(minutes=10)
+    scheduler.schedule(project_id, when, "Dolender")
+    scheduler.publish_due(when + timedelta(minutes=1))
+    scheduler.publish_due(when + timedelta(minutes=2))  # a second firing collapses too
+    SimpleWorker([async_queue], connection=queue.redis()).work(burst=True)
     assert status(client, project_id)["status"] == "done"
     assert _publish_rows(project_id) == 1
 
@@ -59,6 +69,7 @@ def test_rate_limit_backs_off_without_duplicate(client, monkeypatch) -> None:
     monkeypatch.setitem(nodes.FUNCS, "mock_published", rate_limited)
     project_id = run_to_qa_review(client)
     approve(client, project_id, ai_disclosure=DISCLOSURE)
+    publish(project_id)
 
     run = status(client, project_id)
     assert run["status"] == "done"

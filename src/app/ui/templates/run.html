@@ -15,15 +15,15 @@
        hx-swap="innerHTML">{% include "_live.html" %}</div>
 </section>
 
-{% if schedule %}<section class="{{ 'error' if schedule.missed else 'notice' }}">
-  {% if schedule.missed %}<strong>Publish time {{ schedule.when }} has passed — nothing was published.</strong> The video waits for your review; once you approve the final video it publishes straight away.
-  {% elif schedule.waiting %}Approved. <strong>Publishes (mock) at {{ schedule.when }}.</strong>
-  {% else %}Planned topic: publishes (mock) at <strong>{{ schedule.when }}</strong> once both reviews are approved.{% endif %}
+{% if schedule and schedule.when and not schedule.ready %}<section class="{{ 'error' if schedule.missed else 'notice' }}">
+  {% if schedule.missed %}<strong>Missed: the publish time {{ schedule.when }} has passed — nothing was published.</strong> The video waits; once you approve it, give it a new time.
+  {% else %}Publish time <strong>{{ schedule.when }}</strong> — it publishes then (mock), only if you have approved the final video by that minute.{% endif %}
 </section>{% endif %}
 
 {% if waiting %}<section class="notice"><strong>Decision recorded.</strong> Picking the run back up…</section>
 {% elif run.status == "script_review" %}{% include "_script_review.html" %}
 {% elif run.status == "qa_review" %}{% include "_qa_review.html" %}
+{% elif run.status == "export_ready" %}{% include "_ready.html" %}
 {% elif run.status == "done" %}{% include "_finish.html" %}
 {% elif run.status == "failed" %}
 <section class="error">
@@ -33,6 +33,7 @@
 </section>
 {% endif %}
 {% if edit and run.status != "script_review" %}{% include "_edit.html" %}{% endif %}
+{% if run.status in ("export_ready", "done") %}{% include "_story.html" %}{% endif %}
 
 <details class="tech">
   <summary>Technical details</summary>

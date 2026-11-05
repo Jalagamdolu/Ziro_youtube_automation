@@ -1,6 +1,5 @@
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from datetime import UTC, datetime
 from typing import Any
 
 from langgraph.checkpoint.postgres import PostgresSaver
@@ -50,13 +49,13 @@ def _work_node(stage: str) -> Callable[..., Any]:
 
 
 def _wait_for_publish_time(project_id: str) -> None:
-    """A planned topic's run publishes at its publish_at, not before (D-47): until then it stays
-    at export_ready. Nothing runs before interrupt(); the scheduler resumes it when due."""
+    """A finished video publishes only in its time slot (D-47, D-64): approved, it waits at
+    export_ready as Ready until the scheduler fires its slot (scheduler.publish_due decides:
+    the slot has come and the video was approved before it). Nothing runs before interrupt()."""
     from app.jobs import scheduler
 
-    when = scheduler.publish_at(project_id)
-    if when is not None and datetime.now(UTC) < when:
-        interrupt({"gate": scheduler.WAITING, "publish_at": when.isoformat()})
+    if not scheduler.firing(project_id):
+        interrupt({"gate": scheduler.WAITING})
 
 
 @contextmanager

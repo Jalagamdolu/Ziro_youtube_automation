@@ -23,7 +23,7 @@ from app.api import actions
 from app.api.actions import CreateRequest, DecisionRequest
 from app.core import config, db, engines
 from app.core.contracts import ContentPackage, HookDraft, PackageDraft
-from app.core.models import Artifact, Cost, Project
+from app.core.models import Artifact, Cost
 from app.graph.stages import GATES, ORDER, REJECT_TARGETS
 from app.nodes import human_edit, script_checks
 from app.nodes.rendering import PHOTO_CHOICES
@@ -43,15 +43,10 @@ DOWNLOADS = {"video.mp4": "Video (MP4)", "captions.srt": "Captions (SRT)",
 
 @router.get("/", response_class=HTMLResponse)
 def index(request: Request, error: str | None = None) -> HTMLResponse:
-    """First visit: the prompt box. After that: every run, newest first."""
-    with db.session() as s:
-        spent = dict(s.execute(select(Cost.project_id, func.sum(Cost.amount))
-                               .group_by(Cost.project_id)).all())
-        projects = s.scalars(select(Project).order_by(Project.created_at.desc())).all()
-    if not projects:
-        return new(request, error)
-    return templates.TemplateResponse(request, "runs.html", {
-        "projects": projects, "spent": spent, "error": error})
+    """Home is the planner: every video, one row each (D-64)."""
+    from app.ui import planner  # planner renders with this module's templates
+
+    return planner.planner(request, error)
 
 
 @router.get("/new", response_class=HTMLResponse)
@@ -80,11 +75,12 @@ def run_page(request: Request, project_id: str, error: str | None = None,
     waiting = submitted == run["status"]
     with db.session() as s:
         gate = {} if waiting else _gate_context(s, project_id, run["status"])
-        finish = _finish(s, project_id) if run["status"] == "done" else {}
+        finish = _finish(s, project_id) if run["status"] in ("done", "export_ready") else {}
+        script = actions.read_latest(s, project_id, "script.md")
         tech = _technical(s, project_id)
     return templates.TemplateResponse(request, "run.html", {
         "run": run, "gate": gate, "error": error, "waiting": waiting, "finish": finish,
-        "tech": tech,
+        "tech": tech, "script": script,
         "stages": stages(run), "edit": None if waiting else _edit_text(run),
         "reject_targets": REJECT_TARGETS.get(run["status"], []),
         "schedule": _schedule(project_id, run["status"]),

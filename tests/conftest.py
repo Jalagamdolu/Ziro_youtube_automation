@@ -137,3 +137,14 @@ def run_to_qa_review(client: Any, **overrides: Any) -> str:
     assert approve(client, project_id).status_code == 202  # script_review (claims + script)
     assert status(client, project_id)["status"] == "qa_review"
     return project_id
+
+
+def publish(project_id: str) -> None:
+    """Give an approved (Ready) video a slot and let the scheduler fire it (D-64)."""
+    from datetime import UTC, datetime, timedelta
+
+    from app.jobs import scheduler
+
+    when = datetime.now(UTC) + timedelta(minutes=10)
+    scheduler.schedule(project_id, when, "Dolender")
+    assert scheduler.publish_due(when + timedelta(minutes=1)) == [project_id]

@@ -15,7 +15,7 @@ STATUS = {
     "rendering": "Rendering the video…",
     "qa_review": "Waiting for your final review",
     "approved": "Approved — publishing…",
-    "export_ready": "Approved — waiting for its publish time",
+    "export_ready": "Ready — publishes in its slot",
     "mock_published": "Publishing…",
     "metrics_stub": "Publishing…",
     "done": "Published (mock)",
@@ -69,19 +69,27 @@ def stepper(run: dict[str, Any]) -> list[dict[str, str]]:
         elif run["status"] == "cancelled":
             state = "todo"
         else:
-            state = "turn" if run["status"] in GATES else "active"
+            your_turn = run["status"] in GATES or run["status"] == "export_ready"  # D-64
+            state = "turn" if your_turn else "active"
         steps.append({"name": name, "state": state})
     return steps
 
 
 def qa_ticks(report: dict[str, Any] | None) -> list[tuple[bool, str]]:
-    """The automated QA as ticks: length, loudness, pacing, captions."""
+    """The automated QA as ticks: length, loudness, pacing, captions; only the checks the report
+    actually holds (a check it does not hold is never shown as passed or failed)."""
     if not report:
         return []
-    return [(bool(report.get("duration_ok")), f"{report.get('duration_s')}s"),
-            (bool(report.get("loudness_ok", True)), "loudness"),
-            (bool(report.get("pacing", {}).get("ok", True)), "pacing"),
-            (bool(report.get("cues")), "captions")]
+    ticks = []
+    if "duration_s" in report:
+        ticks.append((bool(report.get("duration_ok")), f"{report['duration_s']}s"))
+    if "loudness_ok" in report:
+        ticks.append((bool(report["loudness_ok"]), "loudness"))
+    if "pacing" in report:
+        ticks.append((bool(report["pacing"].get("ok")), "pacing"))
+    if "cues" in report:
+        ticks.append((bool(report["cues"]), "captions"))
+    return ticks
 
 
 def rupees(usd: float) -> str:

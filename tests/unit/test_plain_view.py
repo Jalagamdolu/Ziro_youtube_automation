@@ -34,6 +34,7 @@ def test_qa_becomes_ticks() -> None:
               "pacing": {"ok": False}, "cues": 12}
     assert plain.qa_ticks(report) == [(True, "39.2s"), (True, "loudness"), (False, "pacing"),
                                       (True, "captions")]
+    assert plain.qa_ticks({"stub": True}) == []  # nothing measured, nothing claimed
 
 
 def test_cost_is_shown_in_rupees() -> None:

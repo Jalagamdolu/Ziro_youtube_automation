@@ -4,7 +4,7 @@ import json
 import os
 from pathlib import Path
 
-from conftest import DISCLOSURE, SHORT_TOPIC, approve, create, run_to_qa_review, status
+from conftest import DISCLOSURE, SHORT_TOPIC, approve, create, publish, run_to_qa_review, status
 
 BRIEF = {
     "prompt": SHORT_TOPIC,
@@ -23,6 +23,7 @@ def _read(key: str) -> dict:
 def test_brief_fields_persist_into_outputs(client) -> None:
     project_id = run_to_qa_review(client, **BRIEF)
     approve(client, project_id, ai_disclosure=DISCLOSURE)
+    publish(project_id)
     run = status(client, project_id)
 
     assert run["brief"] == {"topic": SHORT_TOPIC, "audience": BRIEF["audience"], "language": "en",

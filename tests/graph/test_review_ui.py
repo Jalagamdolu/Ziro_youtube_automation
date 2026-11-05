@@ -7,7 +7,7 @@ import json
 import zipfile
 from urllib.parse import parse_qs, urlparse
 
-from conftest import SHORT_TOPIC, status
+from conftest import SHORT_TOPIC, publish, status
 
 
 def _start(client) -> str:
@@ -51,6 +51,7 @@ def test_script_and_qa_screens_through_to_done(client) -> None:
 
     assert _decide(client, project_id, decision="approve", reviewer="Dolender",
                    ai_synthetic="yes", ai_reason="synthetic narration voice") is None
+    publish(project_id)
     run = status(client, project_id)
     assert run["status"] == "done"
     assert run["approvals"][-1]["ai_disclosure"] == {"synthetic": True,
@@ -100,12 +101,12 @@ def test_decided_gate_is_hidden_until_the_run_moves(client) -> None:
     assert "Decision recorded" in page.text and "Approve script and package" not in page.text
 
 
-def test_first_visit_is_the_prompt_then_the_runs_list(client) -> None:
+def test_home_is_the_planner_and_every_video_is_a_row(client) -> None:
     home = client.get("/").text
-    assert 'name="prompt"' in home and "All runs" not in home
-    project_id = _start(client)
-    runs = client.get("/").text
-    assert "All runs" in runs and f"/ui/projects/{project_id}" in runs and "₹0.00" in runs
+    assert "No videos yet" in home and 'name="topic"' in home  # the add-a-video form
+    project_id = _start(client)  # a video from New video is a row too (D-64)
+    rows = client.get("/").text
+    assert f"/ui/projects/{project_id}" in rows and "Needs your review" in rows
     assert 'name="prompt"' in client.get("/new").text
 
 
@@ -156,6 +157,7 @@ def test_finished_run_shows_player_downloads_and_cost(client) -> None:
     _decide(client, project_id, decision="approve", reviewer="Dolender")
     _decide(client, project_id, decision="approve", reviewer="Dolender", ai_synthetic="yes",
             ai_reason="synthetic narration voice")
+    publish(project_id)
     page = client.get(f"/ui/projects/{project_id}").text
     assert "Your video" in page and "<video" in page
     for label in ("Video (MP4)", "Captions (SRT)", "Thumbnail", "Claims",

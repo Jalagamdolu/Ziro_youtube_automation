@@ -2,7 +2,7 @@
 
 from collections import Counter
 
-from conftest import DISCLOSURE, approve, reject, run_to_qa_review, status
+from conftest import DISCLOSURE, approve, publish, reject, run_to_qa_review, status
 
 
 def test_reject_at_qa_review_never_publishes(client, calls: Counter[str]) -> None:
@@ -18,6 +18,8 @@ def test_reject_at_qa_review_never_publishes(client, calls: Counter[str]) -> Non
 def test_approve_enables_mock_publish_only(client) -> None:
     project_id = run_to_qa_review(client)
     assert approve(client, project_id, ai_disclosure=DISCLOSURE).status_code == 202
+    assert status(client, project_id)["status"] == "export_ready"  # approved: Ready, no slot yet
+    publish(project_id)
 
     run = status(client, project_id)
     assert run["status"] == "done"

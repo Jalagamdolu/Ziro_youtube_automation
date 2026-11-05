@@ -1,0 +1,15 @@
+{# The video's approvals and script, in plain words, for a finished or Ready video (D-64). #}
+{% set decided = run.approvals | selectattr("decision", "equalto", "approve") | list %}
+<section>
+  <h2>Approvals</h2>
+  <ul class="story">
+    {% for a in decided %}
+    <li>✓ <strong>{{ plain.GATES.get(a.stage, a.stage) }}</strong> approved by {{ a.approver }} · {{ a.timestamp.strftime("%d %b %Y, %H:%M") }} UTC
+      {% if a.ai_disclosure %}<br><span class="small muted">AI disclosure: {{ "synthetic" if a.ai_disclosure.synthetic else "not synthetic" }} — {{ a.ai_disclosure.reason }}</span>{% endif %}</li>
+    {% else %}<li class="muted">No approvals yet.</li>
+    {% endfor %}
+  </ul>
+  {% if script %}
+  <details class="panel inline"><summary>Script</summary><pre>{{ script }}</pre></details>
+  {% endif %}
+</section>

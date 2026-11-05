@@ -441,3 +441,24 @@ Replaces D-37's full-frame shot style (D-39's synthetic-only narration stands).
 - **Technical details**, one collapsed section at the bottom (closed by default), holds everything else, unchanged: stages, state timeline, run log, decisions, the cost breakdown, the raw QA JSON, the artifact ZIP and Cancel. Nothing was removed: the audit trail is a brief requirement.
 - **Planner and runs list** are cards with plain statuses; there are no stage names ("qa_review") anywhere in the product view. Words live in `app/ui/plain.py`.
 - Screenshots of every page: `tests/manual_qa/ui-v3/`.
+
+## D-64 The planner is one list: one row per video, Planned → Ready → Scheduled → Published (Dolender, 2026-11-05)
+Supersedes the two-tab plan and D-47's "approved late, publishes at once".
+- **One row per video, through its whole life.** A row is a planner topic, the video run it became, or both. A run started from New video (or before the planner) is a row too. Chips are plain words with colours:
+  - Planned (with or without a time);
+  - Being made, Needs your review;
+  - Ready · needs a slot, Scheduled · time;
+  - Published;
+  - Missed (red), Stopped, Cancelled.
+- **Order.** Ready videos without a slot (and videos whose slot was missed) are pinned at the top as "Needs a slot". Then "Coming up" by publish time, "No time yet", "Published" (newest first), and stopped or cancelled last. Home (`/`) is the planner; the old runs list is gone.
+- **Add a video**: topic, guidelines, format, duration (at most) and an optional publish time. With a time, making starts 3 h before it. Without one, the row waits as Planned until you press "Make now".
+- **A finished video publishes only in its slot.**
+  - The final approval no longer publishes at once: the video becomes Ready and waits at export_ready.
+  - You set, change or clear its publish time inline, on the row or on its page. It fires at that minute (mock now, real later).
+  - Only `scheduler.publish_due` fires a slot: the slot has come and the final approval was before it. It marks the row as firing; the graph's publish step waits until it sees that mark, so retries and restarts cannot publish early.
+- **Publish lock unchanged**: no final approval, no scheduling (`scheduler.schedule` refuses), and the Publisher still needs the approved qa_review (D-06).
+- **Missed**: a review still open at the slot shows "Missed" in red and waits. Approved after its slot, the video never publishes on the old time; it shows "Missed · needs a new time" until it is given one.
+- **Uploads** ("Upload a video", e.g. sir's recordings): an MP4 (checked by its header, at most 500 MB) becomes a Ready row. The upload records a manual final approval by the reviewer, with the AI disclosure "not synthetic — human content: uploaded recording", and an asset-license row (Ziro's own recording). It gets the same slots; at its minute the scheduler publishes it through the same Publisher lock, with no pipeline run.
+- **Detail view** (click a row): topic, progress, the video player, the slot controls, the approvals in plain words, the script, and the next action. Technical details stay collapsed.
+- Migration 0009: a row's publish time is optional, and a row has a kind (generated | upload).
+- Screenshots: `tests/manual_qa/ui-planner/`.

@@ -1,50 +1,83 @@
 {% extends "base.html" %}
 {% block title %}Planner{% endblock %}
 {% block content %}
+{# One list, one row per video through its whole life (D-64). #}
 <div class="page-head">
   <div>
     <h1>Planner</h1>
-    <p class="muted">Each video starts {{ lead }} h before its publish time so both reviews fit. Nothing publishes until you approve the script and the final video; if a review is still open at publish time, the video waits and the card says so.</p>
+    <p class="muted">Every video, from idea to published. Planned videos with a time start {{ lead }} h before it; a finished video publishes only in its slot, and only after you approve it.</p>
   </div>
+  <a href="#add"><button class="primary big" type="button" onclick="openPanel('add')">+ Add a video</button></a>
 </div>
-<div class="cards">
-  {% for r in rows %}{% set t = r.topic %}
-  <div class="card">
-    <span class="pill {{ r.state[1] }}">{{ r.state[0] }}</span>
-    <h3>{{ t.topic }}</h3>
-    <p class="small muted">Publishes {{ r.when }} · {{ t.format | capitalize }}{% if t.target_seconds %} · up to {{ t.target_seconds }} s{% endif %}</p>
-    {% if t.keywords %}<p class="small">{{ t.keywords | join(", ") }}</p>{% endif %}
-    {% if t.guidelines %}<p class="small muted">{{ t.guidelines }}</p>{% endif %}
-    <p>{% if t.project_id %}<a href="/ui/projects/{{ t.project_id }}"><button type="button">Open video</button></a>{% endif %}
-      {% if t.status == "planned" %}
-      <form method="post" action="/planner/{{ t.id }}/run" style="display:inline"><button class="primary" type="submit">Run now</button></form>
-      <form method="post" action="/planner/{{ t.id }}/cancel" style="display:inline"><button class="danger" type="submit">Cancel</button></form>
-      {% endif %}</p>
+
+{% set labels = {"slot": "Needs a slot", "upcoming": "Coming up", "unscheduled": "No time yet", "published": "Published", "closed": "Stopped or cancelled"} %}
+{% for group in groups if counts[group] %}
+<h2 class="group">{{ labels[group] }} <span class="count">{{ counts[group] }}</span></h2>
+<div class="rows">
+  {% for r in rows if r.group == group %}
+  <div class="vrow{{ ' pinned' if group == 'slot' }}">
+    <div class="vthumb">{% if r.thumb %}<img alt="" src="/ui/projects/{{ r.project.id }}/files/{{ r.thumb }}">{% elif r.upload %}<span>▶</span>{% else %}<span>{{ r.title[:1] }}</span>{% endif %}</div>
+    <div class="vmain">
+      <span class="pill {{ r.tone }}">{{ r.chip }}</span>{% if r.upload %} <span class="pill">Uploaded</span>{% endif %}
+      <h3>{% if r.project %}<a href="/ui/projects/{{ r.project.id }}">{{ r.title }}</a>{% else %}{{ r.title }}{% endif %}</h3>
+      <p class="small muted">
+        {% if r.when_shown and not r.chip.startswith(("Scheduled", "Planned ·")) %}{{ r.when_shown }} · {% endif %}
+        {% if r.project and r.project.status not in ("done", "export_ready", "failed", "cancelled") %}{{ r.doing }} · {% endif %}
+        {% if r.topic and r.topic.target_seconds %}up to {{ r.topic.target_seconds }} s{% elif r.project and not r.upload %}up to {{ r.project.target_seconds }} s{% endif %}
+        {% if r.topic and r.topic.guidelines %}<br>{{ r.topic.guidelines }}{% endif %}
+      </p>
+    </div>
+    <div class="vact">
+      {% if r.project and r.project.status == "export_ready" %}
+      <form class="slot" method="post" action="/videos/{{ r.project.id }}/schedule">
+        <input type="hidden" name="back" value="/planner">
+        <input type="datetime-local" name="publish_at" value="{{ r.when_input }}" min="{{ min_time }}" required aria-label="Publish time (IST)">
+        <button class="primary" type="submit">{{ "Reschedule" if r.when else "Schedule" }}</button>
+      </form>
+      {% if r.when %}<form method="post" action="/videos/{{ r.project.id }}/schedule"><input type="hidden" name="back" value="/planner"><input type="hidden" name="action" value="unschedule"><button type="submit">Unschedule</button></form>{% endif %}
+      {% elif not r.project and r.topic.status == "planned" %}
+      <form method="post" action="/planner/{{ r.topic.id }}/run"><button class="primary" type="submit">Make now</button></form>
+      <form method="post" action="/planner/{{ r.topic.id }}/cancel"><button class="danger" type="submit">Cancel</button></form>
+      {% elif r.project %}
+      <a href="/ui/projects/{{ r.project.id }}"><button type="button">{{ "Review now" if r.project.status in ("script_review", "qa_review") else "Open" }}</button></a>
+      {% endif %}
+    </div>
   </div>
-  {% else %}
-  <div class="card empty"><p class="muted">No topics planned yet. Add one below.</p></div>
   {% endfor %}
 </div>
-<section>
-  <h2>Plan a topic</h2>
+{% else %}
+<section class="notice"><p>No videos yet. Add the first one below.</p></section>
+{% endfor %}
+
+<details class="panel" id="add"{% if not rows %} open{% endif %}>
+  <summary>+ Add a video</summary>
   <form method="post" action="/planner">
     <label for="topic">Topic</label>
     <input type="text" id="topic" name="topic" required placeholder="e.g. What is RAG?">
-    <div class="row">
-      <div><label for="keywords">Keywords <span class="muted">(comma separated)</span></label>
-        <input type="text" id="keywords" name="keywords" placeholder="retrieval, vector search"></div>
-      <div><label for="publish_at">Publish at (IST)</label>
-        <input type="datetime-local" id="publish_at" name="publish_at" value="{{ default_time }}" required></div>
-    </div>
+    <label for="guidelines">Guidelines <span class="muted">(optional, passed to research and the writer)</span></label>
+    <textarea id="guidelines" name="guidelines" rows="2"></textarea>
     <div class="row">
       <div><label for="format">Format</label>
         <select id="format" name="format"><option value="short">Short (9:16)</option><option value="long">Long (16:9)</option></select></div>
-      <div><label for="target_seconds">Target seconds <span class="muted">(at most; blank = 60 short / 240 long)</span></label>
+      <div><label for="target_seconds">Duration <span class="muted">(at most; blank = 60 s short / 240 s long)</span></label>
         <input type="text" id="target_seconds" name="target_seconds" inputmode="numeric"></div>
+      <div><label for="publish_at">Publish time, IST <span class="muted">(optional)</span></label>
+        <input type="datetime-local" id="publish_at" name="publish_at" min="{{ min_time }}"></div>
     </div>
-    <label for="guidelines">Guidelines <span class="muted">(optional, passed to research and the writer)</span></label>
-    <textarea id="guidelines" name="guidelines" rows="2"></textarea>
-    <p><button class="primary" type="submit">Add to planner</button></p>
+    <p class="small muted">With a time, making starts {{ lead }} h before it. Without one, it waits here as Planned until you press Make now.</p>
+    <p><button class="primary big" type="submit">Add to planner</button></p>
   </form>
-</section>
+</details>
+
+<details class="panel" id="upload">
+  <summary>Upload a video (e.g. sir's recording)</summary>
+  <form method="post" action="/planner/upload" enctype="multipart/form-data">
+    <label for="up-title">Title</label>
+    <input type="text" id="up-title" name="title" required>
+    <label for="up-file">MP4 file <span class="muted">(at most 500 MB)</span></label>
+    <input type="file" id="up-file" name="video" accept="video/mp4" required>
+    <label class="choice"><input type="checkbox" name="approve" value="yes" required> I have watched it and approve it for publishing. Disclosure: human content (not synthetic).</label>
+    <p><button class="primary big" type="submit">Upload as Ready</button></p>
+  </form>
+</details>
 {% endblock %}

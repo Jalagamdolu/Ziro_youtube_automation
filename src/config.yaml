@@ -2,7 +2,7 @@
 
 # prototype: fixture LLM + research, local media tools, $0 API cost (D-19).
 # production: real LLM + research agent on free tiers (evaluation phase, D-27), still $0.
-mode: prototype
+mode: production
 
 # Production LLM (D-27, D-28, D-42): keys from env. Per stage, the first provider in its order
 # that has a key is primary, the rest are fallbacks. Claude writes; Gemini/Groq only stand in.

@@ -149,6 +149,27 @@ a.card:hover { transform: translateY(-2px); box-shadow: var(--shadow-elegant); t
 .card p { margin: 4px 0; }
 .card.empty { grid-column: 1 / -1; text-align: center; }
 
+/* The planner list (D-64): one row per video. */
+h2.group { font-size: 15px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin: 26px 0 10px; }
+h2.group .count { font-size: 12px; background: var(--lavender); color: var(--primary); border-radius: 999px; padding: 2px 8px; margin-left: 6px; }
+.rows { display: flex; flex-direction: column; gap: 12px; }
+.vrow { display: flex; align-items: center; gap: 18px; background: var(--card); border: 1px solid var(--line);
+        border-radius: var(--radius); box-shadow: var(--shadow-card); padding: 14px 18px; }
+.vrow.pinned { border: 2px solid rgba(140, 60, 221, .35); }
+.vthumb { flex-shrink: 0; width: 112px; height: 63px; border-radius: 10px; overflow: hidden; background: var(--gradient);
+          display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 26px; }
+.vthumb img { width: 100%; height: 100%; object-fit: cover; }
+.vmain { flex: 1; min-width: 0; }
+.vmain h3 { margin: 8px 0 4px; font-size: 16px; } .vmain h3 a { color: var(--ink); }
+.vmain p { margin: 0; }
+.vact { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; align-items: center; }
+.vact form { margin: 0; display: flex; gap: 8px; align-items: center; }
+.vact input[type=datetime-local] { width: auto; }
+.pill.info { color: var(--primary); background: #f1e8fc; }
+.pill.ready { color: #fff; background: var(--gradient); }
+.pill.sched { color: #1d4ed8; background: #e7efff; }
+ul.story { list-style: none; padding: 0; margin: 0; } ul.story li { padding: 8px 0; border-bottom: 1px solid var(--line); }
+
 /* Phones: one column, tables scroll sideways instead of squashing. */
 @media (max-width: 720px) {
   .topbar { padding: 10px 16px; gap: 10px; flex-wrap: wrap; }
@@ -162,4 +183,9 @@ a.card:hover { transform: translateY(-2px); box-shadow: var(--shadow-elegant); t
   .step::before { top: 14px; }
   .actionbar { border-radius: 18px; }
   .page-head { flex-direction: column; align-items: flex-start; }
+  .vrow { flex-wrap: wrap; }
+  .vact { width: 100%; justify-content: flex-start; }
+  .vact form { flex-wrap: wrap; width: 100%; }
+  .vact input[type=datetime-local] { width: 100%; }
+  .vthumb { width: 84px; height: 48px; font-size: 20px; }
 }

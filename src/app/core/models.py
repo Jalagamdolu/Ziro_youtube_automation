@@ -34,7 +34,9 @@ class Project(Base):
 
 
 class Topic(Base):
-    """A planned video (D-47): the scheduler starts its run before publish_at."""
+    """One video's row on the planner (D-47, D-64): planned, being made, ready, scheduled or
+    published. With a publish time the scheduler starts its run 3 h before; a finished video
+    publishes only at its publish time."""
 
     __tablename__ = "topics"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -43,8 +45,9 @@ class Topic(Base):
     guidelines: Mapped[str] = mapped_column(Text)
     format: Mapped[str]
     target_seconds: Mapped[int | None]
-    publish_at: Mapped[datetime]
-    status: Mapped[str]  # planned | started | cancelled
+    publish_at: Mapped[datetime | None]  # none: planned without a slot, or Ready needing one
+    status: Mapped[str]  # planned | starting | started | cancelled
+    kind: Mapped[str] = mapped_column(default="generated")  # generated | upload (D-64)
     project_id: Mapped[str | None] = mapped_column(ForeignKey("projects.id"), index=True)
     created_by: Mapped[str]
     created_at: Mapped[datetime] = mapped_column(default=now)
