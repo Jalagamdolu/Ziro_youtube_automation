@@ -228,7 +228,8 @@ def _gate_context(s: Any, project_id: str, status: str) -> dict[str, Any]:
         return {"claims": load("claims.json") or []}
     if status == "script_review":
         lint = {t["title"]: t for t in load("title_lint.json") or []}
-        return {"package": load("content_package.json"), "title_lint": lint}
+        return {"package": load("content_package.json"), "title_lint": lint,
+                "support": load("support_flags.json")}
     if status == "qa_review":
         return {"package": load("content_package.json"), "qa_report": load("qa_report.json"),
                 "video": files.get("video.mp4"), "thumbnail": files.get("thumbnail.png"),

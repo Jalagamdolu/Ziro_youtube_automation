@@ -4,14 +4,18 @@
 # production: real LLM + research agent on free tiers (evaluation phase, D-27), still $0.
 mode: prototype
 
-# Production LLM (D-27, D-28): free tiers; keys from env. Per stage, the first provider in its
-# order that has a key is primary, the rest are fallbacks.
+# Production LLM (D-27, D-28, D-42): keys from env. Per stage, the first provider in its order
+# that has a key is primary, the rest are fallbacks. Claude writes; Gemini/Groq only stand in.
 llm:
+  claude_model: claude-opus-5-5           # content agent (scripting), D-42
+  support_model: claude-haiku-5-5         # support check, flags only (D-44)
+  claude_effort: high
+  claude_max_tokens: 16000
   gemini_model: gemini-flash-lite-latest  # Flash took ~140 s per call on this free tier (D-27)
   groq_model: openai/gpt-oss-120b         # Llama 3.3 70B is no longer offered on Groq (D-28)
   order:
     default: [gemini, groq]               # draft, research agent
-    scripting: [groq, gemini]             # Flash-Lite could not pass the script checks (D-28)
+    scripting: [claude, groq, gemini]     # Flash-Lite could not pass the script checks (D-28)
   rate_limit_wait_max_seconds: 60   # per-minute 429s waited out in place up to this long
 
 # Production research agent (D-03, D-27): search -> fetch -> verify quote, at most max_turns.
@@ -65,6 +69,20 @@ prices:
   tavily-search: 0.0      # searches; free plan credits
   pixabay-search: 0.0     # stock photo searches (D-33, D-34), free API
   pexels-search: 0.0
+  # Claude, USD per token (claude-api price table, 2026-10-06); cache writes at 1.25x input.
+  claude-opus-5-5-input: 4.0e-6
+  claude-opus-5-5-output: 20.0e-6
+  claude-opus-5-5-cache-write: 5.0e-6
+  claude-opus-5-5-cache-read: 0.2e-6
+  claude-haiku-5-5-input: 0.1e-6
+  claude-haiku-5-5-output: 0.5e-6
+  claude-haiku-5-5-cache-write: 0.125e-6
+  claude-haiku-5-5-cache-read: 0.01e-6
 
 # Hard cap on recorded spend per video (USD).
 spend_cap_usd: 5.0
+
+# Paid-API budget (D-45): a call that would pass either cap is refused and the run fails cleanly.
+budget:
+  max_tokens_per_run: 200000   # Claude tokens (input + output + cache) across one run
+  max_usd_per_day: 15.0        # all recorded spend, all runs, per UTC day

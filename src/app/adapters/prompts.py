@@ -16,6 +16,22 @@ ROOT = Path(__file__).resolve().parents[2]
 SKILLS = ROOT / "vendor" / "youtube-agent-skill" / "skills"
 VOICE = ROOT / "voice" / "voice.md"
 EXAMPLE = Path(__file__).parent / "fixtures" / "what-makes-an-ai-agent-different-from-a-chatbot"
+# Hard rules 5 and 9: the same for every brief, so they sit in the cached system prompt (D-42).
+WORD_RULES = f"""# Banned and outcome words (hard rules 5 and 9)
+5. Never mention salaries, placements, getting hired, earnings or income, testimonials, students
+   or alumni of any institute, partnerships, certifications, user/view counts, or rupee/dollar
+   amounts. Do not name Ziro's products or claim anything about Ziro beyond the CTA.
+9. No hype and no invented outcomes, anywhere: narration, on-screen text, titles, thumbnail,
+   description, tags. These words are rejected unless a claim in the ledger uses that exact
+   word: {script_checks.OUTCOME_WORDS}. Say what the thing DOES (connects, fetches, retrieves,
+   references), never how much better it makes something. A cited sentence may only say what its
+   claim says.
+   PASS: "How RAG Connects Models To Data" | "What Is RAG? Fetch First, Then Answer" |
+         "RAG adds a retrieval step that pulls information from a new data source [C4]."
+   FAIL: "Boost AI Answers With RAG" | "How RAG Fixes Hallucinations" |
+         "Make LLM Answers Accurate" |
+         "It references a knowledge base, improving the response [C2]."
+"""
 
 
 def skill(name: str) -> str:
@@ -28,6 +44,30 @@ def skill(name: str) -> str:
             if not re.search(r"\bask (for|the user)|show the user|ship it|hookscore\.py|title\.py",
                              line, re.IGNORECASE)]
     return "\n".join(keep).strip()
+
+
+SUPPORT_SYSTEM = """You check a video script against its sources. For each sentence you get the
+sentence and the exact quotes from the pages it cites. Decide one thing: does the sentence say
+MORE than its quotes?
+
+supported: everything the sentence states is in its quotes. Plainer wording, a shorter version,
+or "you"/"your" addressed to the viewer is fine.
+says more: the sentence adds something the quotes do not state: an effect or benefit ("so
+answers are up to date"), a step, a cause, a comparison, scope ("always", "every"), certainty, or
+a detail. Name exactly what it adds in says_more, in a few words.
+
+You only flag; a person reads your flags and decides. Judge each sentence on its own quotes only,
+not on what you know. Reply with JSON only: one verdict per sentence, in the order given."""
+
+
+def support(cited: list[tuple[str, list[str]]], claims: list[Claim]) -> tuple[str, str]:
+    """Support check (D-44): each cited sentence beside the quotes it cites."""
+    quotes = {c.id: c.quote for c in claims}
+    listed = "\n\n".join(
+        f"{i + 1}. Sentence: {sentence}\n" + "\n".join(
+            f"   [{cid}] quote: {quotes.get(cid, '(not an approved claim)')}" for cid in ids)
+        for i, (sentence, ids) in enumerate(cited))
+    return SUPPORT_SYSTEM, f"{listed}\n\nExactly {len(cited)} verdicts."
 
 
 def learning_outcome(brief: Brief) -> tuple[str, str]:
@@ -96,9 +136,10 @@ def package(brief: Brief, claims: list[Claim], notes: str | None) -> tuple[str, 
              "and the next action.")
     # hookscore.py prefers longer hooks; for a Short the brief's 3-second rule wins (D-21), so
     # every candidate is short and whichever two score best still fit.
-    outcome_words = script_checks.OUTCOME_WORDS
     hook_length = ("Every hook is 5-7 words." if brief.format == "short"
                    else "Every hook is at most 25 words.")
+    body = " and ".join(script_checks.BODY[brief.format])
+    # Everything in the system prompt is the same for every brief, so Claude caches it (D-42).
     system = "\n\n".join([
         "You write YouTube scripts and packaging for Ziro (written \"Ziro\"). Reply with one JSON "
         "object only. Follow the voice profile and the hard rules exactly; a deterministic checker "
@@ -108,6 +149,7 @@ def package(brief: Brief, claims: list[Claim], notes: str | None) -> tuple[str, 
         "# Hook rules (hooks.json)\n" + "\n".join(f"- {r}" for r in hooks["rules"])
         + "\n## Formulas\n" + "\n".join(f"- {f}" for f in formulas),
         "# Packaging method (yt-package)\n" + skill("yt-package"),
+        WORD_RULES,
     ])
     rules = f"""# Hard rules
 1. Script format: Markdown. Exactly these sections, in order, as "## Name" headings:
@@ -130,22 +172,15 @@ def package(brief: Brief, claims: list[Claim], notes: str | None) -> tuple[str, 
 4. Every sentence that uses a fact from the claim ledger ends with its marker, e.g. "[C2]". Use
    only the ledger's facts, in its wording or a faithful paraphrase. Any sentence with a digit,
    year or month name needs a marker. Write numbers as words only if they are not facts.
-5. Never mention salaries, placements, getting hired, earnings or income, testimonials, students
-   or alumni of any institute, partnerships, certifications, user/view counts, or rupee/dollar
-   amounts. Do not name Ziro's products or claim anything about Ziro beyond the CTA.
+   In the {body} section every sentence ends with a marker, except a question, a labelled
+   illustration (starting "For example", "Imagine", "Suppose" or "Say you") or a line spoken
+   to the viewer (starting "You", "If you", "Try" or "Let's"). Anything else is uncited.
+5. Banned topics: see "Banned and outcome words" in the system prompt.
 6. The CTA section contains the CTA exactly once, verbatim: "{brief.cta}". It appears nowhere else.
 7. The Hook section's narration is exactly the text of one of your five hooks.
 8. hooks: five distinct hooks, each with a one-sentence explanation naming its formula.
    {hook_length}
-9. No hype and no invented outcomes, anywhere: narration, on-screen text, titles, thumbnail,
-   description, tags. These words are rejected unless a claim in the ledger uses that exact
-   word: {outcome_words}. Say what the thing DOES (connects, fetches, retrieves, references),
-   never how much better it makes something. A cited sentence may only say what its claim says.
-   PASS: "How RAG Connects Models To Data" | "What Is RAG? Fetch First, Then Answer" |
-         "RAG adds a retrieval step that pulls information from a new data source [C4]."
-   FAIL: "Boost AI Answers With RAG" | "How RAG Fixes Hallucinations" |
-         "Make LLM Answers Accurate" |
-         "It references a knowledge base, improving the response [C2]."
+9. No hype and no invented outcomes: see "Banned and outcome words" in the system prompt.
 10. titles: ten distinct titles, at most 60 characters, no more than two ALL-CAPS words.
 11. thumbnail_text: at most 3 words, not repeating words from the best title.
 12. description: 2-4 plain sentences, then "Sources:" with one line per cited claim

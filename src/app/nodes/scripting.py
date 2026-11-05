@@ -10,7 +10,7 @@ from typing import Any
 
 from sqlalchemy import select
 
-from app.adapters import llm
+from app.adapters import llm, prompts
 from app.core import costs, db
 from app.core.contracts import Brief, Claim, ContentPackage, Hook, PackageDraft
 from app.core.errors import FatalError
@@ -53,7 +53,7 @@ def scripting(ctx: StageContext) -> Outputs:
             trail = {"human_draft.txt": text,
                      "human_edit.json": json.dumps({"edited_by": editor, "source": edited})}
         else:
-            writer = llm.get("scripting")
+            writer = llm.get("scripting", ctx.project_id)
             notes = ctx.notes
             if notes and (previous := _previous_script(ctx)):  # a reject edits the reviewed one
                 notes += f"\nThe reviewed script, to edit rather than rewrite:\n{previous}"
@@ -89,7 +89,32 @@ def scripting(ctx: StageContext) -> Outputs:
         "content_package.json": package.model_dump_json(indent=2),
         "hook_scores.json": json.dumps(hooks, indent=2, ensure_ascii=False),
         "title_lint.json": json.dumps(titles, indent=2, ensure_ascii=False),
+        "support_flags.json": json.dumps(support_flags(ctx.project_id, draft.script, claims),
+                                         indent=2, ensure_ascii=False),
     } | trail
+
+
+def support_flags(project_id: str, script: str, claims: list[Claim]) -> dict[str, Any]:
+    """Claude Haiku's support check (D-44): does a cited line say more than its quote? Flags for
+    the reviewer only: it never approves and never blocks, so a failed check becomes a note.
+    Only the budget cap (D-45) still stops the run."""
+    chat = llm.support_chat(project_id)
+    if chat is None:
+        return {"status": "not run", "reason": "needs production mode and ANTHROPIC_API_KEY",
+                "verdicts": []}
+    cited = script_checks.cited_sentences(script)
+    try:
+        reply = chat.json(*prompts.support(cited, claims), schema=llm.SupportReport)
+        verdicts = llm.SupportReport.model_validate(reply).verdicts
+    except costs.BudgetExceeded:
+        raise
+    except Exception as error:  # flags only: whatever goes wrong, the script is not blocked
+        log.warning("support check failed", reason=str(error))
+        return {"status": "not run", "reason": str(error)[:300], "verdicts": []}
+    finally:
+        costs.record_usage(project_id, "scripting", chat.calls)
+    return {"status": "ok", "model": chat.model,
+            "verdicts": [v.model_dump() for v in verdicts]}
 
 
 def _write(write: Callable[[str | None], PackageDraft], brief: Brief, claims: list[Claim],
@@ -148,6 +173,7 @@ def _problems(draft: PackageDraft, brief: Brief, claims: list[Claim],
     problems += visual_problems(draft.script, claims)
     problems += script_checks.on_screen_problems(draft.script, claims, brief.topic)
     problems += script_checks.mechanism_problems(draft.script, claims, brief.topic)
+    problems += script_checks.uncited_problems(draft.script, brief)
     problems += script_checks.packaging_problems(
         [*draft.titles, draft.thumbnail_text, draft.description, *draft.tags], claims)
     if len({h.text.strip().lower() for h in draft.hooks}) != 5:

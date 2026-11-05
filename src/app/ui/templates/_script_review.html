@@ -17,6 +17,22 @@
     </div>
   </div>
 
+  {% set sup = gate.support %}
+  {% if sup %}
+  <h3>Support check <span class="muted small">(Claude Haiku: does a cited line say more than its quote? Flags only; you decide)</span></h3>
+  {% if sup.status != "ok" %}
+  <p class="muted small">Not run: {{ sup.reason }}</p>
+  {% else %}{% set flagged = sup.verdicts | rejectattr("supported") | list %}
+  <p class="small">{{ flagged | length }} of {{ sup.verdicts | length }} cited lines flagged.</p>
+  {% if flagged %}
+  <table>
+    <tr><th>Line</th><th>Cites</th><th>Says more than its quote</th></tr>
+    {% for v in flagged %}
+    <tr><td>{{ v.sentence }}</td><td>{{ v.claims | join(", ") }}</td><td><span class="pill">flag</span> {{ v.says_more }}</td></tr>
+    {% endfor %}
+  </table>
+  {% endif %}{% endif %}{% endif %}
+
   <h3>Five hooks <span class="muted small">(scored by the skill pack's hookscore.py; top two kept)</span></h3>
   <table>
     <tr><th>Hook</th><th>Score</th><th>Formula</th><th>Why</th></tr>

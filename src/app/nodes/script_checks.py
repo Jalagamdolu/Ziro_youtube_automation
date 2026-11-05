@@ -14,6 +14,11 @@ SECTIONS = {
     "long": ["Hook", "Context", "Build", "Recap", "CTA"],
 }
 TOLERANCE = 0.15  # the script's estimated runtime must land within ±15% of the target (D-35)
+# Where the facts are: every sentence here is a claim unless it says otherwise (D-43).
+BODY = {"short": ["Example"], "long": ["Context", "Build"]}
+# Sentences that say otherwise: a labelled illustration or a line spoken to the viewer.
+NOT_A_FACT = re.compile(r"^(for example|for instance|imagine|suppose|say you|picture|"
+                        r"you\b|if you\b|try\b|let's\b)", re.IGNORECASE)
 
 
 def runtime(brief: Brief) -> tuple[int, int]:
@@ -67,19 +72,48 @@ def spoken_words(lines: list[str]) -> int:
     return sum(len(MARKER.sub("", line).split()) for line in lines)
 
 
+# One sentence: up to its end mark, plus any markers right after it ("It fetches. [C2]").
+SENTENCE = re.compile(r".+?(?:[.!?]+(?=\s|$)|$)(?:\s*\[C\d+\])*")
+
+
+def sentences(text: str) -> list[str]:
+    return [s for m in SENTENCE.finditer(text) if (s := m.group(0).strip())]
+
+
 def claim_problems(script: str, approved: list[Claim]) -> list[str]:
     ids = {c.id for c in approved}
     problems = [f"[C{n}] is not an approved claim" for n in sorted(set(MARKER.findall(script)))
                 if f"C{n}" not in ids]
     narration = " ".join(line for lines in sections(script).values() for line in lines)
-    for sentence in re.split(r"(?<=[.!?])\s+(?!\[C)", narration):
+    for sentence in sentences(narration):
         if FACTUAL.search(MARKER.sub("", sentence)) and not MARKER.search(sentence):
-            problems.append(f"unsourced figure or date: {sentence.strip()!r}")
+            problems.append(f"unsourced figure or date: {sentence!r}")
     problems += [f"banned claim language: {m.group(0)!r}" for m in BANNED.finditer(script)]
     # Outcome words ("improves", "reliable") are claims even without a figure (D-29).
     ledger = " ".join(f"{c.claim} {c.quote}" for c in approved).lower()
     problems += [f"narration claims {m.group(0)!r}; no approved claim says it, so leave it out"
                  for m in OUTCOME.finditer(narration) if m.group(0).lower()[:5] not in ledger]
+    return problems
+
+
+def cited_sentences(script: str) -> list[tuple[str, list[str]]]:
+    """(sentence without markers, claim ids) for every narrated sentence that cites a claim."""
+    narration = " ".join(line for lines in sections(script).values() for line in lines)
+    return [(MARKER.sub("", s).strip(), [f"C{n}" for n in MARKER.findall(s)])
+            for s in sentences(narration) if MARKER.search(s)]
+
+
+def uncited_problems(script: str, brief: Brief) -> list[str]:
+    """Every sentence in the body sections cites a claim, unless it is a question, a labelled
+    illustration or a line spoken to the viewer (D-43). Catches the plain-language fact that
+    carries no figure, which claim_problems lets through."""
+    found = sections(script)
+    problems: list[str] = []
+    for name in BODY[brief.format]:
+        for text in sentences(" ".join(found.get(name, []))):
+            if not MARKER.search(text) and not text.endswith("?") and not NOT_A_FACT.match(text):
+                problems.append(f"uncited line in {name}: '{text}' states a fact without a "
+                                "[C#] marker")
     return problems
 
 

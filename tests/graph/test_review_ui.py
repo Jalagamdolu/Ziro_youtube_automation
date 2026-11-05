@@ -185,7 +185,7 @@ def test_failed_scripting_offers_the_last_draft_flagged_and_a_fix_reaches_review
             return good.model_copy(update={"titles": ["Boost Your Chatbot Skills"]
                                            + good.titles[1:]})
 
-    monkeypatch.setattr(llm, "get", lambda stage="default": Hype())
+    monkeypatch.setattr(llm, "get", lambda *args, **kwargs: Hype())
     project_id = _start(client)
     _decide(client, project_id, **_keep_all())
     assert status(client, project_id)["status"] == "failed"  # the model never passed

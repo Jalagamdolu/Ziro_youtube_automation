@@ -46,7 +46,7 @@ def test_script_reject_hands_the_reviewed_script_to_the_writer(client, monkeypat
             seen.append(notes)
             return super().write_package(brief, claims, notes)
 
-    monkeypatch.setattr(llm, "get", lambda stage="default": Spy())
+    monkeypatch.setattr(llm, "get", lambda *args, **kwargs: Spy())
     project_id = create(client)
     approve(client, project_id)
     reject(client, project_id, "scripting", notes="tighten the hook")
@@ -71,7 +71,7 @@ def test_human_edited_script_goes_through_every_check(client, monkeypatch) -> No
     store = storage.get()
     store.write(human_edit.KEY.format(project_id),
                 human_edit.render(bad, [], "Dolender").encode())
-    monkeypatch.setattr(llm, "get", lambda stage="default": (_ for _ in ()).throw(
+    monkeypatch.setattr(llm, "get", lambda *args, **kwargs: (_ for _ in ()).throw(
         AssertionError("a human-edited package must not call the model")))
 
     approve(client, project_id)

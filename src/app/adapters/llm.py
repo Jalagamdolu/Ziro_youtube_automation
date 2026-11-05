@@ -1,6 +1,6 @@
-"""LLM adapter. Prototype mode serves hand-written fixtures (D-19). Production mode, evaluation
-phase (D-27): Gemini free tier, Groq free tier as fallback. Claude (D-02) stays the documented
-paid upgrade.
+"""LLM adapter. Prototype mode serves hand-written fixtures (D-19). Production mode: Claude
+writes the script (D-42); Gemini and Groq free tiers (D-27) run the other steps and stand in for
+Claude when it is down.
 """
 
 import json
@@ -10,9 +10,11 @@ import time
 from pathlib import Path
 from typing import Any, Protocol
 
+import anthropic
 import httpx
+from pydantic import BaseModel
 
-from app.core import config
+from app.core import config, costs
 from app.core.contracts import Brief, Claim, PackageDraft
 from app.core.errors import FatalError, RetryableError
 from app.core.log import log
@@ -23,9 +25,21 @@ GROQ = "https://api.groq.com/openai/v1/chat/completions"
 TIMEOUT = 180.0
 MINUTE_RETRIES = 3  # per-minute 429s are waited out in place before the stage retry takes over
 MAX_OUTPUT_TOKENS = 4000
+SUPPORT_MAX_TOKENS = 8000  # support check: one short verdict per cited sentence
 
 # Usage of one paid call, as (price key in config.yaml, units). Free tier still records tokens.
 Usage = tuple[str, float]
+
+
+class SupportVerdict(BaseModel):
+    sentence: str
+    claims: list[str]
+    supported: bool
+    says_more: str  # what the sentence adds beyond its quotes; "" when supported
+
+
+class SupportReport(BaseModel):
+    verdicts: list[SupportVerdict]
 
 
 class QuotaExhausted(FatalError):
@@ -35,8 +49,9 @@ class QuotaExhausted(FatalError):
 class Chat(Protocol):
     calls: list[Usage]
 
-    def json(self, system: str, prompt: str) -> Any:
-        """One completion, parsed as JSON."""
+    def json(self, system: str, prompt: str, schema: type[BaseModel] | None = None) -> Any:
+        """One completion, parsed as JSON; `schema` asks for structured output where the
+        provider supports it (callers validate either way)."""
         ...
 
 
@@ -94,7 +109,7 @@ class ModelLLM:
     def write_package(self, brief: Brief, claims: list[Claim], notes: str | None) -> PackageDraft:
         from app.adapters import prompts
 
-        reply = self.chat.json(*prompts.package(brief, claims, notes))
+        reply = self.chat.json(*prompts.package(brief, claims, notes), schema=PackageDraft)
         try:
             return PackageDraft.model_validate(reply)
         except ValueError as error:
@@ -116,7 +131,7 @@ class GeminiChat:
         self.model, self.key, self.wait_max = model, key, wait_max
         self.calls: list[Usage] = []
 
-    def json(self, system: str, prompt: str) -> Any:
+    def json(self, system: str, prompt: str, schema: type[BaseModel] | None = None) -> Any:
         body = {"systemInstruction": {"parts": [{"text": system}]},
                 "contents": [{"role": "user", "parts": [{"text": prompt}]}],
                 "generationConfig": {"responseMimeType": "application/json", "temperature": 0.7}}
@@ -139,7 +154,7 @@ class GroqChat:
         self.model, self.key, self.wait_max = model, key, wait_max
         self.calls: list[Usage] = []
 
-    def json(self, system: str, prompt: str) -> Any:
+    def json(self, system: str, prompt: str, schema: type[BaseModel] | None = None) -> Any:
         # gpt-oss spends hidden reasoning tokens before the JSON; keep reasoning low and the
         # output cap inside the free tier's 8,000 tokens/minute (D-28).
         body = {"model": self.model, "temperature": 0.7, "reasoning_effort": "low",
@@ -163,20 +178,70 @@ class GroqChat:
         return _parse(data["choices"][0]["message"]["content"])
 
 
+class ClaudeChat:
+    """Claude through the Anthropic SDK (D-02, D-42): structured output validated by Pydantic,
+    the fixed system prompt (voice, method, word lists) cached, and every call checked against
+    the budget before it is made (D-45)."""
+
+    name = "claude"
+
+    def __init__(self, model: str, key: str, effort: str, max_tokens: int,
+                 project_id: str | None) -> None:
+        self.model, self.effort, self.max_tokens = model, effort, max_tokens
+        self.project_id = project_id
+        self.client = anthropic.Anthropic(api_key=key, max_retries=2, timeout=TIMEOUT)
+        self.calls: list[Usage] = []
+
+    def json(self, system: str, prompt: str, schema: type[BaseModel] | None = None) -> Any:
+        prices = config.load()["prices"]
+        guess = (len(system) + len(prompt)) / 3  # input tokens, guessed high (~4 chars/token)
+        costs.check_budget(self.project_id, guess + self.max_tokens,
+                           guess * prices[f"{self.model}-cache-write"]
+                           + self.max_tokens * prices[f"{self.model}-output"], self.calls)
+        request: dict[str, Any] = {
+            "model": self.model, "max_tokens": self.max_tokens,
+            "system": [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
+            "messages": [{"role": "user", "content": prompt}],
+            "output_config": {"effort": self.effort}}
+        try:
+            response = (self.client.messages.parse(output_format=schema, **request) if schema
+                        else self.client.messages.create(**request))
+        except (anthropic.RateLimitError, anthropic.APIConnectionError) as error:
+            raise RetryableError(f"claude unavailable: {type(error).__name__}") from error
+        except anthropic.APIStatusError as error:
+            if error.status_code >= 500:  # server errors and 529 overloaded
+                raise RetryableError(f"claude returned {error.status_code}") from error
+            raise FatalError(f"claude returned {error.status_code}: {str(error)[:300]}") from error
+        usage = response.usage
+        self.calls += [(f"{self.model}-input", usage.input_tokens),
+                       (f"{self.model}-output", usage.output_tokens),
+                       (f"{self.model}-cache-write", usage.cache_creation_input_tokens or 0),
+                       (f"{self.model}-cache-read", usage.cache_read_input_tokens or 0)]
+        if response.stop_reason in ("refusal", "max_tokens"):
+            raise RetryableError(f"claude stopped early: {response.stop_reason}")
+        if schema:
+            parsed = getattr(response, "parsed_output", None)
+            if parsed is None:
+                raise RetryableError("claude returned no structured output")
+            return parsed.model_dump()
+        return _parse("".join(b.text for b in response.content
+                              if isinstance(b, anthropic.types.TextBlock)))
+
+
 class FallbackChat:
     """Primary first; the fallback takes over for the rest of the stage once the primary's daily
     quota is gone or it keeps failing. Both out of daily quota fails the run cleanly."""
 
-    def __init__(self, chats: list[GeminiChat | GroqChat]) -> None:
+    def __init__(self, chats: list[ClaudeChat | GeminiChat | GroqChat]) -> None:
         self.chats = chats
         self.calls: list[Usage] = []
 
-    def json(self, system: str, prompt: str) -> Any:
+    def json(self, system: str, prompt: str, schema: type[BaseModel] | None = None) -> Any:
         reasons = []
         while self.chats:
             chat = self.chats[0]
             try:
-                return chat.json(system, prompt)
+                return chat.json(system, prompt, schema)
             except (QuotaExhausted, RetryableError) as error:
                 reasons.append(f"{chat.name}: {error}")
                 if len(self.chats) == 1:
@@ -246,15 +311,21 @@ def fixture_dir(topic: str) -> Path:
     return folder
 
 
-def chat(stage: str = "default") -> FallbackChat:
+def chat(stage: str = "default", project_id: str | None = None) -> FallbackChat:
     """Production chat for a stage: every provider with a key, in the stage's configured order
-    (config.yaml llm.order; D-28)."""
+    (config.yaml llm.order; D-28, D-42). `project_id` scopes Claude's per-run budget."""
     cfg = config.load()["llm"]
     wait = cfg["rate_limit_wait_max_seconds"]
-    keys = {"gemini": os.environ.get("GEMINI_API_KEY"), "groq": os.environ.get("GROQ_API_KEY")}
-    found: list[GeminiChat | GroqChat] = []
+    keys = {"claude": os.environ.get("ANTHROPIC_API_KEY"),
+            "gemini": os.environ.get("GEMINI_API_KEY"), "groq": os.environ.get("GROQ_API_KEY")}
+    found: list[ClaudeChat | GeminiChat | GroqChat] = []
     for name in cfg["order"].get(stage, cfg["order"]["default"]):
-        if key := keys[name]:
+        if not (key := keys[name]):
+            continue
+        if name == "claude":
+            found.append(ClaudeChat(cfg["claude_model"], key, cfg["claude_effort"],
+                                    cfg["claude_max_tokens"], project_id))
+        else:
             found.append(GeminiChat(cfg["gemini_model"], key, wait) if name == "gemini"
                          else GroqChat(cfg["groq_model"], key, wait))
     if not found:
@@ -262,7 +333,16 @@ def chat(stage: str = "default") -> FallbackChat:
     return FallbackChat(found)
 
 
-def get(stage: str = "default") -> LLM:
+def support_chat(project_id: str) -> ClaudeChat | None:
+    """Claude Haiku for the support check (D-44); None in prototype mode or without a key."""
+    cfg = config.load()
+    key = os.environ.get("ANTHROPIC_API_KEY")
+    if cfg["mode"] == "prototype" or not key:
+        return None
+    return ClaudeChat(cfg["llm"]["support_model"], key, "medium", SUPPORT_MAX_TOKENS, project_id)
+
+
+def get(stage: str = "default", project_id: str | None = None) -> LLM:
     if config.load()["mode"] == "prototype":
         return FixtureLLM()
-    return ModelLLM(chat(stage))
+    return ModelLLM(chat(stage, project_id))

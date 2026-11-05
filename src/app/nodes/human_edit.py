@@ -22,6 +22,8 @@ FIXES = [
     ("Hook section", "make the Hook line exactly one of the two top-scoring hooks"),
     ("relevance must land", "keep Hook + Relevance to 25 spoken words or fewer"),
     ("unsourced figure", "cite the claim it comes from, e.g. [C2], or drop the figure"),
+    ("uncited line", "cite the claim it states, e.g. [C2]; or label it (\"For example, ...\"); "
+                     "or cut it"),
     ("banned claim", "remove it; the brief forbids it unless supplied as an approved fact"),
     ("template no", "use the beat syntax, e.g. [ON SCREEN: flow - \"Ask\" to \"Fetch\"]"),
 ]
