@@ -472,3 +472,20 @@ Supersedes the two-tab plan and D-47's "approved late, publishes at once".
   - a slot reached before the final approval shows "Missed" and never publishes;
   - firing is idempotent. A slot fires once (`publish_due` marks the row as firing; a second call finds nothing). A worker that dies after the mock publish but before the step is saved is restarted by the reaper, and the publish still happens exactly once (MockPublisher is idempotent on the video).
 - Screenshots: `tests/manual_qa/ui-planner/` (list, phone, and the Planned, Ready, Scheduled and Published row pages).
+
+## D-66 Planner row lifecycle: one chip, that state's actions only; Published only once confirmed (Dolender, 2026-11-05)
+- **Each row shows one state chip and only the actions of that state:**
+  - Planned → Make now / Cancel.
+  - Needs your review → Approve / Reject, on the row. Script review: "Read script" + Approve. Final review: "Watch" + Approve, which opens the required AI disclosure (yes/no + reason). Reject opens a panel: send back to (the gate's allowed targets) + what must change (required).
+  - Ready · needs a slot → Schedule (date-time picker, IST).
+  - Scheduled → chip with the time and a countdown ("in 3 days", "in 26 h", "in 12 min"); Reschedule / Unschedule.
+  - Publishing… → spinner, no buttons. Shown while the slot is firing, while the publish step runs, and for a finished run with no publish receipt on record.
+  - Published → only after confirmation (below), with the publish time and the receipt link.
+  - Failed → red chip, the reason in plain words (the step and the first line of the failed job's error), Retry. Missed (red) → Approve / Reject while the review is open, a new slot once approved.
+  - Being made, Cancelled → no buttons; the title opens the video's page.
+- **One approval system, two doorways.** The planner's Approve and Reject post to the same gate endpoint as the video page (`/ui/projects/<id>/decide`), with `back=/planner`. The same validation applies (reject needs a target and notes; final approval needs the AI disclosure), the same approvals row is written, and errors come back to the planner. Only `/planner` is accepted as a return address. After a decision the row says "Working on your decision…" with no buttons until the worker moves on. Retry works the same way.
+- **Published is never shown on send alone.** `planner.confirmation(receipt)` decides:
+  - Mock (now): the publish receipt artifact exists → "Published (mock)" + time + receipt link.
+  - Real YouTube (later, after sir's OK): the receipt must carry `confirmed_at` and `watch_url`, written only after an API read-back shows the video live → "Live on YouTube" + watch link + confirmed time. A receipt without them stays "Publishing…".
+- Tests (`tests/graph/test_planner.py`): chip-per-state with only that state's buttons, both approvals from the planner recorded as Dolender's with the disclosure; reject from the planner refused without a note; Publishing… (no buttons, no "Published") while the publish step has not confirmed, "Published (mock)" only once the receipt exists, back to Publishing… if the receipt is not on record; a failed run shows its reason in red and retries back to the planner.
+- Screenshots: `tests/manual_qa/ui-lifecycle/` (planner, phone, Reject panel open).

@@ -110,14 +110,16 @@ async def decide(request: Request, project_id: str) -> RedirectResponse:
     if kind == "approve" and form.get("ai_synthetic"):
         body["ai_disclosure"] = {"synthetic": form["ai_synthetic"] == "yes",
                                  "reason": form.get("ai_reason", "").strip()}
+    page = _return_to(form, f"/ui/projects/{project_id}")  # the run page or the planner (D-66)
     try:
         decision_id = actions.decide(project_id, kind, DecisionRequest.model_validate(body))
     except ValidationError as error:
-        return _back(f"/ui/projects/{project_id}", HTTPException(422, actions.errors(error)))
+        return _back(page, HTTPException(422, actions.errors(error)))
     except HTTPException as error:
-        return _back(f"/ui/projects/{project_id}", error)
+        return _back(page, error)
     gate = decision_id.split(":")[1]
-    return RedirectResponse(f"/ui/projects/{project_id}?submitted={gate}", status_code=303)
+    submitted = gate if page.startswith("/ui/") else f"{project_id}:{gate}"
+    return RedirectResponse(f"{page}?submitted={submitted}", status_code=303)
 
 
 @router.post("/ui/projects/{project_id}/edit")
@@ -178,12 +180,14 @@ async def swap_photo(request: Request, project_id: str) -> RedirectResponse:
 
 
 @router.post("/ui/projects/{project_id}/retry")
-def retry(project_id: str) -> RedirectResponse:
+async def retry(request: Request, project_id: str) -> RedirectResponse:
+    page = _return_to({k: str(v) for k, v in (await request.form()).items()},
+                      f"/ui/projects/{project_id}")
     try:
         actions.retry(project_id)
     except HTTPException as error:
-        return _back(f"/ui/projects/{project_id}", error)
-    return RedirectResponse(f"/ui/projects/{project_id}", status_code=303)
+        return _back(page, error)
+    return RedirectResponse(page, status_code=303)
 
 
 @router.post("/ui/projects/{project_id}/cancel")
@@ -321,6 +325,11 @@ def _technical(s: Any, project_id: str) -> dict[str, Any]:
                       .order_by(Cost.provider)).all()
     report = actions.read_latest(s, project_id, "qa_report.json")
     return {"costs": costs, "qa_report": json.loads(report) if report else None}
+
+
+def _return_to(form: dict[str, str], default: str) -> str:
+    """Where a form sends you back to: only the planner, else the run page."""
+    return "/planner" if form.get("back") == "/planner" else default
 
 
 def _back(path: str, error: HTTPException) -> RedirectResponse:

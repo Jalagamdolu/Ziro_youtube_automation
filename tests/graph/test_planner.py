@@ -230,3 +230,132 @@ def test_firing_is_idempotent_even_when_a_worker_dies_mid_publish(client, monkey
     with db.session() as s:
         assert len(s.scalars(select(Publishing).where(
             Publishing.project_id == project_id)).all()) == 1  # one publish, not two
+
+
+# --- Row lifecycle (D-66): one chip per state, only that state's actions, two doorways ---------
+
+BUTTONS = {"Make now": "/run\"", "Approve": "value=\"approve\"", "Reject": "value=\"reject\"",
+           "Schedule": "/schedule\"", "Retry": "/retry\""}
+
+
+def row(client, project_id: str) -> str:  # type: ignore[no-untyped-def]
+    """The planner's row for one video."""
+    page = client.get("/planner").text
+    chunk = next(c for c in page.split('<div class="vrow')[1:] if project_id in c)
+    return chunk.split("<h2")[0].split('<details class="panel" id=')[0]
+
+
+def offered(html: str) -> set[str]:
+    return {name for name, marker in BUTTONS.items() if marker in html}
+
+
+def chips(html: str) -> int:
+    return html.count('class="pill ') + html.count('class="pill"') - html.count(">Uploaded<")
+
+
+def decide(client, project_id: str, **form: str) -> str:  # type: ignore[no-untyped-def]
+    """A decision sent from the planner row (the second doorway)."""
+    response = client.post(f"/ui/projects/{project_id}/decide",
+                           data={"back": "/planner"} | form, follow_redirects=False)
+    return unquote(response.headers["location"])
+
+
+def test_each_state_shows_one_chip_and_only_its_actions(client) -> None:
+    project_id = create(client)
+    html = row(client, project_id)
+    assert "Needs your review" in html and chips(html) == 1
+    assert offered(html) == {"Approve", "Reject"} and "Read script" in html
+    assert decide(client, project_id, decision="approve").startswith(
+        f"/planner?submitted={project_id}:script_review")
+    html = row(client, project_id)  # now at the final review: the disclosure comes with Approve
+    assert "Needs your review" in html and offered(html) == {"Approve", "Reject"}
+    assert 'name="ai_synthetic"' in html and "Watch" in html
+    assert "/planner?submitted" in decide(client, project_id, decision="approve",
+                                          ai_synthetic="yes", ai_reason="AI narration")
+    html = row(client, project_id)
+    assert "Ready · needs a slot" in html and chips(html) == 1 and offered(html) == {"Schedule"}
+    slot(client, project_id, 3 * 24 * 60)
+    html = row(client, project_id)
+    assert "Scheduled ·" in html and "in 3 days" in html and "Unschedule" in html
+    assert offered(html) == {"Schedule"} and chips(html) == 1  # Reschedule / Unschedule
+    approvals = status(client, project_id)["approvals"]  # one approval system, two doorways
+    assert [(a["stage"], a["decision"], a["approver"]) for a in approvals] == [
+        ("script_review", "approve", "Dolender"), ("qa_review", "approve", "Dolender")]
+    assert approvals[1]["ai_disclosure"] == {"synthetic": True, "reason": "AI narration"}
+
+
+def test_a_decision_just_sent_shows_working_with_no_buttons(client) -> None:
+    project_id = create(client)
+    page = client.get(f"/planner?submitted={project_id}:script_review").text
+    html = next(c for c in page.split('<div class="vrow')[1:] if project_id in c).split("<h2")[0]
+    assert "Working on your decision…" in html and offered(html) == set()
+
+
+def test_reject_from_the_planner_needs_a_note(client) -> None:
+    project_id = create(client)
+    refused = decide(client, project_id, decision="reject", target="scripting", notes="  ")
+    assert refused.startswith("/planner?error=") and "notes" in refused
+    run = status(client, project_id)
+    assert run["status"] == "script_review" and run["approvals"] == []
+    assert "/planner?submitted" in decide(client, project_id, decision="reject",
+                                          target="scripting", notes="Shorter hook")
+    rejection = status(client, project_id)["approvals"][0]
+    assert (rejection["decision"], rejection["notes"]) == ("reject", "Shorter hook")
+    assert "Needs your review" in row(client, project_id)  # rewritten, back at the review
+
+
+def test_published_only_after_confirmation(client, monkeypatch) -> None:
+    import app.nodes as nodes
+
+    assert planner.confirmation(None) is None
+    assert planner.confirmation({"video_id": "abc"}) is None  # sent is not published
+    live = planner.confirmation({"confirmed_at": "Tue 10 Nov, 18:00 IST",
+                                 "watch_url": "https://youtu.be/abc"})
+    assert live is not None and live["label"] == "Live on YouTube"
+    real, kills = nodes.FUNCS["mock_published"], iter([True])
+
+    def dies_before_the_receipt(ctx):  # type: ignore[no-untyped-def]
+        if next(kills, False):
+            raise WorkerKilled  # the publish step is under way, nothing confirmed yet
+        return real(ctx)
+
+    monkeypatch.setitem(nodes.FUNCS, "mock_published", dies_before_the_receipt)
+    project_id = ready(client)
+    slot(client, project_id, 10)
+    scheduler.publish_due(datetime.now(UTC) + timedelta(minutes=11))
+    html = row(client, project_id)
+    assert "Publishing…" in html and "Published" not in html and offered(html) == set()
+    reaper.reap(datetime.now(UTC) + timedelta(hours=1))
+    html = row(client, project_id)
+    assert "Published (mock)" in html and ">receipt</a>" in html and "IST" in html
+    from sqlalchemy import update
+
+    from app.core.models import Artifact
+    with db.session() as s, s.begin():  # no receipt on record: not confirmed, not Published
+        s.execute(update(Artifact).where(
+            Artifact.project_id == project_id,
+            Artifact.type == "publish_receipt.json").values(stale=True))
+    html = row(client, project_id)
+    assert "Publishing…" in html and "Published" not in html
+
+
+def test_a_failed_video_says_why_in_red_and_offers_retry(client, monkeypatch) -> None:
+    import app.nodes as nodes
+    from app.core.errors import FatalError
+
+    real, fails = nodes.FUNCS["scripting"], iter([True])
+
+    def broken(ctx):  # type: ignore[no-untyped-def]
+        if next(fails, False):
+            raise FatalError("claim check failed: line 3 has no approved claim")
+        return real(ctx)
+
+    monkeypatch.setitem(nodes.FUNCS, "scripting", broken)
+    project_id = create(client)
+    html = row(client, project_id)
+    assert "pill bad" in html and ">Failed<" in html and chips(html) == 1
+    assert "line 3 has no approved claim" in html and offered(html) == {"Retry"}
+    response = client.post(f"/ui/projects/{project_id}/retry", data={"back": "/planner"},
+                           follow_redirects=False)
+    assert response.headers["location"] == "/planner"
+    assert "Needs your review" in row(client, project_id)

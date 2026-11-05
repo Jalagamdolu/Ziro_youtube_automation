@@ -10,7 +10,7 @@
   <a href="#add"><button class="primary big" type="button" onclick="openPanel('add')">+ Add a video</button></a>
 </div>
 
-{% set labels = {"slot": "Needs a slot", "upcoming": "Coming up", "unscheduled": "No time yet", "published": "Published (mock)", "closed": "Stopped or cancelled"} %}
+{% set labels = {"slot": "Needs a slot", "upcoming": "Coming up", "unscheduled": "No time yet", "published": "Published (mock)", "closed": "Failed or cancelled"} %}
 {% for group in groups if counts[group] %}
 <h2 class="group">{{ labels[group] }} <span class="count">{{ counts[group] }}</span></h2>
 <div class="rows">
@@ -18,29 +18,62 @@
   <div class="vrow{{ ' pinned' if group == 'slot' }}">
     <div class="vthumb">{% if r.thumb %}<img alt="" src="/ui/projects/{{ r.project.id }}/files/{{ r.thumb }}">{% elif r.upload %}<span>▶</span>{% else %}<span>{{ r.title[:1] }}</span>{% endif %}</div>
     <div class="vmain">
-      <span class="pill {{ r.tone }}">{{ r.chip }}</span>{% if r.upload %} <span class="pill">Uploaded</span>{% endif %}
+      <span class="pill {{ r.tone }}">{% if r.chip.endswith("…") %}<span class="spin inline" aria-hidden="true"></span> {% endif %}{{ r.chip }}</span>{% if r.upload %} <span class="pill">Uploaded</span>{% endif %}
       <h3><a href="{{ '/ui/projects/' ~ r.project.id if r.project else '/planner/' ~ r.topic.id }}">{{ r.title }}</a></h3>
       <p class="small muted">
-        {% if r.when_shown and not r.chip.startswith(("Scheduled", "Planned ·")) %}{{ r.when_shown }} · {% endif %}
-        {% if r.project and r.project.status not in ("done", "export_ready", "failed", "cancelled") %}{{ r.doing }} · {% endif %}
+        {% if r.when_shown and not r.chip.startswith(("Scheduled", "Planned ·")) and not r.confirmed %}{{ r.when_shown }} · {% endif %}
+        {% if r.project and r.do != "deciding" and r.chip != "Publishing…" and r.project.status not in ("done", "export_ready", "failed", "cancelled") %}{{ r.doing }} · {% endif %}
         {% if r.seconds %}{{ "%.1f" | format(r.seconds) }} s · {{ r.cost }}{% elif r.topic and r.topic.target_seconds %}up to {{ r.topic.target_seconds }} s{% elif r.project and not r.upload %}up to {{ r.project.target_seconds }} s{% endif %}
+        {% if r.confirmed %} · published {{ r.confirmed.at }}{% if r.confirmed.watch %} · <a href="{{ r.confirmed.watch }}" target="_blank" rel="noopener noreferrer">watch</a>{% endif %}{% endif %}
         {% if r.receipt %} · <a href="/ui/projects/{{ r.project.id }}/files/{{ r.receipt }}">receipt</a>{% endif %}
+        {% if r.reason %}<br><span class="bad-text">{{ r.reason }}</span>{% endif %}
         {% if r.topic and r.topic.guidelines %}<br>{{ r.topic.guidelines }}{% endif %}
       </p>
     </div>
     <div class="vact">
-      {% if r.project and r.project.status == "export_ready" %}
+      {# One state, its own actions only (D-66). Decisions post to the same gate endpoint as the run page. #}
+      {% if r.do == "schedule" %}
       <form class="slot" method="post" action="/videos/{{ r.project.id }}/schedule">
         <input type="hidden" name="back" value="/planner">
         <input type="datetime-local" name="publish_at" value="{{ r.when_input }}" min="{{ min_time }}" required aria-label="Publish time (IST)">
         <button class="primary" type="submit">{{ "Reschedule" if r.when else "Schedule" }}</button>
       </form>
       {% if r.when %}<form method="post" action="/videos/{{ r.project.id }}/schedule"><input type="hidden" name="back" value="/planner"><input type="hidden" name="action" value="unschedule"><button type="submit">Unschedule</button></form>{% endif %}
-      {% elif not r.project and r.topic.status == "planned" %}
+      {% elif r.do == "make" %}
       <form method="post" action="/planner/{{ r.topic.id }}/run"><button class="primary" type="submit">Make now</button></form>
       <form method="post" action="/planner/{{ r.topic.id }}/cancel"><button class="danger" type="submit">Cancel</button></form>
-      {% elif r.project %}
-      <a href="/ui/projects/{{ r.project.id }}"><button type="button">{{ "Review now" if r.project.status in ("script_review", "qa_review") else "Open" }}</button></a>
+      {% elif r.do == "review" %}
+      {% set rid = r.project.id[:8] %}
+      {% if r.project.status == "script_review" %}
+      <a href="/ui/projects/{{ r.project.id }}"><button type="button">Read script</button></a>
+      <form method="post" action="/ui/projects/{{ r.project.id }}/decide"><input type="hidden" name="back" value="/planner"><input type="hidden" name="decision" value="approve"><button class="primary" type="submit">Approve</button></form>
+      {% else %}
+      <a href="/ui/projects/{{ r.project.id }}"><button type="button">Watch</button></a>
+      <details class="panel inline decide">
+        <summary class="button primary">Approve</summary>
+        <form method="post" action="/ui/projects/{{ r.project.id }}/decide">
+          <input type="hidden" name="back" value="/planner"><input type="hidden" name="decision" value="approve">
+          <p class="small"><strong>AI disclosure (required):</strong> realistic synthetic media viewers could mistake for real?</p>
+          <label class="choice"><input type="radio" name="ai_synthetic" value="yes" required> Yes</label>
+          <label class="choice"><input type="radio" name="ai_synthetic" value="no"> No</label>
+          <input type="text" name="ai_reason" required placeholder="Reason, e.g. AI narration voice" aria-label="Disclosure reason">
+          <button class="primary" type="submit">Approve final video</button>
+        </form>
+      </details>
+      {% endif %}
+      <details class="panel inline decide">
+        <summary class="button danger">Reject</summary>
+        <form method="post" action="/ui/projects/{{ r.project.id }}/decide">
+          <input type="hidden" name="back" value="/planner"><input type="hidden" name="decision" value="reject">
+          <label for="t-{{ rid }}">Send back to</label>
+          <select id="t-{{ rid }}" name="target" required>{% for t in r.targets %}<option value="{{ t }}">{{ plain.TARGETS.get(t, t) }}</option>{% endfor %}</select>
+          <label for="n-{{ rid }}">What must change (required)</label>
+          <textarea id="n-{{ rid }}" name="notes" rows="2" required></textarea>
+          <button class="danger" type="submit">Reject and send back</button>
+        </form>
+      </details>
+      {% elif r.do == "retry" %}
+      <form method="post" action="/ui/projects/{{ r.project.id }}/retry"><input type="hidden" name="back" value="/planner"><button class="primary" type="submit">Retry</button></form>
       {% endif %}
     </div>
   </div>

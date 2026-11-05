@@ -17,7 +17,8 @@ from starlette.datastructures import UploadFile
 
 from app.adapters import storage
 from app.core import config, db
-from app.core.models import Artifact, Cost, Project, Topic
+from app.core.models import Artifact, Cost, Job, Project, Publishing, Topic
+from app.graph.stages import REJECT_TARGETS
 from app.jobs import scheduler
 from app.ui import plain
 from app.ui.routes import templates
@@ -45,9 +46,34 @@ def parse_time(value: str) -> datetime | None:
     return datetime.fromisoformat(value).replace(tzinfo=zone()).astimezone(UTC) if value else None
 
 
+def until(moment: datetime, now: datetime) -> str:
+    """The countdown beside a scheduled time: in 3 days / in 5 h / in 12 min."""
+    left = moment - now
+    if left >= timedelta(hours=36):
+        return f"in {round(left / timedelta(days=1))} days"
+    if left >= timedelta(minutes=90):
+        return f"in {round(left / timedelta(hours=1))} h"
+    return f"in {max(1, round(left / timedelta(minutes=1)))} min"
+
+
+def confirmation(receipt: dict[str, Any] | None) -> dict[str, str] | None:
+    """Published only once confirmed, never on send alone (D-66). Mock: the receipt was written.
+    Real YouTube later: the receipt carries `confirmed_at` and `watch_url` only after a read-back
+    shows the video live. Anything else is still publishing."""
+    if receipt is None:
+        return None
+    if receipt.get("mocked"):
+        return {"label": "Published (mock)", "at": receipt.get("published_at", "")}
+    if receipt.get("confirmed_at") and receipt.get("watch_url"):
+        return {"label": "Live on YouTube", "at": receipt["confirmed_at"],
+                "watch": receipt["watch_url"]}
+    return None
+
+
 def state(topic: Topic | None, project: Project | None, approved: datetime | None,
-          now: datetime) -> tuple[str, str, str]:
-    """(chip text, chip class, group) for one video. A missed slot is said loudly in red."""
+          now: datetime, confirmed: dict[str, str] | None = None) -> tuple[str, str, str]:
+    """(chip text, chip class, group) for one video: one chip, one state (D-66). A missed slot
+    and a failure are said loudly in red."""
     when = topic.publish_at if topic else None
     lead = timedelta(hours=config.load()["planner"]["start_hours_before"])
     if project is None:
@@ -58,17 +84,20 @@ def state(topic: Topic | None, project: Project | None, approved: datetime | Non
             return "Planned", "", "unscheduled"
         return f"Planned · starts {shown(when - lead)}", "", "upcoming"
     status = project.status
-    if status == "done":
-        return "Published (mock)", "ok", "published"
+    if status == "done" and confirmed:
+        return confirmed["label"], "ok", "published"
+    if status in ("done", *PUBLISHING) or (topic is not None and topic.status == scheduler.FIRING
+                                         and status == scheduler.WAITING):
+        return "Publishing…", "sched", "upcoming"
     if status in ("failed", "cancelled"):
-        return ("Stopped", "bad", "closed") if status == "failed" else ("Cancelled", "", "closed")
+        return ("Failed", "bad", "closed") if status == "failed" else ("Cancelled", "", "closed")
     if status == scheduler.WAITING:
         if when is None:
             return "Ready · needs a slot", "ready", "slot"
         if approved is not None and approved > when:
             return "Missed · needs a new time", "bad", "slot"
         if when > now:
-            return f"Scheduled · {shown(when)}", "sched", "upcoming"
+            return f"Scheduled · {shown(when)} · {until(when, now)}", "sched", "upcoming"
         return "Publishing…", "sched", "upcoming"
     review = status in plain.GATES
     if when is not None and now >= when:
@@ -78,12 +107,49 @@ def state(topic: Topic | None, project: Project | None, approved: datetime | Non
         "upcoming" if when else "unscheduled",)
 
 
+PUBLISHING = ("mock_published", "metrics_stub")  # sent, receipt not yet confirmed
 FILES = ("thumbnail.png", "publish_receipt.json", "qa_report.json")
+
+
+def _receipt(files: dict[tuple[str, str], str], project: Project | None,
+             published: dict[str, datetime]) -> dict[str, Any] | None:
+    key = files.get((project.id, "publish_receipt.json")) if project else None
+    if project is None or key is None:
+        return None
+    receipt: dict[str, Any] = json.loads(storage.get().read(key))
+    if project.id in published:
+        receipt.setdefault("published_at", shown(published[project.id]))
+    return receipt
+
+
+def _reason(job: Job | None) -> str:
+    """Why a run failed, in plain words: the step and the first line of the error."""
+    if job is None:
+        return "It stopped without a recorded reason. Retry, or open it for details."
+    step = plain.STATUS.get(job.stage, job.stage.replace("_", " ")).rstrip("…")
+    message = (job.error_message or job.error_code or "unknown error").splitlines()[0][:160]
+    return f"{step}: {message}"
+
+
+def actions(row: dict[str, Any], submitted: str | None) -> str:
+    """The one set of buttons this state offers (D-66)."""
+    project, topic, chip = row["project"], row["topic"], row["chip"]
+    if project is None:
+        return "make" if topic is not None and topic.status == "planned" else ""
+    if submitted == f"{project.id}:{project.status}":
+        return "deciding"  # the decision is in; the worker has not moved on yet
+    if project.status in plain.GATES:
+        return "review"
+    if project.status == "failed":
+        return "retry"
+    if project.status == scheduler.WAITING and chip != "Publishing…":
+        return "schedule"
+    return ""
 
 
 def _seconds(files: dict[tuple[str, str], str], project: Project | None) -> float | None:
     """A finished video's real length, from its QA report (Ready, Scheduled, Published)."""
-    if project is None or project.status not in (scheduler.WAITING, "done"):
+    if project is None or project.status not in (scheduler.WAITING, "done", *PUBLISHING):
         return None
     key = files.get((project.id, "qa_report.json"))
     if key is None:
@@ -92,8 +158,9 @@ def _seconds(files: dict[tuple[str, str], str], project: Project | None) -> floa
     return float(seconds) if seconds is not None else None
 
 
-def rows() -> list[dict[str, Any]]:
-    """Every video, grouped and sorted for the list (D-64)."""
+def rows(submitted: str | None = None) -> list[dict[str, Any]]:
+    """Every video, grouped and sorted for the list (D-64), each with its one chip and its
+    actions (D-66). `submitted` is `project_id:gate` of a decision just sent from the list."""
     now = datetime.now(UTC)
     with db.session() as s:
         topics = s.scalars(select(Topic)).all()
@@ -105,14 +172,19 @@ def rows() -> list[dict[str, Any]]:
                                .group_by(Cost.project_id)).all())
         approved = {p: scheduler.final_approved_at(s, p) for p, project in projects.items()
                     if project.status == scheduler.WAITING}
+        published = {p.project_id: p.created_at for p in s.scalars(select(Publishing))}
+        failures = {j.project_id: j for j in s.scalars(
+            select(Job).where(Job.status == "failed").order_by(Job.id))}
     linked = {t.project_id for t in topics if t.project_id}
     pairs: list[tuple[Topic | None, Project | None]] = [
         (t, projects.get(t.project_id or "")) for t in topics]
     pairs += [(None, p) for p in projects.values() if p.id not in linked]
     found = []
     for topic, project in pairs:
+        receipt = _receipt(files, project, published)
+        confirmed = confirmation(receipt)
         chip, tone, group = state(topic, project, approved.get(project.id) if project else None,
-                                 now)
+                                 now, confirmed)
         when = topic.publish_at if topic else None
         created = project.created_at if project else topic.created_at if topic else now
         found.append({
@@ -121,11 +193,18 @@ def rows() -> list[dict[str, Any]]:
             "when": when, "when_shown": shown(when) if when else "",
             "when_input": local_input(when), "created": created,
             "thumb": files.get((project.id, "thumbnail.png")) if project else None,
-            "receipt": files.get((project.id, "publish_receipt.json")) if project else None,
+            "receipt": files.get((project.id, "publish_receipt.json")) if confirmed and project
+            else None, "confirmed": confirmed,
+            "reason": _reason(failures.get(project.id)) if project and project.status == "failed"
+            else "",
+            "targets": REJECT_TARGETS.get(project.status, []) if project else [],
             "seconds": _seconds(files, project),
             "cost": plain.rupees(spent.get(project.id) or 0) if project else "",
             "upload": bool(topic and topic.kind == "upload"),
             "doing": plain.status(project.status) if project else ""})
+        found[-1]["do"] = actions(found[-1], submitted)
+        if found[-1]["do"] == "deciding":
+            found[-1].update(chip="Working on your decision…", tone="info")
 
     def key(row: dict[str, Any]) -> tuple[Any, ...]:
         newest_first = -row["created"].timestamp()
@@ -137,8 +216,9 @@ def rows() -> list[dict[str, Any]]:
 
 
 @router.get("/planner", response_class=HTMLResponse)
-def planner(request: Request, error: str | None = None) -> HTMLResponse:
-    listed = rows()
+def planner(request: Request, error: str | None = None,
+            submitted: str | None = None) -> HTMLResponse:
+    listed = rows(submitted)
     return templates.TemplateResponse(request, "planner.html", {
         "rows": listed, "error": error, "groups": GROUPS,
         "counts": {g: sum(1 for r in listed if r["group"] == g) for g in GROUPS},

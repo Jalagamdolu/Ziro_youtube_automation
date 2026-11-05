@@ -165,6 +165,20 @@ h2.group .count { font-size: 12px; background: var(--lavender); color: var(--pri
 .vact { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; align-items: center; }
 .vact form { margin: 0; display: flex; gap: 8px; align-items: center; }
 .vact input[type=datetime-local] { width: auto; }
+/* Planner row decisions (D-66): the summary looks like a button; its form opens under the row. */
+.vact details.decide { border: 0; padding: 0; margin: 0; background: none; box-shadow: none; }
+.vact details.decide > summary { list-style: none; display: inline-block; cursor: pointer; font-weight: 600;
+  font-size: 14px; padding: 9px 18px; border-radius: 999px; border: 1px solid rgba(124, 58, 237, .25); background: #fff; }
+.vact details.decide > summary::-webkit-details-marker { display: none; }
+.vact details.decide > summary.primary { background: var(--gradient); color: #fff; border-color: transparent; }
+.vact details.decide > summary.danger { color: var(--bad); border-color: rgba(239, 68, 68, .4); }
+.vrow:has(details.decide[open]) { flex-wrap: wrap; }
+.vrow:has(details.decide[open]) .vact { flex-basis: 100%; }
+.vact details.decide[open] { flex-basis: 100%; order: 9; }
+.vact details.decide form { display: block; margin-top: 10px; padding: 12px; border-radius: 12px; background: #faf7fe; }
+.vact details.decide form button { margin-top: 8px; }
+.spin.inline { display: inline-block; width: 10px; height: 10px; border-width: 2px; vertical-align: -1px; }
+.bad-text { color: var(--bad); }
 .pill.info { color: var(--primary); background: #f1e8fc; }
 .pill.ready { color: #fff; background: var(--gradient); }
 .pill.sched { color: #1d4ed8; background: #e7efff; }
