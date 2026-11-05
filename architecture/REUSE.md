@@ -32,3 +32,7 @@ Filled in as each phase wires a vendored file into the pipeline (file → where 
 | Claim ledger + per-claim review | `src/app/nodes/researching.py`, research_review gate | The pack's yt-viral researches angles, not citable claims with verified quotes. |
 | Fixture LLM + research (prototype mode) | `src/app/adapters/llm.py`, `research.py`, `fixtures/` | D-19: $0 demo. |
 | Free-tier LLM adapters, research agent, search + fetch (production mode) | `src/app/adapters/llm.py`, `research.py`, `search.py`, `prompts.py` | D-27: the pack has no API client, agent loop or quote verification. |
+| Claude writer (v2) | `src/app/adapters/llm.py` (`ClaudeChat`), `prompts.py` | D-42: the pack's SKILL.md and hooks.json text goes into Claude's cached system prompt, read only, as it did for the free tiers. |
+| Uncited-line detector | `src/app/nodes/script_checks.py` (`uncited_problems`) | D-43: the pack has no notion of a claim ledger. |
+| Support check (Claude Haiku, flags only) | `src/app/nodes/scripting.py` (`support_flags`), `prompts.py` | D-44. |
+| Budget caps | `src/app/core/costs.py` (`check_budget`) | D-45. |

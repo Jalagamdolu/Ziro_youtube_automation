@@ -21,3 +21,13 @@ Why: on run 69869d1c, Claude's prepared draft (D-32) was overwritten by a submit
 
 1. **Priority: refuse stale edit submits.** The edit form carries the checksum of the draft it was loaded with. If the stored draft has changed since then (for example a Claude-prepared draft was placed), the submit is refused with "the draft changed since you opened this page; reload", and nothing is overwritten.
 2. **Draft history picker.** Keep every draft for a run instead of overwriting `last_failed_draft.txt`: the model's, Claude's prepared draft and each failed hand edit. Add a picker in the edit box to load any of them.
+
+## v2 Content Studio (branch `v2-content-studio`, from `architecture/v2-architecture.md`)
+Build order: Step 1 Claude writer + uncited-line detector + Haiku support flags + budget caps (D-42..D-45) · Step 2 Sarvam voice · Step 3 topic planner + scheduler + login · Step 4 split layout + two-layer captions + shot planner.
+
+Deferred, not in this build (logged 2026-11-05):
+- LatentSync lip-sync of sir's clip (needs a GPU and sir's base clip + signed consent).
+- FLUX.1 schnell topic images (needs a GPU). Pixabay photos and v1 cards stay the content visuals.
+- YouTube OAuth / real publish (publishing stays mocked).
+- Languages beyond English.
+- Any new infrastructure (no `gpu-worker` / `render` services yet; same four compose services).
