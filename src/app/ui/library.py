@@ -3,6 +3,7 @@ Videos waiting for one of your reviews are pinned to the top; filters narrow the
 approved at the final review lands here with a "Saved to Library" toast."""
 
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
@@ -18,10 +19,15 @@ def library(request: Request, show: str = "all", saved: str | None = None,
             error: str | None = None) -> HTMLResponse:
     show = show if show in planner.FILTERS else "all"
     cards = [v for v in planner.videos(saved) if v["project"] is not None]
-    counts = {key: sum(1 for c in cards if keys is None or c["key"] in keys)
-              for key, (_, keys) in planner.FILTERS.items()}
-    keys = planner.FILTERS[show][1]
-    shown = [c for c in cards if keys is None or c["key"] in keys]
+
+    def listed(key: str) -> list[dict[str, Any]]:
+        """Archived videos show only under Archived (D-73)."""
+        keys = planner.FILTERS[key][1]
+        return [c for c in cards if c["archived"] == (key == "archived")
+                and (keys is None or c["key"] in keys)]
+
+    counts = {key: len(listed(key)) for key in planner.FILTERS}
+    shown = listed(show)
     shown.sort(key=lambda c: (c["key"] not in ("review_script", "review_video"),
                               c["key"] == "cancelled", -c["created"].timestamp()))
     return templates.TemplateResponse(request, "library.html", {

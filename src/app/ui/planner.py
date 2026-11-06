@@ -33,7 +33,8 @@ NEEDS_YOU = ("script_review", "qa_review")
 # Library filters: key -> (label, the statuses it shows)
 FILTERS = {"all": ("All", None), "needs": ("Needs you", {"review_script", "review_video"}),
            "ready": ("Ready", {"ready"}), "scheduled": ("Scheduled", {"scheduled"}),
-           "published": ("Published", {"published"}), "failed": ("Failed", {"failed"})}
+           "published": ("Published", {"published"}), "failed": ("Failed", {"failed"}),
+           "archived": ("Archived", None)}  # archived: hidden from every other view (D-73)
 
 
 def zone() -> timezone:
@@ -210,6 +211,7 @@ def videos(saved: str | None = None, only: str | None = None) -> list[dict[str, 
             chip, tone, key = "Saving to Library…", "info", "saving"
         found.append({
             "topic": topic, "project": project, "id": pid, "chip": chip, "tone": tone,
+            "archived": bool(project and project.archived),
             "key": key, "busy": chip.endswith("…"),
             "title": metas[pid]["title"] if pid in metas else (
                 project.topic if project else topic.topic if topic else ""),
@@ -238,7 +240,7 @@ def needs_you() -> int:
     """The sidebar badge: videos waiting for one of your reviews."""
     with db.session() as s:
         return s.scalar(select(func.count()).select_from(Project)
-                        .where(Project.status.in_(NEEDS_YOU))) or 0
+                        .where(Project.status.in_(NEEDS_YOU), Project.archived.is_(False))) or 0
 
 
 templates.env.globals["needs_you"] = needs_you
@@ -257,7 +259,7 @@ def planner(request: Request, error: str | None = None, view: str = "month",
             month: str | None = None) -> HTMLResponse:
     """The calendar: everything with a time, by day (month) or in order (list)."""
     now = datetime.now(UTC)
-    items = [v for v in videos() if v["key"] != "cancelled" and (
+    items = [v for v in videos() if v["key"] != "cancelled" and not v["archived"] and (
         v["when"] or v["key"] == "failed" and _publish_failed(v))]
     first = _month(month, now)
     weeks = calendar.Calendar(firstweekday=0).monthdatescalendar(first.year, first.month)

@@ -9,7 +9,7 @@
   <a class="button primary" href="/new">+ New Video</a>
 </div>
 <nav class="filters" aria-label="Filter videos">
-  {% for key, (label, _) in filters.items() %}
+  {% for key, (label, _) in filters.items() if key != "archived" or counts[key] %}
   <a href="/library?show={{ key }}" class="{{ 'on' if key == show }}">{{ label }} <span class="count">{{ counts[key] }}</span></a>
   {% endfor %}
 </nav>

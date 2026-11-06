@@ -611,3 +611,13 @@ Reshapes D-64 to D-66; nothing was rebuilt from scratch. Design bar: simple, nea
 - The ₹ cost chip is gone from Library cards, the video page header and Planner rows, for every video, existing and future. This supersedes D-63/D-69 showing it there.
 - Cost is still recorded for every paid call (`costs` rows, unchanged) and stays visible in one place: the Cost table under Technical details on the video page (per provider, with the total in $ and ₹), plus the cost report.
 - Test: `test_planner` checks that no ₹ appears on the Library card, the Planner list or the video page outside Technical details.
+
+## D-73 No banners; old runs archived; old thumbnails redrawn; local production (Dolender, 2026-11-06)
+- **No banners in any mode.** The yellow mode/engine banners (D-46) are gone from every page. The sidebar chip ("production · publish mock") shows the mode. Missing keys are still logged at startup (`engines.banners()` feeds the log only).
+- **Archived.** `projects.archived` (migration 0011) hides a video from every Library filter, the Planner and the "Needs you" badge. It is never deleted, and it is listed under the Library's Archived filter, which appears once something is archived.
+  - `make archive BEFORE=YYYY-MM-DD` (`cli archive`) archives videos created before that IST day, with an audit row each.
+  - Run once on 2026-11-06: 48 runs archived, the 1 run from today kept. 14 archived runs were at a review gate and none had a slot, so nothing scheduled was hidden. There is no unarchive button yet; if one is needed, say so.
+- **Old thumbnails redrawn** with the D-70 fitting logic, as stills only (no video render): all 40 thumbnail artifacts, each from its video's own thumbnail text, replaced in place with the checksum updated and an audit row. The committed export `outputs/demo-short/rendering/thumbnail.png` was redrawn too.
+- **Local config: production** (writer Claude, voice Sarvam `ishita_en_stories`; ANTHROPIC and SARVAM keys present). `publish.mode` stays mock, and the committed default stays prototype.
+- **Length picker** checked in a real browser in production: all five options enabled, 60 s default, one active at a time. With submit blocked in the page (no run created), each preset sent its value and Custom sent `custom` + 42.
+- **₹ cost** stays out of the main UI (D-72), checked on the live pages for old and new videos; it is shown only under Technical details.

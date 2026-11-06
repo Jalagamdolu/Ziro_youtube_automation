@@ -31,6 +31,7 @@ class Project(Base):
     cta: Mapped[str] = mapped_column(Text)
     status: Mapped[str]
     created_at: Mapped[datetime] = mapped_column(default=now)
+    archived: Mapped[bool] = mapped_column(Boolean, default=False)  # hidden, kept (D-73)
 
 
 class Topic(Base):

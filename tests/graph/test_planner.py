@@ -433,3 +433,34 @@ def test_a_failed_video_says_why_in_red_and_offers_retry(client, monkeypatch) ->
                            follow_redirects=False)
     assert response.headers["location"] == "/library"
     assert "Needs your review (script)" in card(client, project_id)
+
+
+def test_no_banners_on_any_page(client) -> None:
+    project_id = create(client)
+    for page in ("/library", "/new", "/planner", f"/ui/projects/{project_id}"):
+        html = client.get(page).text
+        assert 'class="banner"' not in html and "fixture scripts" not in html  # D-73
+    assert "prototype · publish mock" in client.get("/library").text  # the sidebar chip
+
+
+def test_archived_videos_hide_everywhere_but_the_archived_filter(client, monkeypatch) -> None:
+    import argparse
+    from datetime import date
+
+    from app.api import cli
+
+    old, new = create(client), ready(client)
+    slot(client, new, 60)
+    with db.session() as s, s.begin():  # the first video was made before today
+        from app.core.models import Project
+        s.get_one(Project, old).created_at = datetime(2026, 11, 5, 10, tzinfo=UTC)
+    cli.archive(argparse.Namespace(before=date(2026, 11, 6), actor="Dolender"))
+    page = client.get("/library").text
+    assert old not in page and new in page and "Needs you · " not in page
+    assert ">Archived <" in page.replace("Archived <span", "Archived <")
+    archived = client.get("/library?show=archived").text
+    assert old in archived and new not in archived
+    assert old not in client.get("/library?show=needs").text
+    assert status(client, old)["status"] == "script_review"  # kept as it was, not deleted
+    assert ("Dolender", "archived (created before 2026-11-06)") in notes(old)
+    assert new in client.get("/planner?view=list").text

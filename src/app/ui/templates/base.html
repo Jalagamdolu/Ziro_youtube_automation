@@ -27,7 +27,6 @@
     <p class="side-foot small muted"><span class="mode">{{ mode() }} · publish {{ publish_mode() }}</span><br>{{ request.state.user.name }} · times in IST</p>
   </aside>
   <div class="page">
-    {% if banners() %}<div class="banners">{% for line in banners() %}<div class="banner">{{ line }}</div>{% endfor %}</div>{% endif %}
     <main>
       {% if error %}<section class="error" role="alert"><strong>Not done:</strong> {{ error }}</section>{% endif %}
       {% block content %}{% endblock %}

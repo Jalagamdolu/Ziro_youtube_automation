@@ -21,7 +21,7 @@ from sqlalchemy import func, select
 from app.adapters import storage
 from app.api import actions
 from app.api.actions import CreateRequest, DecisionRequest
-from app.core import config, db, engines
+from app.core import config, db
 from app.core.contracts import ContentPackage, HookDraft, PackageDraft
 from app.core.models import Artifact, Cost
 from app.graph.stages import GATES, ORDER, REJECT_TARGETS
@@ -32,7 +32,6 @@ from app.ui import plain
 router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 templates.env.globals["mode"] = lambda: config.load()["mode"]
-templates.env.globals["banners"] = engines.banners  # missing keys, said on every page (D-46)
 templates.env.globals["plain"] = plain  # the product view's words (D-63)
 # The stylesheet's URL carries its content hash, so a browser never keeps a stale copy.
 templates.env.globals["css_version"] = hashlib.sha256(

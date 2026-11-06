@@ -3,10 +3,13 @@
 import argparse
 import shutil
 import time
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
+from sqlalchemy import select
+
 from app.api.actions import CreateRequest, create_project, latest_artifacts
-from app.core import config, db
+from app.core import audit, config, db
 from app.core.models import Project
 from app.graph.stages import CANCELLED, DONE, FAILED, GATES
 
@@ -43,6 +46,19 @@ def export(args: argparse.Namespace) -> None:
     print(f"exported {len(latest)} files to {args.dest}")
 
 
+def archive(args: argparse.Namespace) -> None:
+    """Archive every video created before a day (IST): hidden, never deleted (D-73)."""
+    ist = timezone(timedelta(hours=5, minutes=30))
+    before = datetime.combine(args.before, datetime.min.time(), ist)
+    with db.session() as s, s.begin():
+        old = s.scalars(select(Project).where(Project.created_at < before,
+                                              Project.archived.is_(False))).all()
+        for project in old:
+            project.archived = True
+            audit.action(s, project.id, args.actor, f"archived (created before {args.before})")
+    print(f"archived {len(old)} videos created before {args.before}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="ziro")
     commands = parser.add_subparsers(required=True)
@@ -59,6 +75,11 @@ def main() -> None:
     out.add_argument("--run", required=True)
     out.add_argument("--dest", required=True, type=Path)
     out.set_defaults(handler=export)
+
+    old = commands.add_parser("archive")
+    old.add_argument("--before", required=True, type=date.fromisoformat, help="YYYY-MM-DD, IST")
+    old.add_argument("--actor", default="Dolender")
+    old.set_defaults(handler=archive)
 
     args = parser.parse_args()
     args.handler(args)
