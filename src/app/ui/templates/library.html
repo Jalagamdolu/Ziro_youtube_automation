@@ -17,7 +17,7 @@
 <div class="cards">
   {% for v in cards %}
   <article class="card{{ ' needs' if v.key in ('review_script', 'review_video') }}{{ ' just' if v.id == saved }}">
-    <a class="thumb" href="/ui/projects/{{ v.id }}">{% if v.thumb %}<img alt="" loading="lazy" src="/ui/projects/{{ v.id }}/files/{{ v.thumb }}">{% else %}<span>{{ "▶" if v.upload else v.title[:1] }}</span>{% endif %}</a>
+    <a class="thumb" href="/ui/projects/{{ v.id }}">{% if v.thumb %}<img alt="" loading="lazy" src="/ui/projects/{{ v.id }}/files/{{ v.thumb }}" onerror="this.remove()">{% else %}<span>{{ "▶" if v.upload else v.title[:1] }}</span>{% endif %}</a>
     <div class="body">
       <span class="pill {{ v.tone }}">{% if v.busy %}<span class="spin inline" aria-hidden="true"></span> {% endif %}{{ v.chip }}</span>
       <h3><a href="/ui/projects/{{ v.id }}">{{ v.title }}</a></h3>

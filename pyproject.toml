@@ -78,7 +78,7 @@ exclude = ["src/vendor"]
 
 # Worker-image-only media libraries (D-24); the API/test image type-checks without them.
 [[tool.mypy.overrides]]
-module = ["kokoro_onnx", "numpy", "soundfile", "whisperx"]
+module = ["kokoro_onnx", "numpy", "soundfile", "whisperx", "PIL", "PIL.*"]
 ignore_missing_imports = true
 
 # APScheduler 3.x ships no type information (D-47).

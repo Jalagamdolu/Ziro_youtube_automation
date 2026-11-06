@@ -581,3 +581,15 @@ Reshapes D-64 to D-66; nothing was rebuilt from scratch. Design bar: simple, nea
   - **Phones**: every page leaves the tab bar's height (plus the safe area) free at the bottom. The screenshot tool now sizes the window to the whole page, so fixed bars appear where a reader sees them.
   - **Thumbnail**: a missing or unreadable thumbnail (stub renders) shows a neutral "No thumbnail image yet" box.
   - **Demo data**: the screenshot builder gives each demo video a title, tags and description matching its own topic. Prototype mode's own fixture always matched its topic; the mismatch was demo-only.
+
+## D-70 Thumbnail text always fits the frame; the stylesheet URL is versioned (Dolender, 2026-11-06)
+- **Thumbnail.** The text was drawn at a fixed 120 px, so titles like "Words Become Numbers" ran past the 1280×720 frame. Now:
+  - `rendering.fit_thumbnail` measures the text in the real font and picks one line or the best two-line split, whichever allows the larger size;
+  - the text sits inside 96 px side and 80 px top/bottom margins, capped at 150 px;
+  - FFmpeg still draws it.
+  - Pillow only measures. It is no new dependency: it is already locked at 13.0.0 in the worker through matplotlib/torchvision, and it is imported inside the function, like soundfile.
+- **Checked on stills only**, no video. The eight longest existing titles plus "RAG" were drawn with the real font; every lit pixel sits inside the safe area. The images are in `tests/manual_qa/thumbnails/`, and `tests/unit/test_thumbnail_fit.py` holds the layout rule. Thumbnails of earlier runs keep their old image until those videos are rendered again.
+- **Stylesheet.** Browsers kept the pre-D-69 `theme.css`, so the new sidebar icons had no size and filled the screen. Now:
+  - the link carries the file's content hash (`theme.css?v=…`);
+  - the icons have a fixed 20 px size in the HTML, so they stay small even without styles;
+  - a card thumbnail that cannot load is removed, leaving the placeholder.

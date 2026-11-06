@@ -14,6 +14,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Callable
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
@@ -96,10 +97,7 @@ def rendering(ctx: StageContext) -> Outputs:
         _run(["ffmpeg", "-y", "-i", "raw.mp4", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
               "-c:v", "copy", "-c:a", "aac", "-b:a", "160k", "-ar", "48000",
               "-movflags", "+faststart", "video.mp4"], work)
-        (work / "thumb.txt").write_text(package.thumbnail_text, encoding="utf-8")
-        _run(["ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=0x0F131A:s=1280x720", "-frames:v", "1",
-              "-vf", f"drawtext=fontfile={FONT}:textfile=thumb.txt:fontcolor=white:fontsize=120:"
-                     "x=(w-text_w)/2:y=(h-text_h)/2", "thumbnail.png"], work)
+        thumbnail(package.thumbnail_text, work)
         outputs: Outputs = {
             "narration.wav": (work / "public" / "narration.wav").read_bytes(),
             "words.json": json.dumps(words, indent=2, ensure_ascii=False),
@@ -142,6 +140,44 @@ def rendering(ctx: StageContext) -> Outputs:
 
 
 STEPS = ("voice", "captions", "render", "quality")  # what the Generating screen shows (D-69)
+# Thumbnail (D-70): 1280x720, text kept inside safe margins, one or two lines, as large as fits.
+THUMB_W, THUMB_H, THUMB_MARGIN_X, THUMB_MARGIN_Y = 1280, 720, 96, 80
+THUMB_MAX_SIZE, LINE_GAP = 150, 0.18  # font px cap; gap between lines as a share of the size
+
+
+def fit_thumbnail(text: str, width_at: Callable[[str], float]) -> tuple[list[str], int]:
+    """(lines, font size) for the thumbnail text: one line or the best two-line split, whichever
+    allows the larger size inside the safe area. `width_at(line)` is the line's width at size 1
+    in the thumbnail font."""
+    words = text.split()
+    layouts = [[" ".join(words)]] + [[" ".join(words[:i]), " ".join(words[i:])]
+                                     for i in range(1, len(words))]
+    best: tuple[list[str], int] = ([text], 1)
+    for lines in layouts:
+        by_width = (THUMB_W - 2 * THUMB_MARGIN_X) / max(width_at(line) for line in lines)
+        by_height = (THUMB_H - 2 * THUMB_MARGIN_Y) / (len(lines) + LINE_GAP * (len(lines) - 1))
+        size = int(min(THUMB_MAX_SIZE, by_width, by_height))
+        if size > best[1]:
+            best = (lines, size)
+    return best
+
+
+def thumbnail(text: str, work: Path) -> None:
+    """thumbnail.png in `work`: the text measured in the real font, centred, never past the
+    safe margins. Pillow (locked in the worker via matplotlib) only measures; FFmpeg draws."""
+    from PIL import ImageFont  # worker image only
+
+    font = ImageFont.truetype(FONT, 100)
+    lines, size = fit_thumbnail(text, lambda line: font.getlength(line) / 100)
+    block = size * (len(lines) + LINE_GAP * (len(lines) - 1))
+    draws = []
+    for i, line in enumerate(lines):
+        (work / f"thumb{i}.txt").write_text(line, encoding="utf-8")
+        top = (THUMB_H - block) / 2 + i * size * (1 + LINE_GAP)
+        draws.append(f"drawtext=fontfile={FONT}:textfile=thumb{i}.txt:fontcolor=white:"
+                     f"fontsize={size}:x=(w-text_w)/2:y={top:.0f}")
+    _run(["ffmpeg", "-y", "-f", "lavfi", "-i", f"color=c=0x0F131A:s={THUMB_W}x{THUMB_H}",
+          "-frames:v", "1", "-vf", ",".join(draws), "thumbnail.png"], work)
 
 
 def progress(project_id: str, step: str) -> None:

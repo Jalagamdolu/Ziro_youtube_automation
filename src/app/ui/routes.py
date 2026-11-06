@@ -34,6 +34,9 @@ templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 templates.env.globals["mode"] = lambda: config.load()["mode"]
 templates.env.globals["banners"] = engines.banners  # missing keys, said on every page (D-46)
 templates.env.globals["plain"] = plain  # the product view's words (D-63)
+# The stylesheet's URL carries its content hash, so a browser never keeps a stale copy.
+templates.env.globals["css_version"] = hashlib.sha256(
+    (Path(__file__).parent / "static" / "theme.css").read_bytes()).hexdigest()[:10]
 # Finished-run downloads: file name -> button label (the export bundle, one file at a time).
 DURATIONS = ("30", "40", "50", "60")  # New Video's length picker; 60 s is the ceiling (D-62)
 DOWNLOADS = {"video.mp4": "Video (MP4)", "captions.srt": "Captions (SRT)",
