@@ -139,6 +139,10 @@ def test_regenerate_needs_no_notes_and_rewrites_the_script(client) -> None:
     assert (rejection["decision"], rejection["target_stage"]) == ("reject", "scripting")
     assert rejection["notes"] == "Regenerate the script (no notes given)."
     assert run["status"] == "script_review"  # rewritten, back for review
+    client.post(f"/ui/projects/{project_id}/decide", data={
+        "decision": "regenerate", "target": "researching", "notes": "Find newer sources"})
+    again = status(client, project_id)["approvals"][1]
+    assert (again["target_stage"], again["notes"]) == ("researching", "Find newer sources")
 
 
 def test_new_video_is_a_short_with_a_length_of_at_most_sixty(client) -> None:

@@ -119,8 +119,8 @@ async def decide(request: Request, project_id: str) -> RedirectResponse:
     body: dict[str, Any] = {"reviewer": request.state.user["name"],  # the reviewer (D-61)
                             "notes": form.get("notes", "").strip(),
                             "target": form.get("target") or None}
-    if form.get("decision") == "regenerate":  # D-69: a rewrite, notes optional
-        body["target"] = "scripting"
+    if form.get("decision") == "regenerate":  # D-69: a rewrite (or new research), notes optional
+        body["target"] = "researching" if form.get("target") == "researching" else "scripting"
         body["notes"] = body["notes"] or "Regenerate the script (no notes given)."
     if kind == "approve" and form.get("ai_synthetic"):
         body["ai_disclosure"] = {"synthetic": form["ai_synthetic"] == "yes",

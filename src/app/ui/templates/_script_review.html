@@ -4,12 +4,9 @@
 <section class="gate">
   <h2>Your script review</h2>
   <p class="muted small">Read it beat by beat. Every fact line shows the quote it rests on. Approving locks the script.</p>
-  {% set defs = p.claims | selectattr("kind", "equalto", "definition") | list %}
-  {% set mech = p.claims | selectattr("kind", "equalto", "mechanism") | list %}
-  <p class="small">{{ p.claims | length }} sources: <strong>{{ defs | length }} definition</strong> (what it is) · <strong>{{ mech | length }} mechanism</strong> (how it works) · {{ p.claims | length - defs | length - mech | length }} other.</p>
   {% set sup = gate.support %}
-  {% if sup and sup.status != "ok" %}<p class="muted small">Fact checker not run: {{ sup.reason }}</p>
-  {% elif sup %}{% set n = sup.verdicts | rejectattr("supported") | list | length %}<p class="small">{% if n %}<span class="pill warn">{{ n }} flagged</span> The fact checker thinks {{ n }} line{{ "s" if n != 1 }} say{{ "" if n != 1 else "s" }} more than the source. You decide.{% else %}<span class="pill ok">✓ checked</span> Every fact line matches its source.{% endif %}</p>{% endif %}
+  {% set n = sup.verdicts | rejectattr("supported") | list | length if sup and sup.status == "ok" else 0 %}
+  <p class="small">{% if n %}<span class="pill warn">{{ n }} flagged</span> {{ p.claims | length }} sources — {{ n }} line{{ "s" if n != 1 }} may say more than {{ "their" if n != 1 else "its" }} source. You decide.{% else %}<span class="pill ok">✓</span> {{ p.claims | length }} sources — every fact line verified{% endif %}</p>
 
   <div class="beats">
     {% for line in gate.script_lines %}
@@ -20,7 +17,7 @@
       <p class="said">{{ line.bare }}</p>
       {% if line.claims or line.flags %}
       <div class="source small">
-        {% for c in line.claims %}<span class="pill {{ 'ok' if c.kind == 'mechanism' else '' }}">{{ c.kind or "other" }}</span> <q>{{ c.quote }}</q> — <a href="{{ c.url }}" target="_blank" rel="noopener noreferrer">{{ c.title }}</a>{% if c.published_at %} · {{ c.published_at[:10] }}{% endif %}{% if not loop.last %}<br>{% endif %}{% endfor %}
+        {% for c in line.claims %}<q>{{ c.quote }}</q> — <a href="{{ c.url }}" target="_blank" rel="noopener noreferrer">{{ c.title }}</a>{% if c.published_at %} · {{ c.published_at[:10] }}{% endif %}{% if not loop.last %}<br>{% endif %}{% endfor %}
         {% for f in line.flags %}<p class="flag"><span class="pill warn">flag</span> says more than the source: {{ f.says_more }}</p>{% endfor %}
       </div>
       {% endif %}
@@ -39,7 +36,7 @@
     <p class="small muted">Tags: {{ p.tags | join(", ") }} · Thumbnail text: {{ p.thumbnail_text }}</p>
   </details>
 
-  <div class="actionbar">
+  <div class="actionbar dock" role="group" aria-label="Your decision">
     <form method="post" action="/ui/projects/{{ run.id }}/decide"><input type="hidden" name="decision" value="approve"><button class="primary big" type="submit">✓ Approve</button></form>
     <button class="big" type="button" onclick="openPanel('edit')">Edit</button>
     <button class="big" type="button" onclick="openPanel('regenerate')">Regenerate</button>
@@ -52,8 +49,7 @@
     <input type="hidden" name="decision" value="regenerate">
     <label for="rg-notes">What should change? <span class="muted">(optional)</span></label>
     <textarea id="rg-notes" name="notes" rows="2" placeholder="e.g. Shorter hook, one clearer example"></textarea>
+    <label class="choice"><input type="checkbox" name="target" value="researching"> Find new sources first (research again, then rewrite)</label>
     <p><button class="primary" type="submit">Regenerate</button> <span class="small muted">Every check runs again; you review the new script here.</span></p>
   </form>
-  <p class="small muted">Need new sources instead? <a href="#reject" onclick="openPanel('reject')">Send it back to research</a>.</p>
 </details>
-{% include "_reject.html" %}

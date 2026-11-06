@@ -9,8 +9,8 @@
     <div>
       {% include "_qa_ticks.html" %}
       <h3>Title</h3><p>{{ p.top_titles[0] }}</p>
-      {% if gate.thumbnail %}<h3>Thumbnail</h3><img class="thumb" alt="Thumbnail preview" style="width:100%"
-           src="/ui/projects/{{ run.id }}/files/{{ gate.thumbnail }}">{% endif %}
+      <h3>Thumbnail</h3>
+      <div class="thumbbox"><span>No thumbnail image yet</span>{% if gate.thumbnail %}<img alt="Thumbnail preview" src="/ui/projects/{{ run.id }}/files/{{ gate.thumbnail }}" onerror="this.remove()">{% endif %}</div>
       <h3>Tags</h3><p class="small muted">{{ p.tags | join(", ") }}</p>
       <details class="panel inline"><summary>Description</summary><pre>{{ p.description }}</pre></details>
     </div>

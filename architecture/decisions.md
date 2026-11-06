@@ -566,9 +566,18 @@ Reshapes D-64 to D-66; nothing was rebuilt from scratch. Design bar: simple, nea
   - publish log = `publishing`, which gains `confirmed_at` and `watch_url` (migration 0010);
   - audit trail = `events`, which gains `note`. Every action that is not a state change (schedule, unschedule, publish now, publish early, metadata edit, read-back confirmation) is a row with who, when and what. Gate counting ignores these rows.
 - **Kept from the architecture, against the session prompt:**
-  - Publish attempts stay at 5 (ARCHITECTURE.md §4), not 3 retries.
+  - Publish attempts stay at 5 (ARCHITECTURE.md §4), not 3 retries. **Confirmed by Dolender, 2026-11-06.**
   - The scheduler stays in the API process (v2 §2), not a separate worker. Its state is Postgres, it checks every minute, and it survives restarts.
 - **Tests**:
   - `tests/graph/test_planner.py`: chip-per-state and actions, needs-you pin and badge, filters, toast, Regenerate, New Video limits, publish lock, Publish now, scheduling, missed slots, metadata edits, audit rows, idempotent firing, published-only-after-confirmation.
   - `tests/graph/test_youtube_publish.py` (respx, never calls Google): private with publishAt, synthetic flag and disclosure, no API key, read-back confirmation, publish now, reschedule/unschedule in place, missing OAuth token, wrong channel, crash mid-upload never uploads twice, no publish without the final approval.
 - Screenshots: `tests/manual_qa/ui-v4/` (all five screens, desktop and phone).
+- **Polish round** (from the ui-v4 screenshot review, 2026-11-06):
+  - **Action bar**: the script review's Approve · Edit · Regenerate bar is docked to the viewport's bottom edge (above the tab bar on a phone), and the page leaves room under the script, so no beat is ever behind it.
+  - **Three actions**: script review has exactly Approve · Edit · Regenerate.
+    - "Reject — send it back" is merged into Regenerate (notes optional), which has a "Find new sources first" tick box: a reject to research.
+    - The final review keeps Approve / Reject.
+  - **Sources line**: plain words, "N sources — every fact line verified", or the flag count. The definition/mechanism breakdown (D-40) and the fact checker's status move under Technical details, and quote cards lose their category tag.
+  - **Phones**: every page leaves the tab bar's height (plus the safe area) free at the bottom. The screenshot tool now sizes the window to the whole page, so fixed bars appear where a reader sees them.
+  - **Thumbnail**: a missing or unreadable thumbnail (stub renders) shows a neutral "No thumbnail image yet" box.
+  - **Demo data**: the screenshot builder gives each demo video a title, tags and description matching its own topic. Prototype mode's own fixture always matched its topic; the mismatch was demo-only.

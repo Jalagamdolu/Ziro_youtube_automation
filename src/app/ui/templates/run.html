@@ -32,6 +32,14 @@
 
 <details class="tech">
   <summary>Technical details</summary>
+  {% if run.status == "script_review" and gate.package %}{% set p = gate.package %}
+  <h2>Sources by kind</h2>
+  {% set defs = p.claims | selectattr("kind", "equalto", "definition") | list %}
+  {% set mech = p.claims | selectattr("kind", "equalto", "mechanism") | list %}
+  <p class="small"><strong>{{ defs | length }} definition</strong> (what it is) · <strong>{{ mech | length }} mechanism</strong> (how it works) · {{ p.claims | length - defs | length - mech | length }} other (D-40).</p>
+  <ul class="plainlist small">{% for c in p.claims %}<li><span class="pill {{ 'ok' if c.kind == 'mechanism' else '' }}">{{ c.kind or "other" }}</span> {{ c.id }} · {{ c.title }} · {{ c.verification_status }}</li>{% endfor %}</ul>
+  <p class="small muted">Fact checker (Claude Haiku, flags only): {% if gate.support and gate.support.status == "ok" %}ran on {{ gate.support.verdicts | length }} cited lines{% else %}not run: {{ gate.support.reason if gate.support else "no result" }}{% endif %}</p>
+  {% endif %}
   {% include "_technical.html" %}
   {% if run.status not in ("done", "cancelled") %}
   <form method="post" action="/ui/projects/{{ run.id }}/cancel"><button class="danger" type="submit">Cancel this video</button></form>

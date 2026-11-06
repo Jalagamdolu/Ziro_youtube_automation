@@ -137,7 +137,8 @@ def test_hand_edit_from_the_browser_goes_through_every_check(client) -> None:
     assert "Edit before approving" in page
     # one decision bar: Approve, Edit (opens the edit panel) and Send back (D-63)
     assert "✓ Approve" in page and "openPanel('edit')" in page
-    assert "openPanel('reject')" in page and "Submit my edit through all checks" in page
+    assert "openPanel('regenerate')" in page and "Submit my edit through all checks" in page
+    assert "Reject — send it back" not in page  # three actions only (D-69)
     original = html.unescape(page.split('aria-label="Editable script package">')[1]
                              .split("</textarea>")[0])
 
