@@ -322,7 +322,7 @@ def test_an_uploaded_recording_is_a_card_with_the_same_slots_and_lock(client) ->
     assert Path(receipt["storage_path"]).name == "publish_receipt.json"
 
 
-def test_cards_show_real_length_and_cost_and_planned_rows_have_a_page(client,
+def test_cards_show_real_length_but_no_cost_and_planned_rows_have_a_page(client,
                                                                      monkeypatch) -> None:
     import json
 
@@ -337,7 +337,9 @@ def test_cards_show_real_length_and_cost_and_planned_rows_have_a_page(client,
     assert "No time yet" in client.get(f"/planner/{topic_id}").text
     project_id = ready(client)
     html = card(client, project_id)
-    assert "37 s" in html and "₹0.00" in html  # its real length and cost, not "up to"
+    assert "37 s" in html  # its real length, not "up to"
+    assert "₹" not in html and "₹" not in client.get("/planner?view=list").text  # D-72
+    assert "₹" not in client.get(f"/ui/projects/{project_id}").text.split("Technical details")[0]
     client.post(f"/planner/{topic_id}/run")
     assert client.get(f"/planner/{topic_id}", follow_redirects=False).status_code == 303
 

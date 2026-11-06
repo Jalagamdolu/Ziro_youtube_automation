@@ -10,7 +10,6 @@
       <h1>{{ video.title }}</h1>
       <p class="muted small">Short · up to {{ run.brief.target_seconds }} s · {{ video.created_shown }}</p>
     </div>
-    <span class="chip" title="Recorded spend for this video (approximate rupee conversion)">{{ plain.rupees(run.total_cost_usd) }}</span>
   </div>
   <div hx-get="/ui/projects/{{ run.id }}/live?seen={{ run.events | length }}" hx-trigger="every 2s"
        hx-swap="innerHTML">{% include "_live.html" %}</div>

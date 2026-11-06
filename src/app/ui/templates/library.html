@@ -24,7 +24,6 @@
       <p class="meta small muted">
         {% if v.seconds %}{{ "%.0f" | format(v.seconds) }} s{% else %}up to {{ v.project.target_seconds }} s{% endif %}
         · {{ v.created_shown }}
-        · <span class="chip">{{ v.cost }}</span>
         {% if v.confirmed %}<br>{{ v.confirmed.at }} · {% if v.confirmed.watch %}<a href="{{ v.confirmed.watch }}" target="_blank" rel="noopener noreferrer">watch</a> · {% endif %}<span title="Video ID">{{ v.confirmed.video_id }}</span>{% if v.receipt %} · <a href="/ui/projects/{{ v.id }}/files/{{ v.receipt }}">receipt</a>{% endif %}{% endif %}
       </p>
       {% if v.reason %}<p class="small bad-text">{{ v.reason }}</p>{% endif %}

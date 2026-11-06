@@ -49,7 +49,7 @@
       <p class="small muted">
         {% if v.confirmed %}{{ v.confirmed.at }}{% if v.confirmed.watch %} · <a href="{{ v.confirmed.watch }}" target="_blank" rel="noopener noreferrer">watch</a>{% endif %} · video ID {{ v.confirmed.video_id }}{% if v.receipt %} · <a href="/ui/projects/{{ v.id }}/files/{{ v.receipt }}">receipt</a>{% endif %}
         {% elif v.when_shown and not v.chip.startswith(("Scheduled", "Planned ·")) %}{{ v.when_shown }}{% endif %}
-        {% if v.seconds %} · {{ "%.0f" | format(v.seconds) }} s · {{ v.cost }}{% endif %}
+        {% if v.seconds %} · {{ "%.0f" | format(v.seconds) }} s{% endif %}
       </p>
       {% if v.reason %}<p class="small bad-text">{{ v.reason }}</p>{% endif %}
     </div>

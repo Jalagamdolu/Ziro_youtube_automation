@@ -20,7 +20,7 @@ from starlette.datastructures import UploadFile
 
 from app.adapters import publisher, storage
 from app.core import config, db, metadata
-from app.core.models import Artifact, Cost, Job, Project, Publishing, Topic
+from app.core.models import Artifact, Job, Project, Publishing, Topic
 from app.jobs import scheduler
 from app.ui import plain
 from app.ui.routes import templates
@@ -185,8 +185,6 @@ def videos(saved: str | None = None, only: str | None = None) -> list[dict[str, 
         files = {(a.project_id, a.type): a.storage_path for a in s.scalars(
             select(Artifact).where(Artifact.type.in_(FILES), Artifact.stale.is_(False))
             .order_by(Artifact.version))}
-        spent = dict(s.execute(select(Cost.project_id, func.sum(Cost.amount))
-                               .group_by(Cost.project_id)).all())
         approved = {p: scheduler.final_approved_at(s, p) for p, project in projects.items()
                     if project.status in (scheduler.WAITING, "approved")}
         published = {r.project_id: r for r in s.scalars(select(Publishing))}
@@ -225,7 +223,6 @@ def videos(saved: str | None = None, only: str | None = None) -> list[dict[str, 
             "video": files.get((pid, "video.mp4")) if pid else None,
             "receipt": files.get((pid, "publish_receipt.json")) if confirmed and pid else None,
             "confirmed": confirmed, "seconds": _seconds(files, project),
-            "cost": plain.rupees(spent.get(pid) or 0) if pid else "",
             "upload": bool(topic and topic.kind == "upload"),
             "reason": _reason(failures.get(pid or ""), project.target_seconds if project
                               else None) if key == "failed" else "",

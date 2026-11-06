@@ -606,3 +606,8 @@ Reshapes D-64 to D-66; nothing was rebuilt from scratch. Design bar: simple, nea
 - **Plain failures.** `plain.failure` turns a length failure into "Script (or Video) came out at 52s but you asked for 30s…", worded for prototype or production. Any other failed-checks run points at the flagged last draft. The raw error stays in Technical details, and the video page's status line no longer repeats it.
 - **Production revisions shorten.** When the checker asks for a cut, `scripting.revision_notes` leads the revision prompt with it word for word ("LENGTH FIRST — … cut about 68 spoken words in the Example section …"), ahead of the other fixes.
 - Tests: `test_planner` (form fields, preset/custom, 15–60 whole seconds, prototype refusal, API still takes keywords), `test_plain_view` (failure wording), `test_revision_notes`.
+
+## D-72 No cost chip in the main UI (Dolender, 2026-11-06)
+- The ₹ cost chip is gone from Library cards, the video page header and Planner rows, for every video, existing and future. This supersedes D-63/D-69 showing it there.
+- Cost is still recorded for every paid call (`costs` rows, unchanged) and stays visible in one place: the Cost table under Technical details on the video page (per provider, with the total in $ and ₹), plus the cost report.
+- Test: `test_planner` checks that no ₹ appears on the Library card, the Planner list or the video page outside Technical details.
