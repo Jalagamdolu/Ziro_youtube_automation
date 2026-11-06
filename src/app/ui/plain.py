@@ -5,32 +5,32 @@ from typing import Any
 
 from app.core import config
 
-# Run status -> what a person reads.
+# Run status -> what a person reads (D-69: one status per video, plain words).
 STATUS = {
-    "draft": "Getting started…",
-    "researching": "Researching sources…",
-    "scripting": "Writing the script…",
-    "script_review": "Waiting for your script review",
-    "storyboarding": "Planning the visuals…",
-    "rendering": "Rendering the video…",
-    "qa_review": "Waiting for your final review",
-    "approved": "Approved — publishing…",
-    "export_ready": "Ready — publishes in its slot",
+    "draft": "Writing script…",
+    "researching": "Writing script…",
+    "scripting": "Writing script…",
+    "script_review": "Needs your review (script)",
+    "storyboarding": "Generating…",
+    "rendering": "Generating…",
+    "qa_review": "Needs your review (video)",
+    "approved": "Ready",
+    "export_ready": "Ready",
     "mock_published": "Publishing…",
     "metrics_stub": "Publishing…",
-    "done": "Published (mock)",
-    "failed": "Stopped — needs your attention",
+    "done": "Published",
+    "failed": "Failed",
     "cancelled": "Cancelled",
     "research_review": "Waiting at a retired review step (cancel and restart)",
 }
 # The six steps a person sees, and the statuses (or failed stages) each covers.
 STEPS = [
-    ("Research", {"draft", "researching", "research_review"}),
-    ("Script", {"scripting"}),
-    ("Your review", {"script_review"}),
-    ("Render", {"storyboarding", "rendering"}),
-    ("Your review", {"qa_review"}),
-    ("Published", {"approved", "export_ready", "mock_published", "metrics_stub", "done"}),
+    ("Research & write", {"draft", "researching", "research_review", "scripting"}),
+    ("Script review", {"script_review"}),
+    ("Generate", {"storyboarding", "rendering"}),
+    ("Final review", {"qa_review"}),
+    ("Ready", {"approved", "export_ready"}),
+    ("Published", {"mock_published", "metrics_stub", "done"}),
 ]
 GATES = {"script_review": "Script review", "qa_review": "Final review"}
 # Where a reject sends the run, in words.

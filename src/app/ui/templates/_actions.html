@@ -1,0 +1,57 @@
+{# One video's actions for its one state (D-66, D-69). Needs `v` (a planner.videos() item) and `back`. #}
+{% set rid = (v.id or v.topic.id|string)[:8] %}
+<div class="acts">
+  {% if "review" in v.do %}<a class="button primary" href="/ui/projects/{{ v.id }}">Review now</a>{% endif %}
+  {% if "open" in v.do %}<a class="button" href="/ui/projects/{{ v.id }}">Open</a>{% endif %}
+  {% if "make" in v.do %}
+  <form method="post" action="/planner/{{ v.topic.id }}/run"><button class="primary" type="submit">Make now</button></form>
+  <form method="post" action="/planner/{{ v.topic.id }}/cancel"><button class="danger" type="submit">Cancel</button></form>
+  {% endif %}
+  {% if "retry" in v.do %}
+  <form method="post" action="/ui/projects/{{ v.id }}/retry"><input type="hidden" name="back" value="{{ back }}"><button class="primary" type="submit">Retry</button></form>
+  {% endif %}
+  {% if "publish_now" in v.do %}
+  <form method="post" action="/videos/{{ v.id }}/publish-now"><input type="hidden" name="back" value="{{ back }}"><button class="{{ 'primary' if 'schedule' in v.do else '' }}" type="submit">{{ "Publish now" if "schedule" in v.do else "Publish early" }}</button></form>
+  {% endif %}
+  {% if "schedule" in v.do or "reschedule" in v.do %}
+  <details class="pop">
+    <summary class="button">{{ "Reschedule" if "reschedule" in v.do else "Schedule" }}</summary>
+    <form class="slot" method="post" action="/videos/{{ v.id }}/schedule">
+      <input type="hidden" name="back" value="{{ back }}">
+      <label for="at-{{ rid }}">Publish time (IST)</label>
+      <input type="datetime-local" id="at-{{ rid }}" name="publish_at" value="{{ v.when_input }}" min="{{ min_time }}" required>
+      <button class="primary" type="submit">Save time</button>
+    </form>
+  </details>
+  {% endif %}
+  {% if "unschedule" in v.do %}
+  <form method="post" action="/videos/{{ v.id }}/schedule"><input type="hidden" name="back" value="{{ back }}"><input type="hidden" name="action" value="unschedule"><button type="submit">Unschedule</button></form>
+  {% endif %}
+</div>
+{% if "preview" in v.do or "edit" in v.do %}
+<div class="acts more">
+  {% if "preview" in v.do and v.video %}
+  <details class="pop">
+    <summary class="link">Preview</summary>
+    <video controls preload="none" src="/ui/projects/{{ v.id }}/files/{{ v.video }}"></video>
+  </details>
+  <a class="link" href="/ui/projects/{{ v.id }}/files/{{ v.video }}" download>Download</a>
+  {% endif %}
+  {% if "edit" in v.do and v.meta %}
+  <details class="pop">
+    <summary class="link">Edit</summary>
+    <form method="post" action="/videos/{{ v.id }}/metadata">
+      <input type="hidden" name="back" value="{{ back }}">
+      <label for="ti-{{ rid }}">Title</label>
+      <input type="text" id="ti-{{ rid }}" name="title" value="{{ v.meta.title }}" maxlength="100" required>
+      <label for="de-{{ rid }}">Description</label>
+      <textarea id="de-{{ rid }}" name="description" rows="5">{{ v.meta.description }}</textarea>
+      <label for="ha-{{ rid }}">Hashtags</label>
+      <input type="text" id="ha-{{ rid }}" name="hashtags" value="{{ v.meta.tags | map('string') | join(', ') }}">
+      <p class="small muted">The AI disclosure is added to the description on upload.</p>
+      <button class="primary" type="submit">Save</button>
+    </form>
+  </details>
+  {% endif %}
+</div>
+{% endif %}

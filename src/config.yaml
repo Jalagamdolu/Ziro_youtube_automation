@@ -124,3 +124,15 @@ planner:
   start_hours_before: 3
   utc_offset: "+05:30"
   check_seconds: 60
+
+# Where a published video goes (D-69): mock records a private fake upload; youtube uploads to the
+# pinned channel below with the OAuth refresh token from .env. Dolender flips it; mock is default.
+publish:
+  mode: mock
+
+# Real YouTube target (D-67): the ONLY channel uploads may go to, pinned by ID once sir's consent
+# login (`make youtube-auth`) proves the account owns it; checked again before every publish.
+# Uploads are private only. Publishing stays mock until Dolender switches it.
+youtube:
+  channel_handle: "@Ziro.Digital"
+  channel_id: ""

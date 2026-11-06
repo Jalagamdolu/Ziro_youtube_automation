@@ -10,6 +10,11 @@
   Missed, until it gets a new time (D-64).
 - Uploaded recordings (D-64) get the same slots and lock: a row with a manual final approval
   ("human content"), published by publish_upload() instead of a pipeline run.
+- Publish now (D-69) is a slot at this minute. In youtube mode a slotted video uploads at once,
+  private, with status.publishAt = its slot, so YouTube releases it even if this machine is off;
+  a later reschedule / unschedule / publish-early changes that uploaded video. Published is set
+  only by confirm_due's read-back, never on send (D-66).
+- Every action (schedule, unschedule, publish now) is an audit row: who, when, what.
 """
 
 import hashlib
@@ -19,11 +24,11 @@ from typing import Any
 
 from sqlalchemy import select, update
 
-from app.adapters import storage
-from app.adapters.publisher import MockPublisher, approved_run
+from app.adapters import publisher, storage
+from app.adapters.publisher import approved_run
 from app.core import audit, config, db
 from app.core.log import log
-from app.core.models import Approval, Artifact, AssetLicense, Event, Project, Topic
+from app.core.models import Approval, Artifact, AssetLicense, Event, Project, Publishing, Topic
 from app.jobs.queue import enqueue_once
 
 WAITING = "export_ready"  # a Ready video: approved, waiting for its slot (D-64)
@@ -89,11 +94,13 @@ def final_approved_at(s: Any, project_id: str) -> datetime | None:
 def publish_due(now: datetime | None = None) -> list[str]:
     """Publish Ready videos whose slot has come, if they were approved before it (D-64)."""
     now = now or datetime.now(UTC)
+    # youtube uploads a slotted video at once with publishAt; mock fires at the minute
+    horizon = datetime.max.replace(tzinfo=UTC) if publisher.mode() == "youtube" else now
     with db.session() as s:
         rows = s.execute(select(Project.id, Topic.kind, Topic.publish_at)
                          .join(Topic, Topic.project_id == Project.id)
                          .where(Project.status == WAITING, Topic.publish_at.is_not(None),
-                                Topic.publish_at <= now)).all()
+                                Topic.publish_at <= horizon)).all()
         due = [(p, kind) for p, kind, when in rows
                if when is not None and (approved := final_approved_at(s, p)) is not None
                and approved <= when]
@@ -118,9 +125,21 @@ def _slot(project_id: str) -> str:
     return str(int(when.timestamp())) if when else "none"
 
 
+def uploaded(s: Any, project_id: str) -> Publishing | None:
+    """A video already on YouTube but not confirmed released (youtube mode, D-69)."""
+    row = s.scalars(select(Publishing).where(Publishing.project_id == project_id)).first()
+    if row and row.platform == "youtube" and row.provider_video_id and row.confirmed_at is None:
+        return row  # type: ignore[no-any-return]
+    return None
+
+
 def schedule(project_id: str, when: datetime | None, actor: str) -> None:
     """Set, change or clear a Ready video's publish time (D-64). Refused unless the final video
     is approved and not yet published: no final approval, no scheduling."""
+    with db.session() as s:
+        on_youtube = uploaded(s, project_id)
+    if on_youtube is not None:
+        return _release(project_id, on_youtube.provider_video_id, when, False, actor)
     with db.session() as s, s.begin():
         project = s.get_one(Project, project_id)
         if project.status != WAITING or final_approved_at(s, project_id) is None:
@@ -136,7 +155,76 @@ def schedule(project_id: str, when: datetime | None, actor: str) -> None:
                         project_id=project_id, created_by=actor))
         else:
             topic.publish_at = when
+        audit.action(s, project_id, actor, f"scheduled for {when.isoformat()}" if when
+                     else "unscheduled")
     log.info("publish time set", project_id=project_id, publish_at=str(when), actor=actor)
+
+
+def publish_now(project_id: str, actor: str) -> None:
+    """Publish now (D-69): a slot at this minute, fired at once, under the same lock. On a video
+    already uploaded ahead to YouTube it releases it early instead."""
+    with db.session() as s:
+        on_youtube = uploaded(s, project_id)
+    if on_youtube is not None:
+        _release(project_id, on_youtube.provider_video_id, None, True, actor)
+        confirm_due()
+        return
+    now = datetime.now(UTC)
+    with db.session() as s, s.begin():
+        project = s.get_one(Project, project_id)
+        if project.status != WAITING or final_approved_at(s, project_id) is None:
+            raise ValueError("only an approved video that is not yet published can be published")
+        if firing(project_id):
+            raise ValueError("it is publishing now")
+        topic = s.scalars(select(Topic).where(Topic.project_id == project_id)).first()
+        if topic is None:
+            s.add(Topic(topic=project.topic, keywords=[], guidelines="", format=project.format,
+                        target_seconds=project.target_seconds, publish_at=now, status="started",
+                        project_id=project_id, created_by=actor))
+        else:
+            topic.publish_at = now
+        audit.action(s, project_id, actor, "publish now")
+    publish_due(now)
+
+
+def _release(project_id: str, video_id: str, when: datetime | None, public: bool,
+             actor: str) -> None:
+    """Reschedule, unschedule or publish early a video already on YouTube."""
+    from app.adapters import youtube
+
+    if when is not None and when <= datetime.now(UTC):
+        raise ValueError("pick a time in the future")
+    privacy = youtube.set_release(video_id, when, public)
+    with db.session() as s, s.begin():
+        row = s.scalars(select(Publishing).where(Publishing.project_id == project_id)).one()
+        row.scheduled_at, row.privacy = (None if public else when), privacy
+        s.execute(update(Topic).where(Topic.project_id == project_id)
+                  .values(publish_at=datetime.now(UTC) if public else when))
+        audit.action(s, project_id, actor, "published early on YouTube" if public else
+                     f"rescheduled on YouTube for {when.isoformat()}" if when
+                     else "unscheduled on YouTube (stays private)")
+
+
+def confirm_due(now: datetime | None = None) -> list[str]:
+    """Confirm YouTube uploads that should be live by reading them back (D-66): only then do
+    they show as Published, with the watch link and the time."""
+    from app.adapters import youtube
+
+    now = now or datetime.now(UTC)
+    with db.session() as s:
+        due = [r.project_id for r in s.scalars(select(Publishing).where(
+            Publishing.platform == "youtube", Publishing.confirmed_at.is_(None),
+            Publishing.provider_video_id != "")) if r.privacy == "public" or (
+            r.scheduled_at is not None and r.scheduled_at <= now)]
+    confirmed = []
+    for project_id in due:
+        with db.session() as s, s.begin():
+            row = s.scalars(select(Publishing).where(Publishing.project_id == project_id)).one()
+            if youtube.confirm(row, now):
+                audit.action(s, project_id, "scheduler",
+                             f"confirmed on YouTube ({row.privacy}): {row.watch_url}")
+                confirmed.append(project_id)
+    return confirmed
 
 
 MAX_UPLOAD_BYTES = 500 * 1024 * 1024
@@ -178,15 +266,22 @@ def upload(title: str, video: bytes, filename: str, approver: str) -> str:
 
 
 def publish_upload(project_id: str) -> None:
-    """Mock-publish an uploaded recording through the same Publisher lock (D-06)."""
+    """Publish an uploaded recording through the same Publisher lock (D-06), same provider."""
+    from app.core import metadata
+
     with db.session() as s, s.begin():
         project = s.get_one(Project, project_id)
-        request = {"snippet": {"title": project.topic, "description": "", "tags": [],
-                               "categoryId": "27", "defaultLanguage": project.language},
-                   "status": {"privacyStatus": "private", "selfDeclaredMadeForKids": False}}
-        row = MockPublisher().publish(s, approved_run(s, project_id), request)
-        receipt = {"request": request, "video_id": row.provider_video_id,
-                   "idempotency_key": row.idempotency_key, "mocked": True}
+        run = approved_run(s, project_id)
+        meta = metadata.edited(s, project_id) or {"title": project.topic, "description": "",
+                                                  "tags": []}
+        request = publisher.request(run, meta["title"], meta["description"], meta["tags"],
+                                    project.language, generated=False)
+        video = s.scalars(select(Artifact.storage_path).where(
+            Artifact.project_id == project_id, Artifact.type == "video.mp4")).one()
+        row = publisher.get().publish(s, run, request, video, publish_at(project_id))
+        receipt = {"request": request, "platform": row.platform,
+                   "video_id": row.provider_video_id, "idempotency_key": row.idempotency_key,
+                   "mocked": row.platform != "youtube", "publish_at": str(row.scheduled_at)}
         data = json.dumps(receipt, indent=2).encode()
         key = storage.get().write(f"{project_id}/mock_published/v1/publish_receipt.json", data)
         s.add(Artifact(project_id=project_id, stage="mock_published",
@@ -202,7 +297,8 @@ def waiting_for_publish(project: Project, now: datetime) -> bool:
 
 def tick() -> dict[str, Any]:
     started, published = start_due(), publish_due()
-    return {"started": started, "published": published}
+    confirmed = confirm_due() if publisher.mode() == "youtube" else []
+    return {"started": started, "published": published, "confirmed": confirmed}
 
 
 def start() -> Any:

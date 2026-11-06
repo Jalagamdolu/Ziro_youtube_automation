@@ -5,8 +5,9 @@ Each phase replaces entries in app.nodes.FUNCS with real stages.
 
 import json
 
-from app.adapters.publisher import MockPublisher, approved_run
-from app.core import costs, db
+from app.adapters import publisher
+from app.adapters.publisher import approved_run
+from app.core import costs, db, metadata
 from app.core.contracts import ContentPackage
 from app.nodes.context import Outputs, StageContext
 
@@ -31,24 +32,27 @@ def export_ready(ctx: StageContext) -> Outputs:
 
 
 def mock_published(ctx: StageContext) -> Outputs:
+    """The publish step (state name from the brief; the provider follows publish.mode, D-69)."""
+    from app.jobs import scheduler
+
     package = ContentPackage.model_validate(ctx.read_json("scripting", "content_package.json"))
     footage = f"{ctx.inputs['rendering']}/stock.json"  # D-33: credit the stock provider
     credit = (json.loads(ctx.storage.read(footage)).get("credit")
               if ctx.storage.exists(footage) else None)
-    request = {
-        "snippet": {
-            "title": package.top_titles[0],
-            "description": f"{package.description}\n\n{credit}" if credit else package.description,
-            "tags": package.tags,
-            "categoryId": "27",
-            "defaultLanguage": package.brief.language,
-        },
-        "status": {"privacyStatus": "private", "selfDeclaredMadeForKids": False},
-    }
+    provider = publisher.get()
     with db.session() as s, s.begin():
-        row = MockPublisher().publish(s, approved_run(s, ctx.project_id), request)
-        receipt = {"request": request, "video_id": row.provider_video_id,
-                   "idempotency_key": row.idempotency_key, "mocked": True}
+        run = approved_run(s, ctx.project_id)
+        meta = metadata.edited(s, ctx.project_id) or {
+            "title": package.top_titles[0], "description": package.description,
+            "tags": package.tags}
+        description = f"{meta['description']}\n\n{credit}" if credit else meta["description"]
+        request = publisher.request(run, meta["title"], description, meta["tags"],
+                                    package.brief.language, generated=True)
+        row = provider.publish(s, run, request, f"{ctx.inputs['rendering']}/video.mp4",
+                               scheduler.publish_at(ctx.project_id))
+        receipt = {"request": request, "platform": row.platform, "video_id": row.provider_video_id,
+                   "idempotency_key": row.idempotency_key, "mocked": row.platform != "youtube",
+                   "publish_at": row.scheduled_at}
     return {"publish_receipt.json": _dump(receipt)}
 
 

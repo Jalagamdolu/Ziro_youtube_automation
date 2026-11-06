@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Library{% endblock %}
+{% block head %}{% if pending %}<meta http-equiv="refresh" content="2">{% endif %}{% endblock %}
+{% block content %}
+{# Library (D-69): every video as a card, one status chip, that state's actions. Needs-you first. #}
+{% if saved %}<div class="toast" role="status">✓ Saved to Library</div>{% endif %}
+<div class="page-head">
+  <h1>Library</h1>
+  <a class="button primary" href="/new">+ New Video</a>
+</div>
+<nav class="filters" aria-label="Filter videos">
+  {% for key, (label, _) in filters.items() %}
+  <a href="/library?show={{ key }}" class="{{ 'on' if key == show }}">{{ label }} <span class="count">{{ counts[key] }}</span></a>
+  {% endfor %}
+</nav>
+{% if not cards %}<section class="notice"><p>Nothing here yet. {% if show == "all" %}<a href="/new">Make your first video</a>.{% else %}<a href="/library">Show all</a>.{% endif %}</p></section>{% endif %}
+<div class="cards">
+  {% for v in cards %}
+  <article class="card{{ ' needs' if v.key in ('review_script', 'review_video') }}{{ ' just' if v.id == saved }}">
+    <a class="thumb" href="/ui/projects/{{ v.id }}">{% if v.thumb %}<img alt="" loading="lazy" src="/ui/projects/{{ v.id }}/files/{{ v.thumb }}">{% else %}<span>{{ "▶" if v.upload else v.title[:1] }}</span>{% endif %}</a>
+    <div class="body">
+      <span class="pill {{ v.tone }}">{% if v.busy %}<span class="spin inline" aria-hidden="true"></span> {% endif %}{{ v.chip }}</span>
+      <h3><a href="/ui/projects/{{ v.id }}">{{ v.title }}</a></h3>
+      <p class="meta small muted">
+        {% if v.seconds %}{{ "%.0f" | format(v.seconds) }} s{% else %}up to {{ v.project.target_seconds }} s{% endif %}
+        · {{ v.created_shown }}
+        · <span class="chip">{{ v.cost }}</span>
+        {% if v.confirmed %}<br>{{ v.confirmed.at }} · {% if v.confirmed.watch %}<a href="{{ v.confirmed.watch }}" target="_blank" rel="noopener noreferrer">watch</a> · {% endif %}<span title="Video ID">{{ v.confirmed.video_id }}</span>{% if v.receipt %} · <a href="/ui/projects/{{ v.id }}/files/{{ v.receipt }}">receipt</a>{% endif %}{% endif %}
+      </p>
+      {% if v.reason %}<p class="small bad-text">{{ v.reason }}</p>{% endif %}
+      {% set back = "/library" ~ ("?show=" ~ show if show != "all" else "") %}
+      {% include "_actions.html" %}
+    </div>
+  </article>
+  {% endfor %}
+</div>
+
+<details class="panel" id="upload">
+  <summary>Upload a finished video (e.g. sir's recording)</summary>
+  <form method="post" action="/planner/upload" enctype="multipart/form-data">
+    <label for="up-title">Title</label>
+    <input type="text" id="up-title" name="title" required>
+    <label for="up-file">MP4 file <span class="muted">(at most 500 MB)</span></label>
+    <input type="file" id="up-file" name="video" accept="video/mp4" required>
+    <label class="choice"><input type="checkbox" name="approve" value="yes" required> I have watched it and approve it for publishing. Disclosure: human content (not synthetic).</label>
+    <p><button class="primary" type="submit">Add to Library as Ready</button></p>
+  </form>
+</details>
+{% endblock %}

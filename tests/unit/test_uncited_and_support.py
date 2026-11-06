@@ -108,9 +108,10 @@ def test_script_review_shows_flags_beside_their_line_and_approval_still_works(
     monkeypatch.setattr(llm, "support_chat", lambda project_id: stub)
     project_id = create(client)  # at script_review: claims and script together (D-50)
     page = client.get(f"/ui/projects/{project_id}").text
-    assert "1 of 2 cited lines flagged." in page
-    row = page[page.index(line + " [C2]"):].split("</tr>")[0]
-    assert "says more than C2: &#39;with people&#39;" in row  # the flag sits beside its line
+    assert "1 flagged</span>" in page
+    row = page[page.index(line):]
+    row = row[:row.index('<div class="line')]
+    assert "says more than the source: &#39;with people&#39;" in row  # beside its line
     approve(client, project_id)  # flags never block
     assert status(client, project_id)["status"] == "qa_review"
 

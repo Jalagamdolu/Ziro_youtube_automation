@@ -489,3 +489,86 @@ Supersedes the two-tab plan and D-47's "approved late, publishes at once".
   - Real YouTube (later, after sir's OK): the receipt must carry `confirmed_at` and `watch_url`, written only after an API read-back shows the video live → "Live on YouTube" + watch link + confirmed time. A receipt without them stays "Publishing…".
 - Tests (`tests/graph/test_planner.py`): chip-per-state with only that state's buttons, both approvals from the planner recorded as Dolender's with the disclosure; reject from the planner refused without a note; Publishing… (no buttons, no "Published") while the publish step has not confirmed, "Published (mock)" only once the receipt exists, back to Publishing… if the receipt is not on record; a failed run shows its reason in red and retries back to the planner.
 - Screenshots: `tests/manual_qa/ui-lifecycle/` (planner, phone, Reject panel open).
+
+## D-67 The one real YouTube target is @Ziro.Digital, and sir's consent login is the sign-off (Dolender, 2026-11-06)
+Amends the CLAUDE.md "sandbox only, never touch any real YouTube channel" rule for exactly one channel.
+- **The consent login is the founder sign-off.** The credential can only exist if sir personally logs in to @Ziro.Digital's Google account and grants consent. That act is the sign-off the sandbox rule required. Until that login happens, nothing is connected.
+- **One-time authorization**, `make youtube-auth`:
+  - It runs on the host, using only the Python standard library, because Google's redirect goes to 127.0.0.1.
+  - It reads `YT_CLIENT_ID` / `YT_CLIENT_SECRET` (a Desktop app OAuth client) from `.env`, and refuses an API key (`AIza…`).
+  - It prints the consent URL and catches the redirect (PKCE, state checked). It saves `YT_REFRESH_TOKEN` to `.env`, never printed or logged.
+- **Scopes: youtube.upload + youtube.readonly.** Pinning the channel and checking it on every publish needs to read the authorized account's own channel (`channels.list mine=true`), which upload alone cannot do. Readonly cannot change or delete anything.
+- **Pinned by ID.** `src/config.yaml` `youtube.channel_handle: "@Ziro.Digital"` is the only allowed target. After consent:
+  - the account must have exactly one channel, and its handle must match;
+  - then its channel ID is written to `youtube.channel_id`;
+  - for any other channel, the token is revoked at once and nothing is saved.
+  - `youtube_auth.matches()` is the check the future adapter repeats before every publish (handle and pinned ID).
+- **Still mock.** Uploads will be private only. Public release follows the planner rules: final approval, then the slot. Publishing remains MockPublisher until Dolender switches it. No publish adapter was built here.
+
+## D-68 PLANNED, not built: multi-platform publishing (YouTube, then Instagram Reels) (Dolender, 2026-11-06)
+Roadmap only. Nothing below is implemented; publishing stays MockPublisher until Dolender switches it.
+- **One publisher interface, three providers: `mock | youtube | instagram`.** This refactors today's single Publisher (D-06). Every provider keeps the same lock:
+  - it only accepts a run with an approved qa_review;
+  - it carries an idempotency key, so a slot fires once;
+  - "Published" shows only after the provider confirms (D-66).
+- **Planner: same rows, a slot per platform.** A video can be scheduled separately on each platform (e.g. YouTube Fri 18:00, Instagram Sat 10:00). Each platform gets its own chip and actions on the same row, and its own receipt. The final approval covers the video; each platform slot is a separate scheduled publish.
+- **YouTube provider (first).** It uses the D-67 credential and only @Ziro.Digital, with the channel ID checked before every publish.
+  - Uploads are private, with `publishAt` set to the slot.
+  - It is confirmed by a read-back before the row says "Live on YouTube".
+  - It must be built and proven end to end before Instagram starts.
+- **Instagram Reels provider (second)**, via the Instagram Graph API: create a media container (`media_type=REELS`, `video_url`, caption), wait for the container to finish processing, then `media_publish`; it is confirmed by a read-back of the published media.
+  - Needs, all external and set up by a human:
+    - an Instagram Business or Creator account linked to a Facebook Page;
+    - a Meta app with `instagram_content_publish` (plus the basic Instagram/Page read permissions that publishing requires) and its review;
+    - a long-lived token, stored in `.env` only.
+  - Same consent-is-sign-off rule as D-67: the account is pinned by ID in config, and only that account is allowed.
+- **Public-URL staging for the MP4.** The Graph API fetches the video from a public URL. Plan: upload to a Supabase storage bucket and give Instagram a short-lived signed link (minutes), deleted after the publish is confirmed.
+  - The bucket lives in a **separate, non-production Supabase project**. CLAUDE.md still forbids Ziro's production Supabase; using it would need its own sign-off entry.
+  - Adds a Storage-style "stage" adapter with a mock for tests.
+- **Build order:** (1) YouTube adapter, proven on @Ziro.Digital with private uploads; (2) publisher refactor to per-platform providers and per-platform planner slots; (3) Instagram Reels with staging.
+- New dependencies for each step get their own one-line justification when they are built.
+
+## D-69 UI and workflow final: New Video · Library · Planner; Publish now; real YouTube behind publish.mode (Dolender, 2026-11-06)
+Reshapes D-64 to D-66; nothing was rebuilt from scratch. Design bar: simple, neat, phone-first.
+- **Three places**: a sidebar on a desktop, a bottom tab bar on a phone. A "Needs you · N" badge counts videos waiting for a review, and those cards are pinned to the top of the Library. All times are IST.
+- **One status per video, in plain words**:
+  - Writing script → Needs your review (script) → Generating → Needs your review (video) → Ready → Scheduled → Publishing → Published;
+  - plus Failed (the reason and Retry) and Cancelled.
+  - `planner.state()` is the only place this is decided. The Library card, the Planner and the video page all show the same chip.
+- **New Video**: prompt (required), keywords and guidelines (optional), and a length picker of 30/40/50/60 s. 60 s is the ceiling (D-62), and the server refuses anything else. Shorts 9:16 only: the format field is gone until long templates exist. After submit, the page shows "Researching & writing…" until the script review.
+- **Script review**: beat by beat. Each fact line has its source quote, link, date and kind (definition/mechanism, D-40) beside it, and the fact checker's flags (D-44) sit on the line they concern.
+  - Approve · Edit (every check runs again, D-30) · Regenerate.
+  - Regenerate is a reject to scripting with optional notes; empty notes are recorded as "Regenerate the script (no notes given)." so the reject-needs-notes rule holds.
+  - Research rejects stay under "Send it back". The approved script stays locked (editing is only possible at script_review or after a failed scripting run).
+- **Generating**: live steps Voice → Captions → Render → Quality check. The render step writes its current step to `rendering/progress.json`, which is not an artifact. The presenter note reads "sir's avatar zone — placeholder until connected".
+- **Final review**: the player, Approve (with the AI disclosure, required) and Reject (notes, back to a named stage). Approving lands the video in the Library with a "Saved to Library" toast.
+- **Library**: every video as a card with:
+  - thumbnail, title, real duration, IST created date, ₹ cost chip and one status chip;
+  - filters All · Needs you · Ready · Scheduled · Published · Failed;
+  - actions for its state only. Review now; Publish now and Schedule (Ready); Reschedule, Unschedule and Publish early (Scheduled); Retry (Failed). Preview, Download and Edit (title, description, hashtags) sit as quiet links.
+  - Edits are allowed only before the upload. Each edit is a versioned `metadata.json` artifact and an audit row; the publish step uses the latest one.
+  - The D-66 approve/reject buttons on planner rows are replaced by "Review now", which opens the review screen, so the final video is watched before approval. There is still one approval system (the same gate endpoint and approvals rows).
+  - "Upload a finished video" (D-64) moved here.
+- **Planner**: month calendar and list of everything with a time: scheduled, publishing, published, planned topics, and failed publishes with Retry. Reschedule, Unschedule and Publish early work inline. A banner says new Google API projects upload as private until YouTube's audit. "Plan a topic for later" (D-47) stays, collapsed.
+- **Publish now** is a slot at this minute, fired at once through the same scheduler path and lock.
+- **Publisher interface, `publish.mode: mock | youtube`.** Mock is the default and the committed value; Dolender flips it. The publish step keeps its brief state name (mock_published) and uses the configured provider.
+  - **Mock** fires at the slot and is confirmed by its receipt (D-66).
+  - **YouTube** (`app/adapters/youtube.py`) uses only the OAuth refresh token from .env, never an API key. A missing token is a FatalError, the §08 "missing OAuth token" failure.
+    - The pinned channel (D-67) is checked before every call that changes a video.
+    - Uploads are always private. A slotted video uploads as soon as it is scheduled, with `status.publishAt` = the slot, so YouTube releases it even if this machine is off. Reschedule, unschedule and publish early change that uploaded video (`videos.update`, keeping its other status fields).
+    - Every upload carries `containsSyntheticMedia` and the AI disclosure in its description. A pipeline video is always synthetic (AI narration); an uploaded recording follows its recorded human-content disclosure.
+    - Timeouts, 429 and 5xx are retried; any other refusal is fatal and shown with YouTube's reason.
+- **Never twice.** The `publishing` row (the publish log; idempotency key = the video) is committed before any byte goes to YouTube, and every upload is tagged with a hash of that key. A retry after a crash mid-upload finds the tagged video on the channel instead of uploading again. The mock stays idempotent as before.
+- **Published only after a read-back.** Every minute the scheduler reads back YouTube videos that should be live. "Published" (with link, time and video ID) shows only when YouTube says public, or when the slot has passed and processing has finished. In the second case the chip reads "Published · private": an unaudited API project keeps uploads private.
+- **Data**: no drafted videos/schedules/publish_log tables existed, so they map onto what was there:
+  - videos = `projects`;
+  - schedules = `topics.publish_at` and `publishing.scheduled_at`;
+  - publish log = `publishing`, which gains `confirmed_at` and `watch_url` (migration 0010);
+  - audit trail = `events`, which gains `note`. Every action that is not a state change (schedule, unschedule, publish now, publish early, metadata edit, read-back confirmation) is a row with who, when and what. Gate counting ignores these rows.
+- **Kept from the architecture, against the session prompt:**
+  - Publish attempts stay at 5 (ARCHITECTURE.md §4), not 3 retries.
+  - The scheduler stays in the API process (v2 §2), not a separate worker. Its state is Postgres, it checks every minute, and it survives restarts.
+- **Tests**:
+  - `tests/graph/test_planner.py`: chip-per-state and actions, needs-you pin and badge, filters, toast, Regenerate, New Video limits, publish lock, Publish now, scheduling, missed slots, metadata edits, audit rows, idempotent firing, published-only-after-confirmation.
+  - `tests/graph/test_youtube_publish.py` (respx, never calls Google): private with publishAt, synthetic flag and disclosure, no API key, read-back confirmation, publish now, reschedule/unschedule in place, missing OAuth token, wrong channel, crash mid-upload never uploads twice, no publish without the final approval.
+- Screenshots: `tests/manual_qa/ui-v4/` (all five screens, desktop and phone).

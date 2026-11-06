@@ -176,7 +176,7 @@ def test_mock_publish_credits_the_images(client, monkeypatch) -> None:
                    if a["type"] == "publish_receipt.json")
     description = json.loads(storage.get().read(receipt["storage_path"]))["request"]["snippet"][
         "description"]
-    assert description.endswith("\n\nImages: Pixabay")
+    assert "\n\nImages: Pixabay\n\nAI disclosure:" in description  # credit, then disclosure (D-69)
 
 
 def test_a_photo_is_not_used_twice_unless_the_reviewer_picks_it(client, monkeypatch, tmp_path

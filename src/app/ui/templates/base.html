@@ -3,29 +3,35 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Ziro review{% endblock %} · Ziro AI Content Studio</title>
+  <title>{% block title %}Ziro{% endblock %} · Ziro AI Content Studio</title>
   <link rel="icon" type="image/png" href="/static/favicon.png">
   <link rel="stylesheet" href="/static/theme.css">
   <script src="/static/htmx.min.js"></script>
   <script>
-    // Approve / Edit / Send back (D-63): Edit and Send back open their panel and scroll to it.
+    // Edit / Reject open their panel and scroll to it (D-63).
     function openPanel(id) { const d = document.getElementById(id); if (d) { d.open = true; d.scrollIntoView({behavior: "smooth"}); } }
   </script>
+  {% block head %}{% endblock %}
 </head>
 <body>
-  <header class="topbar">
-    <a class="logo" href="/"><img src="/static/brand/ziro-digital-logo-transparent.png" alt="Ziro"></a>
-    <span class="mode" title="sandbox · publishing is mocked">{{ mode() }} · sandbox</span>
-    <nav>
-      <a href="/">Planner</a>
-      <a href="/new">New video</a>
-      <span class="who">{{ request.state.user.name }}</span>
+  {% set badge_count = needs_you() %}
+  {% set here = request.url.path %}
+  {# Three places (D-69): New Video · Library · Planner. Sidebar on a desktop, tab bar on a phone. #}
+  <aside class="sidebar">
+    <a class="logo" href="/library"><img src="/static/brand/ziro-digital-logo-transparent.png" alt="Ziro"></a>
+    <nav aria-label="Main">
+      <a href="/new" class="{{ 'here' if here == '/new' }}"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg><span>New Video</span></a>
+      <a href="/library" class="{{ 'here' if here in ('/', '/library') or here.startswith('/ui/') }}"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg><span>Library</span>{% if badge_count %}<span class="badge" title="Videos waiting for your review">Needs you · {{ badge_count }}</span>{% endif %}</a>
+      <a href="/planner" class="{{ 'here' if here.startswith('/planner') }}"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>Planner</span></a>
     </nav>
-  </header>
-  {% if banners() %}<div class="banners">{% for line in banners() %}<div class="banner">{{ line }}</div>{% endfor %}</div>{% endif %}
-  <main>
-    {% if error %}<section class="error"><strong>Not done:</strong> {{ error }}</section>{% endif %}
-    {% block content %}{% endblock %}
-  </main>
+    <p class="side-foot small muted"><span class="mode">{{ mode() }} · publish {{ publish_mode() }}</span><br>{{ request.state.user.name }} · times in IST</p>
+  </aside>
+  <div class="page">
+    {% if banners() %}<div class="banners">{% for line in banners() %}<div class="banner">{{ line }}</div>{% endfor %}</div>{% endif %}
+    <main>
+      {% if error %}<section class="error" role="alert"><strong>Not done:</strong> {{ error }}</section>{% endif %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
 </body>
 </html>

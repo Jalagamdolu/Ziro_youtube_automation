@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def test_approved_run_cannot_be_forged() -> None:
     with pytest.raises(TypeError):
-        ApprovedRun("project", 1, object())
+        ApprovedRun("project", 1, {}, object())
 
 
 def test_no_qa_approval_means_no_approved_run(client) -> None:

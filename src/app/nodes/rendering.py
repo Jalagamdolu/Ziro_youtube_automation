@@ -63,8 +63,10 @@ def rendering(ctx: StageContext) -> Outputs:
         work = Path(folder)
         (work / "public").mkdir()
         # A Short's requested length is a ceiling (D-62); a long video keeps its ±25% QA band.
+        progress(ctx.project_id, "voice")
         narration, segments, clock = _synthesised(ctx.project_id, scenes,
                                                   package.brief.target_seconds)
+        progress(ctx.project_id, "captions")
         spoken = aligner.get().align(_resample(narration, tts.RATE, aligner.RATE), segments)
         words = written_words(spoken, segments)
         cues = make_cues(words)
@@ -88,6 +90,7 @@ def rendering(ctx: StageContext) -> Outputs:
                         if k in scene}
                        for scene in scenes],
             "cues": cues, "echoes": echoes}), encoding="utf-8")
+        progress(ctx.project_id, "render")
         _run(["npx", "remotion", "render", "src/index.ts", "Short", str(work / "raw.mp4"),
               f"--props={work / 'props.json'}", f"--public-dir={work / 'public'}"], TEMPLATES)
         _run(["ffmpeg", "-y", "-i", "raw.mp4", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
@@ -113,6 +116,7 @@ def rendering(ctx: StageContext) -> Outputs:
             _run(["ffmpeg", "-y", "-ss", f"{moment:.2f}", "-i", "video.mp4", "-frames:v", "1",
                   name], work)
             outputs[name] = (work / name).read_bytes()
+        progress(ctx.project_id, "quality")
         duration = _probe_seconds(work / "video.mp4")
         lufs = _loudness(work / "video.mp4")
     # A Short's requested length is a ceiling (D-62): up to 15% under is fine, over fails QA
@@ -135,6 +139,15 @@ def rendering(ctx: StageContext) -> Outputs:
         "deferred": ["chapters", "dead-air", "lip-sync (LatentSync)"]}, indent=2)
     outputs["stock.json"] = json.dumps(footage, indent=2, ensure_ascii=False)
     return outputs
+
+
+STEPS = ("voice", "captions", "render", "quality")  # what the Generating screen shows (D-69)
+
+
+def progress(project_id: str, step: str) -> None:
+    """Which step the render is on, for the live Generating screen; not an artifact."""
+    data = json.dumps({"step": step}).encode()
+    storage.get().write(f"{project_id}/rendering/progress.json", data)
 
 
 def _synthesised(project_id: str, scenes: list[dict[str, Any]], ceiling: float | None = None

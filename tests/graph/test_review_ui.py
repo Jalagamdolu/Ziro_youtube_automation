@@ -25,21 +25,23 @@ def _decide(client, project_id: str, **form: str):
 
 
 
-def test_script_review_shows_the_claims_above_the_script(client) -> None:
+def test_script_review_is_beat_by_beat_with_each_source_beside_its_line(client) -> None:
     project_id = _start(client)
     page = client.get(f"/ui/projects/{project_id}").text
-    assert "Script review" in page and "Research review" not in page
-    assert 'href="https://www.ibm.com/think/topics/chatbots"' in page
-    assert "A chatbot is a software application that communicates" in page  # the quote
-    assert page.index("Claims (4)") < page.index("<h3>Script")
+    assert "Your script review" in page and "Research review" not in page
+    assert '<h3 class="beat">Hook</h3>' in page  # beat by beat (D-69)
+    fact = page[page.index("A chatbot is a software application that communicates"):]
+    fact = fact[:fact.index('<div class="line')]  # this line and what sits beside it
+    assert 'href="https://www.ibm.com/think/topics/chatbots"' in fact and "<q>" in fact
     assert "definition</span>" in page or "other</span>" in page  # kind labels
+    assert "✓ Approve" in page and "openPanel('edit')" in page and "openPanel('regenerate')" in page
 
 
 def test_script_and_qa_screens_through_to_done(client) -> None:
     project_id = _start(client)
 
     page = client.get(f"/ui/projects/{project_id}").text
-    assert "Five hooks" in page and page.count("top 2</span>") == 2
+    assert "Hooks, titles and description" in page and page.count("top 2</span>") == 2
     assert page.count("top 3</span>") == 3 and "TALK OR DO?" in page
     _decide(client, project_id, decision="approve", reviewer="Dolender")
 
@@ -101,13 +103,19 @@ def test_decided_gate_is_hidden_until_the_run_moves(client) -> None:
     assert "Decision recorded" in page.text and "Approve script and package" not in page.text
 
 
-def test_home_is_the_planner_and_every_video_is_a_row(client) -> None:
+def test_home_is_the_library_and_every_video_is_a_card(client) -> None:
     home = client.get("/").text
-    assert "No videos yet" in home and 'name="topic"' in home  # the add-a-video form
-    project_id = _start(client)  # a video from New video is a row too (D-64)
-    rows = client.get("/").text
-    assert f"/ui/projects/{project_id}" in rows and "Needs your review" in rows
-    assert 'name="prompt"' in client.get("/new").text
+    assert "<h1>Library</h1>" in home and "Nothing here yet" in home
+    for place in ('href="/new"', 'href="/library"', 'href="/planner"'):  # the sidebar (D-69)
+        assert place in home
+    project_id = _start(client)
+    cards = client.get("/").text
+    assert f"/ui/projects/{project_id}" in cards and "Needs your review (script)" in cards
+    assert "Needs you · 1" in cards  # the sidebar badge
+    new = client.get("/new").text
+    assert 'name="prompt"' in new and 'name="keywords"' in new and 'name="guidelines"' in new
+    assert [f'value="{s}"' in new for s in (30, 40, 50, 60)] == [True] * 4
+    assert 'name="format"' not in new  # Shorts only until long templates exist
 
 
 def test_stage_table_shows_the_gate_waiting_and_approve_all_advances(client) -> None:
@@ -128,7 +136,7 @@ def test_hand_edit_from_the_browser_goes_through_every_check(client) -> None:
     page = client.get(f"/ui/projects/{project_id}").text
     assert "Edit before approving" in page
     # one decision bar: Approve, Edit (opens the edit panel) and Send back (D-63)
-    assert "Approve script and package" in page and "openPanel('edit')" in page
+    assert "✓ Approve" in page and "openPanel('edit')" in page
     assert "openPanel('reject')" in page and "Submit my edit through all checks" in page
     original = html.unescape(page.split('aria-label="Editable script package">')[1]
                              .split("</textarea>")[0])
@@ -159,9 +167,9 @@ def test_finished_run_shows_player_downloads_and_cost(client) -> None:
             ai_reason="synthetic narration voice")
     publish(project_id)
     page = client.get(f"/ui/projects/{project_id}").text
-    assert "Your video" in page and "<video" in page
+    assert "✓ Published (mock)" in page and "<video" in page
     for label in ("Video (MP4)", "Captions (SRT)", "Thumbnail", "Claims",
-                  "Publish receipt (mock)", "Everything (ZIP)"):
+                  "Publish receipt", "Everything (ZIP)"):
         assert label in page, label
     assert "<h3>Cost</h3>" in page and "Edit before approving" not in page
 

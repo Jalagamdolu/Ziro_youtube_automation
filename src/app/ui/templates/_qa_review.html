@@ -1,6 +1,7 @@
 {% set p = gate.package %}
 <section class="gate">
-  <h2>Final review — watch it, then decide</h2>
+  <h2>Your final review — watch it, then decide</h2>
+  <p class="muted small">Approved videos are saved to the Library, where you publish now or pick a time.</p>
   <div class="row">
     <div class="player">
       {% if gate.video %}<video controls preload="metadata" src="/ui/projects/{{ run.id }}/files/{{ gate.video }}"></video>{% else %}<p class="muted">No video yet.</p>{% endif %}
@@ -48,8 +49,8 @@
     </fieldset>
     <div class="actionbar static">
       <input type="text" name="notes" placeholder="Notes (optional)" aria-label="Notes (optional)">
-      <button class="primary big" type="submit">✓ Approve and publish (mock)</button>
-      <button class="big danger" type="button" onclick="openPanel('reject')">Send back</button>
+      <button class="primary big" type="submit">✓ Approve</button>
+      <button class="big danger" type="button" onclick="openPanel('reject')">Reject</button>
     </div>
   </form>
 </section>

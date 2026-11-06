@@ -8,7 +8,7 @@ UNTIL    ?= end
 AUDIENCE ?= Indian students, early-career developers and career switchers
 CTA      ?= Explore AI learning at ziro.digital
 
-.PHONY: up down test test-live lint secret-scan video export install-voice demo-short demo-long second-topic
+.PHONY: up down test test-live lint secret-scan video export install-voice youtube-auth demo-short demo-long second-topic
 
 up:
 	$(COMPOSE) up -d --build
@@ -40,6 +40,9 @@ video:
 
 export:
 	$(CLI) export --run $(RUN) --dest $(DEST)
+
+youtube-auth:  # on the host, not in a container: the browser redirects to 127.0.0.1 (D-67)
+	PYTHONPATH=src python -m app.api.youtube_auth
 
 install-voice:
 	mkdir -p ~/.claude/youtube

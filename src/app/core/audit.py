@@ -16,6 +16,13 @@ def transition(s: Session, project_id: str, to_state: str, actor: str = "system"
     project.status = to_state
 
 
+def action(s: Session, project_id: str, actor: str, note: str) -> None:
+    """Audit an action that changes no state (schedule, publish now, a metadata edit): who, when,
+    what (D-69)."""
+    status = s.get_one(Project, project_id).status
+    s.add(Event(project_id=project_id, from_state=status, to_state=status, actor=actor, note=note))
+
+
 def start_job(s: Session, project_id: str, stage: str) -> Job:
     previous = s.scalar(
         select(func.count()).where(Job.project_id == project_id, Job.stage == stage)
@@ -54,7 +61,8 @@ def mark_stale(s: Session, project_id: str, stages: list[str]) -> None:
 
 def gate_opened_at(s: Session, project_id: str, gate: str) -> datetime:
     opened = s.scalar(
-        select(func.max(Event.at)).where(Event.project_id == project_id, Event.to_state == gate)
+        select(func.max(Event.at)).where(Event.project_id == project_id, Event.to_state == gate,
+                                         Event.note.is_(None))
     )
     if opened is None:
         raise LookupError(f"{gate} never opened for {project_id}")
@@ -63,7 +71,8 @@ def gate_opened_at(s: Session, project_id: str, gate: str) -> datetime:
 
 def gate_openings(s: Session, project_id: str, gate: str) -> int:
     count = s.scalar(
-        select(func.count()).where(Event.project_id == project_id, Event.to_state == gate)
+        select(func.count()).where(Event.project_id == project_id, Event.to_state == gate,
+                                   Event.note.is_(None))
     )
     return count or 0
 

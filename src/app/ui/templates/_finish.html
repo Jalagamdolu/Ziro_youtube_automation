@@ -1,19 +1,24 @@
-<section class="success">
-  <h2>✓ Your video is ready</h2>
-  <p class="muted">Published to the mock publisher only (private, never a real channel). Download it below.</p>
+{# An approved video (D-69): its one status, the player, and the same actions as its Library card. #}
+{% set v = video %}
+{% set back = "/ui/projects/" ~ run.id %}
+{% set min_time = schedule.min_time if schedule else "" %}
+<section class="{{ 'success' if v.key == 'published' else 'gate' }}">
+  <h2>{% if v.key == "published" %}✓ {{ v.confirmed.label }}{% elif v.key == "scheduled" %}Scheduled — it publishes by itself{% elif v.key == "publishing" %}Publishing…{% elif v.key == "ready_missed" %}Missed its slot — pick a new time{% else %}Ready — publish now or pick a time{% endif %}</h2>
   <div class="row">
     <div class="player">
       {% if finish.video %}<video controls preload="metadata" src="/ui/projects/{{ run.id }}/files/{{ finish.video }}"></video>{% else %}<p class="muted">No video file.</p>{% endif %}
     </div>
     <div>
+      <p><span class="pill {{ v.tone }}">{% if v.busy %}<span class="spin inline" aria-hidden="true"></span> {% endif %}{{ v.chip }}</span></p>
+      {% if v.confirmed %}<p class="small">{{ v.confirmed.at }}{% if v.confirmed.watch %} · <a href="{{ v.confirmed.watch }}" target="_blank" rel="noopener noreferrer">Watch on YouTube</a>{% endif %} · video ID {{ v.confirmed.video_id }}</p>{% endif %}
       {% include "_qa_ticks.html" %}
-      {% if finish.thumbnail %}<img class="thumb" alt="Thumbnail" style="width:100%"
-           src="/ui/projects/{{ run.id }}/files/{{ finish.thumbnail }}">{% endif %}
-      <h3>Downloads</h3>
-      <p class="downloads">{% for label, key in finish.downloads %}
-        <a href="/ui/projects/{{ run.id }}/files/{{ key }}" download><button type="button">{{ label }}</button></a>
-      {% endfor %}
-        <a href="/ui/projects/{{ run.id }}/bundle.zip"><button class="primary" type="button">Everything (ZIP)</button></a></p>
+      {% include "_actions.html" %}
+      {% if finish.downloads %}
+      <details class="panel inline"><summary>All files</summary>
+        <p class="downloads">{% for label, key in finish.downloads %}<a class="button" href="/ui/projects/{{ run.id }}/files/{{ key }}" download>{{ label }}</a> {% endfor %}
+          <a class="button primary" href="/ui/projects/{{ run.id }}/bundle.zip">Everything (ZIP)</a></p>
+      </details>
+      {% endif %}
     </div>
   </div>
 </section>

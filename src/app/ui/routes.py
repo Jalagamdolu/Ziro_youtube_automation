@@ -35,18 +35,19 @@ templates.env.globals["mode"] = lambda: config.load()["mode"]
 templates.env.globals["banners"] = engines.banners  # missing keys, said on every page (D-46)
 templates.env.globals["plain"] = plain  # the product view's words (D-63)
 # Finished-run downloads: file name -> button label (the export bundle, one file at a time).
+DURATIONS = ("30", "40", "50", "60")  # New Video's length picker; 60 s is the ceiling (D-62)
 DOWNLOADS = {"video.mp4": "Video (MP4)", "captions.srt": "Captions (SRT)",
              "captions.vtt": "Captions (VTT)", "thumbnail.png": "Thumbnail",
              "content_package.json": "Metadata (content package)", "claims.json": "Claims",
-             "publish_receipt.json": "Publish receipt (mock)", "cost_report.json": "Cost report"}
+             "publish_receipt.json": "Publish receipt", "cost_report.json": "Cost report"}
 
 
 @router.get("/", response_class=HTMLResponse)
 def index(request: Request, error: str | None = None) -> HTMLResponse:
-    """Home is the planner: every video, one row each (D-64)."""
-    from app.ui import planner  # planner renders with this module's templates
+    """Home is the Library: every video, the ones waiting for you first (D-69)."""
+    from app.ui import library  # library renders with this module's templates
 
-    return planner.planner(request, error)
+    return library.library(request, error=error)
 
 
 @router.get("/new", response_class=HTMLResponse)
@@ -56,8 +57,17 @@ def new(request: Request, error: str | None = None) -> HTMLResponse:
 
 @router.post("/ui/projects")
 async def create(request: Request) -> RedirectResponse:
+    """New Video (D-69): prompt, optional keywords and guidelines, 30/40/50/60 s. Shorts only
+    until long templates exist; 60 s is a hard ceiling (D-62)."""
+    from app.core import metadata
+
     form = await request.form()
-    fields = {k: str(v).strip() for k, v in form.items() if str(v).strip()}
+    fields: dict[str, Any] = {k: str(v).strip() for k, v in form.items() if str(v).strip()}
+    fields["format"] = "short"
+    if "keywords" in fields:
+        fields["keywords"] = metadata.hashtags(fields["keywords"])
+    if fields.get("target_seconds") not in (None, *DURATIONS):
+        return _back("/new", HTTPException(422, "pick a length of 30, 40, 50 or 60 seconds"))
     try:
         project_id = actions.create_project(CreateRequest.model_validate(fields))
     except ValidationError as error:
@@ -80,7 +90,8 @@ def run_page(request: Request, project_id: str, error: str | None = None,
         tech = _technical(s, project_id)
     return templates.TemplateResponse(request, "run.html", {
         "run": run, "gate": gate, "error": error, "waiting": waiting, "finish": finish,
-        "tech": tech, "script": script,
+        "tech": tech, "script": script, "step": generating_step(run),
+        "video": _video(project_id),
         "stages": stages(run), "edit": None if waiting else _edit_text(run),
         "reject_targets": REJECT_TARGETS.get(run["status"], []),
         "schedule": _schedule(project_id, run["status"]),
@@ -92,8 +103,9 @@ def live(request: Request, project_id: str, seen: int) -> HTMLResponse:
     """Polled every 2 s. `seen` is the page's event count: any new transition (even a gate
     reopening after a reject) sends the browser to a fresh page showing the current panel."""
     run = actions.run_status(project_id)
-    response = templates.TemplateResponse(request, "_live.html", {"run": run,
-                                                                  "stages": stages(run)})
+    response = templates.TemplateResponse(request, "_live.html", {
+        "run": run, "stages": stages(run), "step": generating_step(run),
+        "video": _video(project_id)})
     if len(run["events"]) != seen:
         response.headers["HX-Redirect"] = f"/ui/projects/{project_id}"
     return response
@@ -107,6 +119,9 @@ async def decide(request: Request, project_id: str) -> RedirectResponse:
     body: dict[str, Any] = {"reviewer": request.state.user["name"],  # the reviewer (D-61)
                             "notes": form.get("notes", "").strip(),
                             "target": form.get("target") or None}
+    if form.get("decision") == "regenerate":  # D-69: a rewrite, notes optional
+        body["target"] = "scripting"
+        body["notes"] = body["notes"] or "Regenerate the script (no notes given)."
     if kind == "approve" and form.get("ai_synthetic"):
         body["ai_disclosure"] = {"synthetic": form["ai_synthetic"] == "yes",
                                  "reason": form.get("ai_reason", "").strip()}
@@ -118,6 +133,8 @@ async def decide(request: Request, project_id: str) -> RedirectResponse:
     except HTTPException as error:
         return _back(page, error)
     gate = decision_id.split(":")[1]
+    if gate == "qa_review" and approving and page.startswith("/ui/"):
+        return RedirectResponse(f"/library?saved={project_id}", status_code=303)  # D-69 toast
     submitted = gate if page.startswith("/ui/") else f"{project_id}:{gate}"
     return RedirectResponse(f"{page}?submitted={submitted}", status_code=303)
 
@@ -236,7 +253,7 @@ def _gate_context(s: Any, project_id: str, status: str) -> dict[str, Any]:
         lint = {t["title"]: t for t in load("title_lint.json") or []}
         package, support = load("content_package.json"), load("support_flags.json")
         return {"package": package, "title_lint": lint, "support": support,
-                "script_lines": script_lines(package["script"], support)}
+                "script_lines": script_lines(package["script"], support, package["claims"])}
     if status == "qa_review":
         return {"package": load("content_package.json"), "qa_report": load("qa_report.json"),
                 "video": files.get("video.mp4"), "thumbnail": files.get("thumbnail.png"),
@@ -244,14 +261,24 @@ def _gate_context(s: Any, project_id: str, status: str) -> dict[str, Any]:
     return {}
 
 
-def script_lines(script: str, support: dict[str, Any] | None) -> list[dict[str, Any]]:
-    """The script line by line, each with the support-check flags (D-44) for its sentences."""
+def script_lines(script: str, support: dict[str, Any] | None,
+                 claims: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
+    """The script beat by beat (D-69): each line with its kind (beat heading, on-screen note or
+    spoken), the claims it cites (quote and source shown beside it) and the support-check flags
+    (D-44) for its sentences."""
     flagged = [v for v in (support or {}).get("verdicts", []) if not v["supported"]]
+    by_id = {c["id"]: c for c in claims or []}
     lines = []
     for text in script.strip().splitlines():
-        bare = script_checks.MARKER.sub("", text)
-        lines.append({"text": text, "flags": [v for v in flagged
-                                              if v["sentence"][:60].strip() in bare]})
+        if not text.strip():
+            continue
+        bare = script_checks.MARKER.sub("", text).strip()
+        kind = ("beat" if text.startswith("##") else
+                "screen" if text.lstrip().startswith("[ON SCREEN") else "spoken")
+        cited = [by_id[f"C{n}"] for n in script_checks.MARKER.findall(text) if f"C{n}" in by_id]
+        lines.append({"text": text, "bare": bare.lstrip("# ").strip("[]") if kind != "spoken"
+                      else bare, "kind": kind, "claims": cited,
+                      "flags": [v for v in flagged if v["sentence"][:60].strip() in bare]})
     return lines
 
 
@@ -328,8 +355,30 @@ def _technical(s: Any, project_id: str) -> dict[str, Any]:
 
 
 def _return_to(form: dict[str, str], default: str) -> str:
-    """Where a form sends you back to: only the planner, else the run page."""
-    return "/planner" if form.get("back") == "/planner" else default
+    """Where a form sends you back to: the planner or the library, else the run page."""
+    back = form.get("back", "")
+    return back if back.split("?")[0] in ("/planner", "/library") else default
+
+
+def _video(project_id: str) -> dict[str, Any]:
+    """This video's one status chip and actions, the same as its Library card (D-69)."""
+    from app.ui import planner  # planner renders with this module's templates
+
+    return planner.one(project_id)
+
+
+GENERATING = [("voice", "Voice"), ("captions", "Captions"), ("render", "Render"),
+              ("quality", "Quality check")]
+
+
+def generating_step(run: dict[str, Any]) -> int:
+    """Which Generating step is running (0-3); -1 while the shots are still being planned."""
+    if run["status"] != "rendering":
+        return -1
+    key = f"{run['id']}/rendering/progress.json"
+    store = storage.get()
+    step = json.loads(store.read(key))["step"] if store.exists(key) else "voice"
+    return [name for name, _ in GENERATING].index(step)
 
 
 def _back(path: str, error: HTTPException) -> RedirectResponse:
@@ -342,3 +391,6 @@ def _schedule(project_id: str, status: str) -> dict[str, Any] | None:
     from app.ui import planner  # planner renders with this module's templates
 
     return planner.schedule(project_id, status)
+
+
+templates.env.globals["generating"] = GENERATING

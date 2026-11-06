@@ -42,6 +42,7 @@ Open v2 items:
 Deferred, not in this build (logged 2026-11-05):
 - LatentSync lip-sync of sir's clip (needs a GPU and sir's base clip + signed consent).
 - FLUX.1 schnell topic images (needs a GPU). Pixabay photos and v1 cards stay the content visuals.
-- YouTube OAuth / real publish (publishing stays mocked).
+- Real YouTube publish: built behind `publish.mode` (D-69), default mock. Waiting for the OAuth client in .env and sir's consent login (D-67); then Dolender flips the mode.
+- Multi-platform publishing, planned (D-68): one publisher with mock | youtube | instagram providers, a slot per platform on the same planner row. YouTube adapter first and proven, then Instagram Reels (Graph API, MP4 staged at a short-lived public URL in a non-production Supabase bucket).
 - Languages beyond English.
 - Any new infrastructure (no `gpu-worker` / `render` services yet; same four compose services).

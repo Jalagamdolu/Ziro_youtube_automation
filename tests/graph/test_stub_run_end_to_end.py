@@ -17,7 +17,8 @@ def test_stub_run_passes_all_gates_to_done(client, calls: Counter[str]) -> None:
 
     run = status(client, project_id)
     assert run["status"] == "done"
-    assert [e["to_state"] for e in run["events"]] == [*ORDER, "done"]
+    assert [e["to_state"] for e in run["events"] if not e["note"]] == [*ORDER, "done"]
+    assert [e["note"] for e in run["events"] if e["note"]][0].startswith("scheduled for")  # D-69
     assert all(count == 1 for count in calls.values()) and len(calls) == 8
 
     approvals = run["approvals"]

@@ -11,7 +11,7 @@ Prompt-to-video pipeline: one content brief in → researched, fact-checked, scr
 - Do not invent requirements. If the brief is unclear, ask.
 
 ## Hard rules
-- **Sandbox only.** Never touch Ziro production Supabase, the Content Studio or any real YouTube channel. No MCP server connections (D-11), even if the session has them attached.
+- **Sandbox only.** Never touch Ziro production Supabase, the Content Studio or any real YouTube channel, with ONE exception (D-67): @Ziro.Digital, and only through the credential sir creates by personally logging in and granting consent (`make youtube-auth`). That channel is pinned by ID in `src/config.yaml` and re-checked before every publish; uploads are private only; publishing stays mock until Dolender switches it. No MCP server connections (D-11), even if the session has them attached.
 - **Publishing is mocked.** `Publisher` accepts only a run with an approved `qa_review` row — enforced in code/types, not convention (D-06). Never publish from draft/failed/rejected/unapproved.
 - **No invented facts.** No salaries, placements, earnings, testimonials, student identities, partnerships, certifications, reach or metrics unless supplied as approved facts. Every material claim maps to an approved claim-ledger entry. Claim check + banned-claim scan are deterministic code, not LLM judgment (D-10). Topical claims carry publication date + citation (brief §07).
 - **Secrets** only via env vars; `.env.example` lists names only. Nothing sensitive in code, logs, screenshots, tickets (T12).

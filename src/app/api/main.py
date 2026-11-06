@@ -14,7 +14,7 @@ from app.api.actions import CreateRequest, DecisionRequest
 from app.core import engines
 from app.core.log import log
 from app.jobs import reaper, scheduler
-from app.ui import auth, planner
+from app.ui import auth, library, planner
 from app.ui import routes as ui
 
 
@@ -38,6 +38,7 @@ app = FastAPI(title="Ziro AI Content Studio (sandbox)", lifespan=lifespan)
 app.middleware("http")(auth.middleware)
 app.include_router(ui.router)
 app.include_router(planner.router)
+app.include_router(library.router)
 # The official logo straight from templates/brand (D-56), before the general static mount.
 app.mount("/static/brand", StaticFiles(directory=Path(__file__).resolve().parents[3] / "templates"
                                        / "brand"), name="brand")

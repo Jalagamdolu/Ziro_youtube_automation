@@ -1,37 +1,25 @@
 {% extends "base.html" %}
-{% block title %}New video{% endblock %}
+{% block title %}New Video{% endblock %}
 {% block content %}
-<section>
-  <h1>Make a video</h1>
-  <p class="muted small">Type a topic. The run researches it, writes a script and renders the video, pausing at two review gates on the run page: the script (with its claims) and the final video. To schedule a video, use the Planner.</p>
+{# New Video (D-69): one form. Shorts 9:16 only until long templates exist; 60 s is a hard ceiling. #}
+<section class="narrow">
+  <h1>New Video</h1>
+  <p class="muted">A YouTube Short (9:16). It researches, writes the script and stops for your review.</p>
   <form method="post" action="/ui/projects">
-    <label for="prompt">Topic</label>
-    <input type="text" id="prompt" name="prompt" required autofocus
-           placeholder="e.g. What is RAG (retrieval-augmented generation) in AI, explained for students?">
-    <div class="row">
-      <div>
-        <label for="format">Format</label>
-        <select id="format" name="format">
-          <option value="short">Short (9:16, 15–60 s)</option>
-          <option value="long">Long (16:9, 60–600 s)</option>
-        </select>
-      </div>
-      <div>
-        <label for="target_seconds">Target seconds <span class="muted">(at most; blank = 60 short / 240 long)</span></label>
-        <input type="text" id="target_seconds" name="target_seconds" inputmode="numeric">
-      </div>
-    </div>
-    <label for="audience">Audience</label>
-    <input type="text" id="audience" name="audience"
-           value="Indian students, early-career developers and career switchers">
-    <label for="cta">CTA</label>
-    <input type="text" id="cta" name="cta" value="Explore AI learning at ziro.digital">
-    {% if mode() == "prototype" %}
-    <p class="muted small">Prototype mode: only topics with a hand-written fixture have content; any other topic stops at research with a clear error. Switch <code>mode</code> to <code>production</code> in <code>src/config.yaml</code> for any topic (free-tier keys in <code>.env</code>).</p>
-    {% else %}
-    <p class="muted small">Production mode: any topic. Rendering is Shorts only for now.</p>
-    {% endif %}
-    <button class="primary" type="submit">Start run</button>
+    <label for="prompt">What is the video about?</label>
+    <textarea id="prompt" name="prompt" rows="3" required autofocus placeholder="e.g. What is RAG, explained for students? — or paste a draft"></textarea>
+    <label for="keywords">Keywords <span class="muted">(optional)</span></label>
+    <input type="text" id="keywords" name="keywords" placeholder="e.g. RAG, retrieval, LLM">
+    <label for="guidelines">Guidelines <span class="muted">(optional)</span></label>
+    <textarea id="guidelines" name="guidelines" rows="2" placeholder="e.g. One worked example. No jargon."></textarea>
+    <fieldset class="durations">
+      <legend>Length <span class="muted">(at most)</span></legend>
+      {% for s in ("30", "40", "50", "60") %}
+      <label class="seg"><input type="radio" name="target_seconds" value="{{ s }}"{% if s == "60" %} checked{% endif %}><span>{{ s }} s</span></label>
+      {% endfor %}
+    </fieldset>
+    {% if mode() == "prototype" %}<p class="muted small">Prototype mode: only topics with a prepared script have content; any other topic stops with a clear reason.</p>{% endif %}
+    <p><button class="primary big wide" type="submit">Create video</button></p>
   </form>
 </section>
 {% endblock %}

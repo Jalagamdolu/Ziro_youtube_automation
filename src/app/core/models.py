@@ -120,9 +120,11 @@ class Publishing(Base):
     channel_id: Mapped[str | None]
     privacy: Mapped[str]
     scheduled_at: Mapped[datetime | None]
-    provider_video_id: Mapped[str]
-    status: Mapped[str]
+    provider_video_id: Mapped[str]  # "" while an upload is claimed but not yet returned
+    status: Mapped[str]  # uploading | uploaded | mock_published
     created_at: Mapped[datetime] = mapped_column(default=now)
+    confirmed_at: Mapped[datetime | None]  # set only by a read-back (D-66, D-69)
+    watch_url: Mapped[str | None] = mapped_column(Text)
 
 
 class Cost(Base):
@@ -146,6 +148,7 @@ class Event(Base):
     to_state: Mapped[str]
     actor: Mapped[str]
     at: Mapped[datetime] = mapped_column(default=now)
+    note: Mapped[str | None] = mapped_column(Text)  # an action that is not a state change (D-69)
 
 
 class AssetLicense(Base):

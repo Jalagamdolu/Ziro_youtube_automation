@@ -1,4 +1,4 @@
-{# Refreshed every 2 s: the six-step progress bar and one plain status line (D-63). #}
+{# Refreshed every 2 s: progress, one plain status chip and, while it runs, what it is doing (D-69). #}
 {% set failed_job = run.jobs | selectattr("status", "equalto", "failed") | list | last %}
 <ol class="stepper">
   {% for st in plain.stepper(run) %}
@@ -9,8 +9,24 @@
   {% endfor %}
 </ol>
 <p class="status-line">
-  <span class="pill {{ plain.tone(run.status) }}">{{ plain.status(run.status) }}</span>
-  {% if run.status == "failed" and failed_job %}<span class="small">{{ (failed_job.error_message or "")[:180] }}{% if (failed_job.error_message or "") | length > 180 %}…{% endif %}</span>
-  {% elif run.status not in ("done", "cancelled") and not run.awaiting_gate %}<span class="muted small">This page updates by itself.</span>
-  {% endif %}
+  <span class="pill {{ video.tone }}">{% if video.busy %}<span class="spin inline" aria-hidden="true"></span> {% endif %}{{ video.chip }}</span>
+  {% if run.status == "failed" and failed_job %}<span class="small">{{ (failed_job.error_message or "")[:180] }}{% if (failed_job.error_message or "") | length > 180 %}…{% endif %}</span>{% endif %}
 </p>
+{% if run.status in ("draft", "researching", "scripting") %}
+<section class="working">
+  <span class="spin big" aria-hidden="true"></span>
+  <div><h2>Researching &amp; writing…</h2>
+    <p class="muted">{{ "Finding and checking sources" if run.status in ("draft", "researching") else "Writing the script and checking every fact" }}. It stops at your script review — this page updates by itself.</p></div>
+</section>
+{% elif run.status in ("storyboarding", "rendering") %}
+<section class="working generating">
+  <h2>Generating…</h2>
+  <ol class="gen-steps">
+    {% for key, label in generating %}
+    <li class="{{ 'done' if loop.index0 < step else 'active' if loop.index0 == step else 'todo' }}">
+      <span class="dot">{% if loop.index0 < step %}✓{% elif loop.index0 == step %}<span class="spin"></span>{% else %}{{ loop.index }}{% endif %}</span>{{ label }}</li>
+    {% endfor %}
+  </ol>
+  <p class="muted small">{% if step < 0 %}Planning the shots first. {% endif %}Presenter: sir's avatar zone — placeholder until connected. This page updates by itself.</p>
+</section>
+{% endif %}
