@@ -145,15 +145,31 @@ def test_regenerate_needs_no_notes_and_rewrites_the_script(client) -> None:
     assert (again["target_stage"], again["notes"]) == ("researching", "Find newer sources")
 
 
-def test_new_video_is_a_short_with_a_length_of_at_most_sixty(client) -> None:
-    refused = client.post("/ui/projects", data={"prompt": TOPIC, "target_seconds": "70"},
-                          follow_redirects=False)
-    assert "30, 40, 50 or 60" in unquote(refused.headers["location"])
-    made = client.post("/ui/projects", data={"prompt": TOPIC, "target_seconds": "40",
-                                             "keywords": "#agents, chatbots", "format": "long"},
-                       follow_redirects=False)
-    run = status(client, made.headers["location"].rsplit("/", 1)[1])
-    assert run["brief"]["format"] == "short" and run["brief"]["target_seconds"] == 40
+def test_new_video_takes_a_preset_or_a_custom_length_of_at_most_sixty(client,
+                                                                      monkeypatch) -> None:
+    from app.api import actions
+
+    page = client.get("/new").text
+    assert 'name="keywords"' not in page and 'name="guidelines"' not in page  # D-71
+    assert 'name="custom_seconds"' in page and 'value="60" checked' in page
+    assert "Only 60s is available in prototype mode" in page
+
+    def post(**form: str) -> str:
+        response = client.post("/ui/projects", data={"prompt": TOPIC} | form,
+                               follow_redirects=False)
+        return unquote(response.headers["location"])
+
+    assert "15 to 60" in post(length="custom", custom_seconds="70")  # the hard ceiling
+    assert "15 to 60" in post(length="custom", custom_seconds="42.5")  # whole seconds
+    assert "15 to 60" in post(length="custom", custom_seconds="10")
+    assert "can't be shortened" in post(length="40")  # prototype: fixtures are fixed text
+    made = post(length="60")
+    assert status(client, made.rsplit("/", 1)[1])["brief"]["target_seconds"] == 60
+    seen: list[actions.CreateRequest] = []
+    monkeypatch.setattr(actions, "create_project", lambda request: seen.append(request) or "x")
+    post(length="custom", custom_seconds="42", format="long", keywords="#agents, chatbots")
+    assert (seen[0].target_seconds, seen[0].format) == (42, "short")  # a ceiling, Shorts only
+    assert seen[0].keywords == ["agents", "chatbots"]  # the API still takes keywords
 
 
 def test_a_planned_row_without_a_time_waits_for_make_now(client) -> None:

@@ -5,13 +5,14 @@ at most MAX_REVISIONS times, then the stage fails (FatalError, never retried).
 """
 
 import json
+import re
 from collections.abc import Callable
 from typing import Any
 
 from sqlalchemy import select
 
 from app.adapters import llm, prompts
-from app.core import costs, db
+from app.core import config, costs, db
 from app.core.contracts import Brief, Claim, ContentPackage, Hook, PackageDraft
 from app.core.errors import FatalError
 from app.core.log import log
@@ -21,6 +22,7 @@ from app.nodes.context import Outputs, StageContext
 from app.nodes.storyboarding import visual_problems
 
 MAX_REVISIONS = 2
+LENGTH = re.compile(r"\bcut about \d+ spoken words")  # a length problem from the checker
 
 
 class ChecksFailed(FatalError):
@@ -58,9 +60,10 @@ def scripting(ctx: StageContext) -> Outputs:
             if notes and (previous := _previous_script(ctx)):  # a reject edits the reviewed one
                 notes += f"\nThe reviewed script, to edit rather than rewrite:\n{previous}"
             try:
+                revisions = MAX_REVISIONS if config.load()["mode"] == "production" else 0
                 draft, hooks, titles = _write(
                     lambda n: writer.write_package(brief, claims, n), brief, claims, notes,
-                    MAX_REVISIONS)
+                    revisions)
             finally:
                 costs.record_usage(ctx.project_id, "scripting", writer.calls)
     except ChecksFailed as failed:  # keep the last draft, flagged, for the hand-edit bridge
@@ -129,11 +132,21 @@ def _write(write: Callable[[str | None], PackageDraft], brief: Brief, claims: li
         log.info("draft checked", draft=attempt + 1, problems=problems, script=draft.script)
         if not problems:
             return draft, hooks, titles
-        # The model sees its own draft and exactly what to change, not just that it failed.
-        notes = (f"{reviewer}Fix: " + "; ".join(problems)
-                 + f"\nYour previous script, to revise rather than restart:\n{draft.script}")
+        notes = revision_notes(reviewer, problems, draft.script)
     raise ChecksFailed(f"script failed checks after {revisions} revisions: "
                        + "; ".join(problems), draft, problems)
+
+
+def revision_notes(reviewer: str, problems: list[str], script: str) -> str:
+    """What the model gets back: its own draft and exactly what to change. A length cut leads,
+    word for word as the checker counted it ("cut about 68 spoken words in the Example
+    section"), so a revision actually shortens the script (D-71)."""
+    lengths = [p for p in problems if LENGTH.search(p)]
+    first = ("LENGTH FIRST — the script is too long: " + "; ".join(lengths)
+             + ". Remove that many spoken words there; keep every [C#] claim and the CTA.\n"
+             if lengths else "")
+    return (f"{reviewer}{first}Fix: " + "; ".join(problems)
+            + f"\nYour previous script, to revise rather than restart:\n{script}")
 
 
 def _previous_script(ctx: StageContext) -> str | None:

@@ -1,5 +1,4 @@
 {# Refreshed every 2 s: progress, one plain status chip and, while it runs, what it is doing (D-69). #}
-{% set failed_job = run.jobs | selectattr("status", "equalto", "failed") | list | last %}
 <ol class="stepper">
   {% for st in plain.stepper(run) %}
   <li class="step {{ st.state }}">
@@ -10,7 +9,6 @@
 </ol>
 <p class="status-line">
   <span class="pill {{ video.tone }}">{% if video.busy %}<span class="spin inline" aria-hidden="true"></span> {% endif %}{{ video.chip }}</span>
-  {% if run.status == "failed" and failed_job %}<span class="small">{{ (failed_job.error_message or "")[:180] }}{% if (failed_job.error_message or "") | length > 180 %}…{% endif %}</span>{% endif %}
 </p>
 {% if run.status in ("draft", "researching", "scripting") %}
 <section class="working">

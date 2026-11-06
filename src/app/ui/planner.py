@@ -140,13 +140,18 @@ def _seconds(files: dict[tuple[str, str], str], project: Project | None) -> floa
     return float(seconds) if seconds is not None else None
 
 
-def _reason(job: Job | None) -> str:
-    """Why a run failed, in plain words: the step and the first line of the error."""
+def _reason(job: Job | None, asked: int | None = None) -> str:
+    """Why a run failed, in plain words (D-71): length failures say what came out and what was
+    asked; other script failures point at the flagged draft; anything else is the step and the
+    first line of the error. The raw error stays in Technical details."""
     if job is None:
         return "It stopped without a recorded reason. Retry, or open it for details."
+    message = job.error_message or job.error_code or "unknown error"
+    plain_words = plain.failure(message, asked, config.load()["mode"])
+    if plain_words:
+        return plain_words
     step = plain.STATUS.get(job.stage, job.stage.replace("_", " ")).rstrip("…")
-    message = (job.error_message or job.error_code or "unknown error").splitlines()[0][:160]
-    return f"{step}: {message}"
+    return f"{step}: {message.splitlines()[0][:160]}"
 
 
 def actions(key: str, project: Project | None, row: Publishing | None) -> list[str]:
@@ -222,7 +227,8 @@ def videos(saved: str | None = None, only: str | None = None) -> list[dict[str, 
             "confirmed": confirmed, "seconds": _seconds(files, project),
             "cost": plain.rupees(spent.get(pid) or 0) if pid else "",
             "upload": bool(topic and topic.kind == "upload"),
-            "reason": _reason(failures.get(pid or "")) if key == "failed" else "",
+            "reason": _reason(failures.get(pid or ""), project.target_seconds if project
+                              else None) if key == "failed" else "",
             "do": actions(key, project, row)})
     return found
 

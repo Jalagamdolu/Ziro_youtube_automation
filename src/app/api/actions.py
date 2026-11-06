@@ -42,7 +42,14 @@ class DecisionRequest(BaseModel):
     ai_disclosure: AiDisclosure | None = None
 
 
+PROTOTYPE_LENGTH = ("In prototype mode scripts are prepared at 60s and can't be shortened — "
+                    "pick 60s, or wait for production mode.")
+
+
 def create_project(request: CreateRequest) -> str:
+    seconds = request.target_seconds or DEFAULT_SECONDS[request.format]
+    if config.load()["mode"] == "prototype" and request.format == "short" and seconds < 60:
+        raise HTTPException(422, PROTOTYPE_LENGTH)  # fixtures are fixed text (D-71)
     try:
         brief = Brief(
             topic=request.prompt,

@@ -593,3 +593,16 @@ Reshapes D-64 to D-66; nothing was rebuilt from scratch. Design bar: simple, nea
   - the link carries the file's content hash (`theme.css?v=…`);
   - the icons have a fixed 20 px size in the HTML, so they stay small even without styles;
   - a card thumbnail that cannot load is removed, leaving the placeholder.
+
+## D-71 New Video is the prompt and a length; prototype mode only offers 60 s; plain failure messages (Dolender, 2026-11-06)
+- **Form.** The New Video form shows only "What is the video about?" and Length. Keywords and guidelines can go inside the prompt; the API still accepts them, and planned topics keep them.
+- **Length**: presets 30/40/50/60 s plus Custom, a whole number of seconds from 15 to 60.
+  - Every choice is a ceiling (D-62), and 60 s stays the default and the hard limit; the server refuses anything else in plain words.
+  - Exactly one length is active: typing a number selects Custom, and picking a preset clears the box.
+- **Prototype mode: 60 s only.** Its scripts are fixed fixture text that no revision can shorten, and a too-long render fails QA anyway (D-62), so "accept the fixture at its own length" could not work. Instead:
+  - the shorter presets and Custom are disabled on the form, with "Only 60s is available in prototype mode — its prepared scripts can't be shortened.";
+  - `create_project` refuses a Short under 60 s in prototype mode, for the API and planned topics too: "In prototype mode scripts are prepared at 60s and can't be shortened — pick 60s, or wait for production mode.";
+  - the revision loop is skipped, since a fixture cannot change.
+- **Plain failures.** `plain.failure` turns a length failure into "Script (or Video) came out at 52s but you asked for 30s…", worded for prototype or production. Any other failed-checks run points at the flagged last draft. The raw error stays in Technical details, and the video page's status line no longer repeats it.
+- **Production revisions shorten.** When the checker asks for a cut, `scripting.revision_notes` leads the revision prompt with it word for word ("LENGTH FIRST — … cut about 68 spoken words in the Example section …"), ahead of the other fixes.
+- Tests: `test_planner` (form fields, preset/custom, 15–60 whole seconds, prototype refusal, API still takes keywords), `test_plain_view` (failure wording), `test_revision_notes`.

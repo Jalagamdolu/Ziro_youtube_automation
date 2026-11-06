@@ -38,7 +38,7 @@ templates.env.globals["plain"] = plain  # the product view's words (D-63)
 templates.env.globals["css_version"] = hashlib.sha256(
     (Path(__file__).parent / "static" / "theme.css").read_bytes()).hexdigest()[:10]
 # Finished-run downloads: file name -> button label (the export bundle, one file at a time).
-DURATIONS = ("30", "40", "50", "60")  # New Video's length picker; 60 s is the ceiling (D-62)
+MIN_SECONDS, MAX_SECONDS = 15, 60  # a Short's length range; 60 s is the hard ceiling (D-62)
 DOWNLOADS = {"video.mp4": "Video (MP4)", "captions.srt": "Captions (SRT)",
              "captions.vtt": "Captions (VTT)", "thumbnail.png": "Thumbnail",
              "content_package.json": "Metadata (content package)", "claims.json": "Claims",
@@ -60,8 +60,9 @@ def new(request: Request, error: str | None = None) -> HTMLResponse:
 
 @router.post("/ui/projects")
 async def create(request: Request) -> RedirectResponse:
-    """New Video (D-69): prompt, optional keywords and guidelines, 30/40/50/60 s. Shorts only
-    until long templates exist; 60 s is a hard ceiling (D-62)."""
+    """New Video (D-69, D-71): the prompt and a length: a preset (30/40/50/60) or Custom, whole
+    seconds 15-60, always a ceiling. Shorts only until long templates exist; 60 s is the hard
+    ceiling (D-62). Keywords/guidelines are still accepted if a client sends them."""
     from app.core import metadata
 
     form = await request.form()
@@ -69,8 +70,14 @@ async def create(request: Request) -> RedirectResponse:
     fields["format"] = "short"
     if "keywords" in fields:
         fields["keywords"] = metadata.hashtags(fields["keywords"])
-    if fields.get("target_seconds") not in (None, *DURATIONS):
-        return _back("/new", HTTPException(422, "pick a length of 30, 40, 50 or 60 seconds"))
+    choice = fields.pop("length", None)
+    custom = fields.pop("custom_seconds", None)
+    length = custom if choice == "custom" else choice or fields.get("target_seconds")
+    if length is not None:
+        if not length.isdigit() or not MIN_SECONDS <= int(length) <= MAX_SECONDS:
+            return _back("/new", HTTPException(
+                422, f"pick a length of whole seconds from {MIN_SECONDS} to {MAX_SECONDS}"))
+        fields["target_seconds"] = length
     try:
         project_id = actions.create_project(CreateRequest.model_validate(fields))
     except ValidationError as error:

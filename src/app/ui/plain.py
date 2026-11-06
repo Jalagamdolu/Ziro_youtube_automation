@@ -1,6 +1,7 @@
 """Plain words for the product view (D-63): what a run is doing, the six-step progress bar, the QA
 summary with ticks and the cost in rupees. The engineering names stay in Technical details."""
 
+import re
 from typing import Any
 
 from app.core import config
@@ -36,6 +37,27 @@ GATES = {"script_review": "Script review", "qa_review": "Final review"}
 # Where a reject sends the run, in words.
 TARGETS = {"researching": "Research — find new sources", "scripting": "Script — rewrite it",
            "storyboarding": "Visual plan — re-plan the shots", "rendering": "Video — render again"}
+
+
+RAN = re.compile(r"would run (\d+(?:\.\d+)?)s|runtime (\d+)s|the Short runs (\d+(?:\.\d+)?)s")
+
+
+def failure(message: str, asked: int | None, mode: str) -> str | None:
+    """A run's failure in plain words, or None to show the raw step and error (D-71)."""
+    ran = RAN.search(message)
+    if ran and asked:
+        seconds = round(float(next(g for g in ran.groups() if g)))
+        what = "Video" if message.startswith("the Short runs") else "Script"
+        if mode == "prototype":
+            return (f"{what} came out at {seconds}s but you asked for {asked}s. In prototype "
+                    "mode scripts can't be shortened — pick 60s, or wait for production mode.")
+        return (f"{what} came out at {seconds}s but you asked for at most {asked}s, and the "
+                "rewrites couldn't cut it enough. Retry, pick a longer length, or edit the "
+                "last draft yourself.")
+    if message.startswith("script failed checks"):
+        return ("The script didn't pass its checks after its rewrites. Open it to fix the last "
+                "draft yourself (every problem is marked), or Retry.")
+    return None
 
 
 def status(value: str) -> str:

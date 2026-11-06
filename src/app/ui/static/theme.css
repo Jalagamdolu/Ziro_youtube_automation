@@ -241,6 +241,14 @@ label.seg span { display: block; text-align: center; padding: 10px 0; border-rad
                  background: #fff; cursor: pointer; }
 label.seg input:checked + span { background: var(--gradient); color: #fff; border-color: transparent; }
 label.seg input:focus-visible + span { box-shadow: 0 0 0 3px rgba(140, 60, 221, .3); }
+label.seg input:disabled + span { opacity: .4; cursor: not-allowed; }
+label.seg.custom { flex: 1.4; }
+label.seg.custom span { display: flex; align-items: center; justify-content: center; gap: 4px; padding: 4px 8px; }
+label.seg.custom input[type=number] { position: static; opacity: 1; width: 5.2em; padding: 6px 2px; text-align: center; -moz-appearance: textfield;
+  font: inherit; border: 0; border-radius: 8px; background: transparent; color: inherit; }
+label.seg.custom input[type=number]::placeholder { color: inherit; opacity: .7; }
+label.seg.custom input::-webkit-inner-spin-button, label.seg.custom input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+label.seg.custom input[type=number]:focus { outline: none; background: rgba(255, 255, 255, .25); }
 
 /* Working screens: researching & writing, generating. */
 section.working { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; margin: 18px 0 0; box-shadow: none; background: var(--lavender); }

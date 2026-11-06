@@ -1,25 +1,37 @@
 {% extends "base.html" %}
 {% block title %}New Video{% endblock %}
 {% block content %}
-{# New Video (D-69): one form. Shorts 9:16 only until long templates exist; 60 s is a hard ceiling. #}
+{# New Video (D-69, D-71): what it is about, and how long at most. Shorts 9:16 only; 15–60 s,
+   60 s is the hard ceiling. Keywords or guidelines go inside the prompt itself. #}
+{% set prototype = mode() == "prototype" %}
 <section class="narrow">
   <h1>New Video</h1>
   <p class="muted">A YouTube Short (9:16). It researches, writes the script and stops for your review.</p>
   <form method="post" action="/ui/projects">
     <label for="prompt">What is the video about?</label>
-    <textarea id="prompt" name="prompt" rows="3" required autofocus placeholder="e.g. What is RAG, explained for students? — or paste a draft"></textarea>
-    <label for="keywords">Keywords <span class="muted">(optional)</span></label>
-    <input type="text" id="keywords" name="keywords" placeholder="e.g. RAG, retrieval, LLM">
-    <label for="guidelines">Guidelines <span class="muted">(optional)</span></label>
-    <textarea id="guidelines" name="guidelines" rows="2" placeholder="e.g. One worked example. No jargon."></textarea>
-    <fieldset class="durations">
+    <textarea id="prompt" name="prompt" rows="4" required autofocus placeholder="e.g. What is RAG, explained for students? Add keywords or guidelines here if you have any."></textarea>
+    <fieldset class="durations" id="length">
       <legend>Length <span class="muted">(at most)</span></legend>
       {% for s in ("30", "40", "50", "60") %}
-      <label class="seg"><input type="radio" name="target_seconds" value="{{ s }}"{% if s == "60" %} checked{% endif %}><span>{{ s }} s</span></label>
+      <label class="seg"><input type="radio" name="length" value="{{ s }}"{% if s == "60" %} checked{% endif %}{% if prototype and s != "60" %} disabled{% endif %}><span>{{ s }} s</span></label>
       {% endfor %}
+      <label class="seg custom"><input type="radio" name="length" value="custom"{% if prototype %} disabled{% endif %}><span><input type="number" name="custom_seconds" min="15" max="60" step="1" inputmode="numeric" placeholder="Custom" aria-label="Custom length in seconds, 15 to 60"{% if prototype %} disabled{% endif %}> s</span></label>
     </fieldset>
-    {% if mode() == "prototype" %}<p class="muted small">Prototype mode: only topics with a prepared script have content; any other topic stops with a clear reason.</p>{% endif %}
+    {% if prototype %}<p class="muted small">Only 60s is available in prototype mode — its prepared scripts can't be shortened.</p>
+    {% else %}<p class="muted small">Custom: any whole number of seconds from 15 to 60.</p>{% endif %}
     <p><button class="primary big wide" type="submit">Create video</button></p>
   </form>
 </section>
+<script>
+  // Exactly one length is active: typing a number picks Custom, a preset clears the box.
+  (function () {
+    const box = document.querySelector('input[name="custom_seconds"]');
+    const custom = document.querySelector('input[name="length"][value="custom"]');
+    box.addEventListener("input", () => { if (box.value) custom.checked = true; });
+    box.addEventListener("focus", () => { custom.checked = true; });
+    document.querySelectorAll('input[name="length"]').forEach((radio) => radio.addEventListener("change", () => {
+      if (radio.value !== "custom") box.value = "";
+    }));
+  })();
+</script>
 {% endblock %}

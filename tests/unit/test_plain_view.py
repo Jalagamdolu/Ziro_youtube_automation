@@ -40,5 +40,20 @@ def test_qa_becomes_ticks() -> None:
     assert plain.qa_ticks({"stub": True}) == []  # nothing measured, nothing claimed
 
 
+def test_failures_are_plain_words() -> None:
+    script = ("script failed checks after 0 revisions: with its pauses the Short would run "
+              "52.3s; it was asked for at most 30s: cut about 68 spoken words in the Example "
+              "section")
+    assert plain.failure(script, 30, "prototype") == (
+        "Script came out at 52s but you asked for 30s. In prototype mode scripts can't be "
+        "shortened — pick 60s, or wait for production mode.")
+    assert "rewrites couldn't cut it" in (plain.failure(script, 30, "production") or "")
+    video = "the Short runs 41.6s but was asked for at most 40s, even with the pauses tightened."
+    assert (plain.failure(video, 40, "production") or "").startswith("Video came out at 42s")
+    other = "script failed checks after 2 revisions: the five hooks must be distinct"
+    assert "every problem is marked" in (plain.failure(other, 60, "production") or "")
+    assert plain.failure("claim check failed: line 3", 60, "production") is None
+
+
 def test_cost_is_shown_in_rupees() -> None:
     assert plain.rupees(0.5).startswith("₹") and plain.rupees(0) == "₹0.00"

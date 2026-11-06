@@ -113,7 +113,7 @@ def test_home_is_the_library_and_every_video_is_a_card(client) -> None:
     assert f"/ui/projects/{project_id}" in cards and "Needs your review (script)" in cards
     assert "Needs you · 1" in cards  # the sidebar badge
     new = client.get("/new").text
-    assert 'name="prompt"' in new and 'name="keywords"' in new and 'name="guidelines"' in new
+    assert 'name="prompt"' in new and 'name="keywords"' not in new  # prompt + length only
     assert [f'value="{s}"' in new for s in (30, 40, 50, 60)] == [True] * 4
     assert 'name="format"' not in new  # Shorts only until long templates exist
 
